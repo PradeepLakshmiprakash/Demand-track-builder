@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Not available{% endblock %}
+{% block main %}
+<div class="head"><div><h1>{{ 'Page not found' if status == 404 else 'Not available' }}</h1></div></div>
+<section class="panel panel-body stack" style="max-width:640px">
+  <p style="margin:0">{{ detail }}</p>
+  {% if switcher %}<p style="margin:0" class="muted">Use <strong>View as</strong> in the sidebar to switch to another user.</p>{% endif %}
+  <div><a class="btn" href="/">Go to my home page</a></div>
+</section>
+{% endblock %}

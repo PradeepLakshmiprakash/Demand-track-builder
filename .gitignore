@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+var/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# DP sheets carry candidate personal data: never commit real ones.
+*.xlsx
+!seed/sample_dp_sheet.xlsx

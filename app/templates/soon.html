@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ label }}{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>{{ label }}</h1>
+  </div>
+</div>
+<section class="panel panel-body soon stack">
+  <div class="ph">PHASE {{ item.phase }}</div>
+  <p style="margin:0">This screen is built in Phase {{ item.phase }} of the plan. It's in the menu now so each persona's navigation can be checked end to end.</p>
+  <p style="margin:0" class="muted">Your access today: {{ actor.access_summary }}.</p>
+</section>
+{% endblock %}

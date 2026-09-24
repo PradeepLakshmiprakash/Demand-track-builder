@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}User access{% endblock %}
+{% block main %}
+{# Editor values: the rejected draft if a save failed, else the selected user, else blanks for a new user. #}
+{% if draft %}
+  {% set v = {
+    'name': draft.name, 'email': draft.email, 'role': draft.role, 'level': draft.level or '', 'scope': draft.scope or '',
+    'bu_ids': draft.bu_ids | map('int') | list, 'practices': draft.practices,
+    'skills': draft.skills, 'max_grade': draft.max_grade or ''} %}
+{% elif selected %}
+  {% set p = selected.interviewer_profile %}
+  {% set v = {
+    'name': selected.name, 'email': selected.email, 'role': selected.role, 'level': selected.level or '',
+    'scope': selected.visibility_scope, 'bu_ids': selected.business_units | map(attribute='id') | list,
+    'practices': selected.practices, 'skills': (p.skills | join(', ')) if p else '', 'max_grade': (p.max_grade or '') if p else ''} %}
+{% else %}
+  {% set v = {'name': '', 'email': '', 'role': 'demand_owner', 'level': '', 'scope': 'own', 'bu_ids': [], 'practices': [], 'skills': '', 'max_grade': ''} %}
+{% endif %}
+{% set editing = selected is not none %}
+
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>User access</h1>
+    <div class="lede">Decide who sees what. Admin demand owners and leadership always see the whole account.</div>
+  </div>
+  <a class="btn primary" href="/users?new=1">Add user</a>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <section class="panel tbl users" aria-label="Users">
+      <div class="tr th"><div>User</div><div>Role</div><div>BU / practice</div><div>Sees</div></div>
+      {% for u in users %}
+        <a class="tr {{ 'on' if selected and selected.id == u.id }} {{ 'off' if not u.active }}" href="/users?id={{ u.id }}" {% if selected and selected.id == u.id %}aria-current="true"{% endif %}>
+          <div>
+            <div class="title">{{ u.name }}</div>
+            <div class="note">{{ u.email }}</div>
+          </div>
+          <div>{{ u.role_enum.label }}</div>
+          <div class="small">
+            {% set bn = u.business_units | map(attribute='name') | list %}
+            {{ 'All BUs' if u.visibility_scope == 'full' else (bn | join(', ') or '—') }}{% if u.practices %} · {{ u.practices | join(', ') }}{% endif %}
+          </div>
+          <div>
+            {% if not u.active %}<span class="chip gray">Inactive</span>
+            {% else %}<span class="chip {{ 'done' if u.visibility_scope == 'full' else ('blue' if u.role == 'interviewer' else 'gray') }}">{{ u.scope_enum.label }}</span>{% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </section>
+
+    <section class="panel panel-body stack">
+      <h2>Default access by role</h2>
+      <div class="defaults">
+        <div class="title">Demand owner</div><div>Own demands. Admin can widen to read-only view of their BU.</div>
+        <div class="title">Interviewer</div><div>Only interviews assigned to them, plus alerts for new requisitions in their skills.</div>
+        <div class="title">Admin demand owner</div><div>Full account, all BUs. Fixed.</div>
+        <div class="title">Leadership</div><div>Full account, all BUs. Fixed.</div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="panel panel-body editor">
+    <form method="post" action="{{ '/users/%d' % selected.id if editing else '/users' }}" class="stack" id="user-form">
+      <div>
+        <div class="eyebrow">{{ 'Edit user' if editing else 'Add user' }}</div>
+        <h2 style="font-size:22px;margin-top:2px">{{ v.name or 'New user' }}</h2>
+        {% if editing and not selected.active %}<div class="flash bad small" style="margin-top:8px">Inactive: this user can't see anything until reactivated.</div>{% endif %}
+      </div>
+      {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
+
+      <label class="f">Name<input type="text" name="name" value="{{ v.name }}" required maxlength="120"></label>
+      <label class="f">Email<input type="email" name="email" value="{{ v.email }}" required></label>
+      <div class="grid2">
+        <label class="f">Role
+          <select name="role" id="role">
+            {% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if v.role == r.value }}>{{ r.label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="f">Level<input type="text" name="level" value="{{ v.level }}" placeholder="e.g. C2" maxlength="10"></label>
+      </div>
+      <div class="f">Account<div class="hint" style="font-size:15px;color:var(--ink)">{{ account.name }}</div></div>
+
+      <fieldset class="f" style="border:0;padding:0;margin:0">
+        <legend style="padding:0 0 6px">Business units</legend>
+        <div class="toggle-chips" id="bu-chips">
+          {% for b in bus if b.active or b.id in v.bu_ids %}
+            <label><input type="checkbox" name="bu_ids" value="{{ b.id }}" {{ 'checked' if b.id in v.bu_ids }}><span>{{ b.name }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="hint" id="bu-locked" hidden>Every BU. Fixed for this role.</div>
+      </fieldset>
+
+      <fieldset class="f" style="border:0;padding:0;margin:0">
+        <legend style="padding:0 0 6px">Practices <span class="hint">(optional)</span></legend>
+        <div class="toggle-chips">
+          {% for pr in cfg.practices %}
+            <label><input type="checkbox" name="practices" value="{{ pr }}" {{ 'checked' if pr in v.practices }}><span>{{ pr }}</span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <fieldset class="f stack" style="border:0;padding:0;margin:0;gap:8px">
+        <legend style="padding:0 0 6px">Visibility</legend>
+        {% for sc in all_scopes %}
+          <label class="scope-opt" data-scope="{{ sc.value }}">
+            <input type="radio" name="scope" value="{{ sc.value }}" {{ 'checked' if v.scope == sc.value }}>
+            <div class="title">{{ sc.label }}</div>
+            <div class="d">{{ sc.description }}</div>
+          </label>
+        {% endfor %}
+        <div class="hint" id="scope-locked" hidden>Fixed for this role.</div>
+      </fieldset>
+
+      <div class="stack" id="iv-fields">
+        <label class="f">Interview skills<input type="text" name="skills" value="{{ v.skills }}" placeholder="Java, Spring Boot, AWS"><span class="hint">Comma-separated. Used to route new requisitions.</span></label>
+        <label class="f">Highest grade they interview
+          <select name="max_grade">
+            <option value="">Any</option>
+            {% for g in cfg.grades %}<option {{ 'selected' if v.max_grade == g }}>{{ g }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" type="submit">{{ 'Save changes' if editing else 'Add user' }}</button>
+        {% if not editing %}<a class="btn" href="/users">Cancel</a>{% endif %}
+      </div>
+    </form>
+
+    {% if editing and selected.id != actor.id %}
+    <form method="post" action="/users/{{ selected.id }}/active" style="margin-top:12px">
+      <input type="hidden" name="active" value="{{ '0' if selected.active else '1' }}">
+      <button class="btn {{ 'danger' if selected.active }}" type="submit">{{ 'Deactivate' if selected.active else 'Reactivate' }}</button>
+      {% if selected.active %}<div class="hint" style="margin-top:6px">Removes access immediately. Their demands and history stay.</div>{% endif %}
+    </form>
+    {% endif %}
+  </aside>
+</div>
+
+<script>
+// Show only the visibility options the chosen role allows. The server enforces the same rule.
+(function () {
+  var allowed = {{ allowed_scopes | tojson }};
+  var role = document.getElementById('role');
+  function sync() {
+    var ok = allowed[role.value] || [];
+    var locked = ok.length === 1;
+    document.querySelectorAll('.scope-opt').forEach(function (el) {
+      var s = el.dataset.scope, input = el.querySelector('input');
+      el.classList.toggle('hidden', ok.indexOf(s) === -1);
+      if (ok.indexOf(s) === -1) input.checked = false;
+    });
+    if (!document.querySelector('.scope-opt:not(.hidden) input:checked')) {
+      document.querySelector('.scope-opt[data-scope="' + ok[0] + '"] input').checked = true;
+    }
+    document.getElementById('scope-locked').hidden = !locked;
+    var full = ok.length === 1 && ok[0] === 'full';
+    document.querySelectorAll('#bu-chips input').forEach(function (i) { if (full) i.checked = true; i.disabled = full; });
+    document.getElementById('bu-locked').hidden = !full;
+    document.getElementById('iv-fields').hidden = role.value !== 'interviewer';
+  }
+  role.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

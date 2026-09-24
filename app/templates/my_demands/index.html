@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main %}
+{% set show_owner = actor.scope.value != 'own' %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ 'All BUs' if actor.is_full else actor.bu_names | join(', ') }}</div>
+    <h1>{{ title }}</h1>
+  </div>
+  {% if actor.role.value in ('demand_owner', 'admin') %}
+    <a class="btn primary" href="/soon/raise" title="Arrives in Phase 2">Raise demand</a>
+  {% endif %}
+</div>
+
+<div class="cards">
+  <div class="card"><div class="k">Open demands</div><div class="v">{{ stats.open }}</div></div>
+  <div class="card"><div class="k">Before GTD</div><div class="v">{{ stats.before_gtd }}</div><div class="s">Draft or waiting for admin</div></div>
+  <div class="card"><div class="k">In coverage or offer</div><div class="v">{{ stats.in_coverage }}</div></div>
+  <div class="card warn"><div class="k">Needs attention</div><div class="v">{{ stats.attention }}</div><div class="s">Missing, escalated or past start</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="pills" role="group" aria-label="Filter demands">
+      {% for key, label in filters.items() %}
+        <a class="pill {{ 'on' if key == active_filter }}" href="?filter={{ key }}{% if active_bu %}&bu={{ active_bu }}{% endif %}" {% if key == active_filter %}aria-current="true"{% endif %}>{{ label }} ({{ counts[key] }})</a>
+      {% endfor %}
+    </div>
+    {% if bus %}
+    <form method="get" class="row">
+      <input type="hidden" name="filter" value="{{ active_filter }}">
+      <label class="row small muted">Business unit
+        <select name="bu" onchange="this.form.submit()" style="width:auto;min-height:40px">
+          <option value="">All</option>
+          {% for b in bus %}<option value="{{ b.id }}" {{ 'selected' if active_bu == b.id }}>{{ b.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <noscript><button class="btn small">Apply</button></noscript>
+    </form>
+    {% endif %}
+  </div>
+  <div class="tbl demands {{ 'with-owner' if show_owner }}" role="table" aria-label="{{ title }}">
+    <div class="tr th" role="row">
+      <div>App ref</div><div>GTD req</div><div>Demand</div>{% if show_owner %}<div>Owner · BU</div>{% endif %}<div>Practice</div><div>Grade</div><div>Start date</div><div>Status</div>
+    </div>
+    {% for r in rows %}
+    {% set d = r.demand %}
+    <div class="tr" role="row">
+      <div class="mono">{{ d.app_ref }}</div>
+      <div class="mono">{{ r.req_id or '—' }}</div>
+      <div>
+        <div class="title">{{ d.name }}</div>
+        {% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}
+      </div>
+      {% if show_owner %}
+      <div class="small">{{ d.owner.name }}<div class="note">{{ d.business_unit.name }}{% if r.read_only and actor.scope.value == 'own_bu_read' %} · <span class="chip ro">read-only</span>{% endif %}</div></div>
+      {% endif %}
+      <div>{{ d.practice }}</div>
+      <div>{{ d.grade }}</div>
+      <div>{{ d.start_date | d }}</div>
+      <div><span class="chip {{ r.chip }}">{{ r.status_label }}</span></div>
+    </div>
+    {% else %}
+    <div class="empty">No demands here{% if active_filter != 'all' %} for this filter{% endif %}.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

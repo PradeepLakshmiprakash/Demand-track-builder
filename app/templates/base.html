@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Demand tracker{% endblock %} · Demand tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="side" aria-label="Main">
+    <div class="brand">
+      <div class="acct">{{ actor.account_name if actor else "Demand tracker" }}</div>
+      <div class="name">Demand tracker</div>
+    </div>
+
+    {% if switcher %}
+    <details class="viewas">
+      <summary class="cap-row">
+        <span class="who">
+          {% if actor %}{{ actor.role.label }}<small>{{ actor.name }}</small>{% else %}Pick a user<small>View as</small>{% endif %}
+        </span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5l4 4 4-4"/></svg>
+      </summary>
+      <div class="menu" role="menu" aria-label="View as (prototype)">
+        {% for g in switcher if g.users %}
+          <div class="grp">{{ g.label }}</div>
+          {% for u in g.users %}
+            <a role="menuitem" href="/view-as/{{ u.id }}" class="{{ 'on' if actor and actor.id == u.id }} {{ 'off' if not u.active }}">
+              <span>{{ u.name }}</span>
+              <span class="meta">{% if not u.active %}inactive{% elif u.visibility_scope == 'full' %}all BUs{% else %}{{ u.business_units | map(attribute='name') | join(', ') or '—' }}{% endif %}</span>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    {% for item in menu %}
+      {% if item.ready %}
+        <a class="nav-link {{ 'active' if path == item.path or (path.startswith(item.path ~ '/') ) }}" href="{{ item.path }}">{{ item.label_for(actor.role) }}</a>
+      {% else %}
+        <a class="nav-link soon {{ 'active' if path == '/soon/' ~ item.key }}" href="/soon/{{ item.key }}">{{ item.label_for(actor.role) }} <span class="tag">P{{ item.phase }}</span></a>
+      {% endif %}
+    {% endfor %}
+
+    {% if actor %}
+    <div class="side-foot">Access: {{ actor.scope.label | lower }}<br>{{ 'All BUs' if actor.is_full else (actor.bu_names | join(', ') or 'No BU') }} · {{ actor.account_name }}</div>
+    {% endif %}
+  </nav>
+
+  <main>
+    {% if msg %}<div class="flash ok" role="status">{{ msg }}</div>{% endif %}
+    {% if err %}<div class="flash bad" role="alert">{{ err }}</div>{% endif %}
+    {% block main %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

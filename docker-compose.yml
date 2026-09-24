@@ -1,0 +1,29 @@
+# Local stack: app + Postgres 16. Seed with: docker compose exec app python -m seed
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dt
+      POSTGRES_PASSWORD: dt
+      POSTGRES_DB: demand_tracker
+    ports: ["5434:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dt"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      ENV: local
+      DATABASE_URL: postgresql+psycopg://dt:dt@db:5432/demand_tracker
+      VIEW_SWITCHER_ENABLED: "true"
+      MAIL_BACKEND: console
+    ports: ["8010:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  dbdata:

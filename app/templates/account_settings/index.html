@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Account settings{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ account.name }}</div>
+    <h1>Account settings</h1>
+    <div class="lede">Every client-specific rule lives here, so another account can be onboarded without code changes.</div>
+  </div>
+</div>
+
+<nav class="settings-nav" aria-label="Sections">
+  <a class="pill" href="#thresholds">Thresholds</a>
+  <a class="pill" href="#business-units">Business units</a>
+  <a class="pill" href="#lists">Practices and lists</a>
+  <a class="pill" href="#supply-channels">Supply channels</a>
+  <a class="pill" href="#status-mapping">DP sheet status mapping</a>
+</nav>
+
+<section id="thresholds" class="panel">
+  <div class="panel-head"><div><h2>Thresholds and timing</h2><div class="hint">Drive escalations, the daily admin mail and offer approval routing.</div></div></div>
+  <form method="post" action="/settings/thresholds" class="panel-body stack">
+    <div class="grid4">
+      <label class="f">Grace period (working days)<input type="number" name="grace_days" min="0" max="60" value="{{ account.grace_days }}" required><span class="hint">Sent to GTD but not in the DP sheet → missing</span></label>
+      <label class="f">L1 due (working days)<input type="number" name="l1_sla_days" min="1" max="60" value="{{ account.l1_sla_days }}" required><span class="hint">{{ cfg.escalation_owners.get('L1', 'L1') }} before L2</span></label>
+      <label class="f">L2 due (working days)<input type="number" name="l2_sla_days" min="1" max="60" value="{{ account.l2_sla_days }}" required><span class="hint">{{ cfg.escalation_owners.get('L2', 'L2') }}</span></label>
+      <label class="f">Aging (days without progress)<input type="number" name="aging_days" min="1" max="365" value="{{ account.aging_days }}" required></label>
+      <label class="f">Panel SLA (hours)<input type="number" name="panel_timer_hours" min="1" max="720" value="{{ account.panel_timer_hours }}" required></label>
+      <label class="f">Rejection limit<input type="number" name="rejection_limit" min="1" max="50" value="{{ account.rejection_limit }}" required><span class="hint">Panel + client rejections on one demand</span></label>
+      <label class="f">Margin cut-off (%)<input type="number" name="margin_threshold" min="0" max="100" step="0.01" value="{{ account.margin_threshold }}" required><span class="hint">At or above: admin approves. Below: leadership.</span></label>
+      <label class="f">Daily admin mail at<input type="time" name="mail_time" value="{{ account.mail_time.strftime('%H:%M') }}" required></label>
+      <label class="f">Time zone<input type="text" name="timezone" value="{{ cfg.timezone }}" required><span class="hint">e.g. America/Chicago</span></label>
+    </div>
+    <div><button class="btn primary">Save thresholds</button></div>
+  </form>
+</section>
+
+<section id="business-units" class="panel">
+  <div class="panel-head"><div><h2>Business units</h2><div class="hint">Retiring a BU keeps its demands and history; it just can't be picked for new ones.</div></div></div>
+  <div class="tbl bu">
+    <div class="tr th"><div>Name</div><div>In use</div><div>Status</div><div></div></div>
+    {% for b, n_demands, n_users in bus %}
+    <form method="post" action="/settings/business-units/{{ b.id }}" class="tr">
+      <input type="text" name="name" value="{{ b.name }}" aria-label="Name for {{ b.name }}" required>
+      <div class="small muted">{{ n_demands }} demands · {{ n_users }} users</div>
+      <select name="active" aria-label="Status for {{ b.name }}"><option value="1" {{ 'selected' if b.active }}>Active</option><option value="0" {{ 'selected' if not b.active }}>Retired</option></select>
+      <button class="btn small">Save</button>
+    </form>
+    {% endfor %}
+    <form method="post" action="/settings/business-units" class="tr">
+      <input type="text" name="name" placeholder="New business unit" aria-label="New business unit" required>
+      <div></div><div></div>
+      <button class="btn small">Add</button>
+    </form>
+  </div>
+</section>
+
+<section id="lists" class="panel">
+  <div class="panel-head"><div><h2>Practices and pick lists</h2><div class="hint">One per line. Grades go lowest to highest; interviewer max grade uses that order.</div></div></div>
+  <form method="post" action="/settings/lists" class="panel-body stack">
+    <div class="grid3">
+      <label class="f">Practices<textarea name="practices" rows="6">{{ cfg.practices | join('\n') }}</textarea></label>
+      <label class="f">Grades<textarea name="grades" rows="6">{{ cfg.grades | join('\n') }}</textarea></label>
+      <label class="f">Regions<textarea name="regions" rows="6">{{ cfg.regions | join('\n') }}</textarea></label>
+      <label class="f">Work modes<textarea name="work_modes" rows="4">{{ cfg.work_modes | join('\n') }}</textarea></label>
+      <label class="f">Categories<textarea name="categories" rows="4">{{ cfg.categories | join('\n') }}</textarea></label>
+      <label class="f">Escalation reasons<textarea name="resolution_reasons" rows="6">{{ cfg.resolution_reasons | join('\n') }}</textarea></label>
+    </div>
+    <div><button class="btn primary">Save lists</button></div>
+  </form>
+</section>
+
+<section id="supply-channels" class="panel">
+  <div class="panel-head"><div><h2>Supply channels</h2><div class="hint">How the DP sheet names each channel. Clear a label to remove a row.</div></div></div>
+  <form method="post" action="/settings/supply-channels">
+    <div class="tbl chan">
+      <div class="tr th"><div>Channel</div><div>Sheet marker</div><div>Needs sourcing req</div></div>
+      {% for c in cfg.supply_channels %}
+      <div class="tr">
+        <input type="text" name="label" value="{{ c.label }}" aria-label="Channel {{ loop.index }}">
+        <input type="text" name="sheet_marker" value="{{ c.sheet_marker }}" aria-label="Sheet marker {{ loop.index }}">
+        <select name="needs_sourcing_req" aria-label="Needs sourcing req {{ loop.index }}"><option value="">No</option><option value="on" {{ 'selected' if c.needs_sourcing_req }}>Yes</option></select>
+      </div>
+      {% endfor %}
+      <div class="tr">
+        <input type="text" name="label" placeholder="Add a channel" aria-label="New channel">
+        <input type="text" name="sheet_marker" placeholder="Sheet marker" aria-label="New sheet marker">
+        <select name="needs_sourcing_req" aria-label="New needs sourcing req"><option value="">No</option><option value="on">Yes</option></select>
+      </div>
+    </div>
+    <div class="panel-body"><button class="btn primary">Save channels</button></div>
+  </form>
+</section>
+
+<section id="status-mapping" class="panel">
+  <div class="panel-head"><div><h2>DP sheet status mapping</h2><div class="hint">Once a demand is linked, its stage comes from the sheet's Status / Status Group through this table. Clear a status to remove a row.</div></div></div>
+  <form method="post" action="/settings/status-mapping">
+    <div class="tbl map">
+      <div class="tr th"><div>Status group</div><div>Status</div><div>App stage</div></div>
+      {% for m in cfg.status_mapping %}
+      <div class="tr">
+        <input type="text" name="status_group" value="{{ m.status_group }}" placeholder="(blank)" aria-label="Status group {{ loop.index }}">
+        <input type="text" name="status" value="{{ m.status }}" aria-label="Status {{ loop.index }}">
+        <select name="stage" aria-label="App stage {{ loop.index }}">{% for st in stages %}<option value="{{ st.value }}" {{ 'selected' if m.stage == st }}>{{ st.label }}</option>{% endfor %}</select>
+      </div>
+      {% endfor %}
+      <div class="tr">
+        <input type="text" name="status_group" placeholder="New status group" aria-label="New status group">
+        <input type="text" name="status" placeholder="New status" aria-label="New status">
+        <select name="stage" aria-label="New app stage">{% for st in stages %}<option value="{{ st.value }}">{{ st.label }}</option>{% endfor %}</select>
+      </div>
+    </div>
+    <div class="panel-body"><button class="btn primary">Save mapping</button></div>
+  </form>
+</section>
+{% endblock %}
