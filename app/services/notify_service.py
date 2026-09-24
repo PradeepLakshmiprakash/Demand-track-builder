@@ -66,7 +66,11 @@ def _demands(db: Session, account_id: int, status: DemandStatus) -> list[Demand]
         db.scalars(
             select(Demand)
             .where(Demand.account_id == account_id, Demand.status == status.value)
-            .options(selectinload(Demand.business_unit), selectinload(Demand.owner))
+            .options(
+                selectinload(Demand.business_unit),
+                selectinload(Demand.owner),
+                selectinload(Demand.submissions),
+            )
             .order_by(Demand.submitted_at, Demand.app_ref)
         )
     )
@@ -121,7 +125,8 @@ def compose(
         return d.start_date.strftime("%d %b %Y") if d.start_date else "no start date"
 
     def line(d: Demand) -> str:
-        return f"  {d.gtd_name}\n    {facts(d)} · start {start(d)} · owner {d.owner.name}"
+        again = f" · resubmit, was {d.gtd_req_id}" if d.submissions else ""
+        return f"  {d.gtd_name}\n    {facts(d)} · start {start(d)} · owner {d.owner.name}{again}"
 
     def rows(ds: list[Demand]) -> str:
         td = "<td style='padding:6px 10px'>{}</td>"

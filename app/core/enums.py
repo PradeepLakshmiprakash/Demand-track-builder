@@ -170,9 +170,27 @@ class EscalationStatus(StrEnum):
 
 
 class ResolutionAction(StrEnum):
-    RESUBMIT = "resubmit"
-    EXTEND = "extend"
-    CLOSE = "close"
+    RESUBMIT = "resubmit"  # back into the next admin mail; the new GTD ID chains to the old one
+    EXTEND = "extend"  # stays open at L1 with a new due date
+    CLOSE = "close"  # the demand is closed
+    NO_ACTION = "no_action"  # the condition has already cleared (e.g. the ID was linked late)
+
+    @property
+    def label(self) -> str:
+        return {
+            "resubmit": "Resubmit in next admin mail",
+            "extend": "Extend due date",
+            "close": "Close demand",
+            "no_action": "No further action (condition cleared)",
+        }[self.value]
+
+
+class EscalationEventKind(StrEnum):
+    OPENED = "opened"
+    NOTIFIED = "notified"
+    PROMOTED = "promoted"
+    EXTENDED = "extended"
+    RESOLVED = "resolved"
 
 
 class StageOrigin(StrEnum):

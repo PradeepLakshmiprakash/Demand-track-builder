@@ -59,6 +59,22 @@
         <p class="muted small" style="margin:10px 0 0">No requisition ID yet. {% if d.status == 'draft' %}Submit the demand to send it to the admin.{% else %}The admin team links it after entering the demand on GTD.{% endif %}</p>
       {% endif %}
     </section>
+    {% if escalations %}
+    <section class="panel panel-body">
+      <h2>Escalations</h2>
+      <div class="stack" style="gap:10px;margin-top:10px">
+        {% for e in escalations %}
+          <div class="small">
+            <span class="chip {{ 'esc' if e.status == 'open' else 'gray' }}">{{ e.type_enum.label }} · L{{ e.level }}{{ '' if e.status == 'open' else ' · resolved' }}</span>
+            <div class="muted" style="margin-top:4px">{{ e.detail }}</div>
+            {% if e.status == 'open' %}<div class="muted">Due {{ e.due_at | at(tz, '%d %b %Y') }}</div>
+            {% else %}<div class="muted">{{ e.reason }}{% if e.comment %}: {{ e.comment }}{% endif %}</div>{% endif %}
+            {% if sees_escalations %}<a href="/escalations?status=all&id={{ e.id }}">Open escalation</a>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
     <section class="panel panel-body">
       <h2>History</h2>
       <ol class="timeline">

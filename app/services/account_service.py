@@ -1,5 +1,6 @@
 """Account settings: the only place client-specific rules change (plan.md principle 1)."""
 
+import re
 from datetime import time
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -87,7 +88,15 @@ def bu_usage(db: Session, bu_id: int) -> tuple[int, int]:
     return demands, users
 
 
-def update_business_unit(db: Session, account_id: int, bu_id: int, name: str, active: bool) -> None:
+def update_business_unit(
+    db: Session,
+    account_id: int,
+    bu_id: int,
+    name: str,
+    active: bool,
+    head_name: str = "",
+    head_email: str = "",
+) -> None:
     bu = db.get(BusinessUnit, bu_id)
     if bu is None or bu.account_id != account_id:
         raise SettingsError("Business unit not found.")
@@ -101,8 +110,13 @@ def update_business_unit(db: Session, account_id: int, bu_id: int, name: str, ac
     )
     if clash:
         raise SettingsError(f"{name} already exists.")
+    head_email = head_email.strip()
+    if head_email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", head_email):
+        raise SettingsError(f"'{head_email}' isn't an email address.")
     bu.name = name
     bu.active = active  # retired BUs keep their demands and history; they just can't be picked
+    bu.delivery_head_name = head_name.strip() or None
+    bu.delivery_head_email = head_email or None
     db.commit()
 
 

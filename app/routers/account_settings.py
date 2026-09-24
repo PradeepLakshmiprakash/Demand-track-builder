@@ -84,8 +84,11 @@ async def edit_bu(
 ) -> RedirectResponse:
     form = await request.form()
     name, active = str(form.get("name", "")), form.get("active") == "1"
+    head, email = str(form.get("head_name") or ""), str(form.get("head_email") or "")
     return _done(
-        "business-units", lambda: svc.update_business_unit(db, actor.account_id, bu_id, name, active), db
+        "business-units",
+        lambda: svc.update_business_unit(db, actor.account_id, bu_id, name, active, head, email),
+        db,
     )
 
 

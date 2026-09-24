@@ -15,6 +15,7 @@ from app.core.security import VIEW_AS_COOKIE, Actor, current_user
 from app.core.templating import render
 from app.routers import (
     account_settings,
+    escalations,
     excel_import,
     gtd_queue,
     my_demands,
@@ -31,6 +32,7 @@ ROUTERS = [
     gtd_queue.router,
     excel_import.router,
     reconciliation.router,
+    escalations.router,
     user_access.router,
     account_settings.router,
 ]

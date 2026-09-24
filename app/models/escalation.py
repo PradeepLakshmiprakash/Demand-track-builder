@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, String, Text, func, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
-from app.core.enums import EscalationStatus, EscalationType, ResolutionAction, check_in
+from app.core.enums import EscalationEventKind, EscalationStatus, EscalationType, ResolutionAction, check_in
 
 
 class Escalation(Base):
@@ -44,7 +44,28 @@ class Escalation(Base):
     comment: Mapped[str | None] = mapped_column(Text)
     resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     resolved_at: Mapped[datetime | None]
+    # Highest level whose owners have been mailed. The sweep mails whatever is above it.
+    notified_level: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+
+    events: Mapped[list["EscalationEvent"]] = relationship(
+        order_by="EscalationEvent.id", cascade="all, delete-orphan"
+    )
 
     @property
     def type_enum(self) -> EscalationType:
         return EscalationType(self.type)
+
+
+class EscalationEvent(Base):
+    """Audit trail: who and when for every open, mail, promotion, extension and resolution."""
+
+    __tablename__ = "escalation_events"
+    __table_args__ = (CheckConstraint(check_in("kind", EscalationEventKind), name="kind_valid"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    escalation_id: Mapped[int] = mapped_column(ForeignKey("escalations.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))
+    level: Mapped[int] = mapped_column(SmallInteger)
+    at: Mapped[datetime] = mapped_column(server_default=func.now())
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    note: Mapped[str | None] = mapped_column(Text)

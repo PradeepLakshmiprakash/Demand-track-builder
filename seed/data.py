@@ -63,6 +63,14 @@ CONFIG = {
 
 BUSINESS_UNITS = ["CARDS", "BANKING", "PAYMENTS", "DATA"]
 
+# LOB delivery head per BU: owner of L1 escalations (mailed, no login). Placeholder people.
+DELIVERY_HEADS = {
+    "CARDS": ("Asha P.", "asha.p@example.com"),
+    "BANKING": ("Daniel W.", "daniel.w@example.com"),
+    "PAYMENTS": ("Ritu S.", "ritu.s@example.com"),
+    "DATA": ("Omar F.", "omar.f@example.com"),
+}
+
 # key, name, email, role, level, scope, BUs, practices, interviewer (skills, max grade)
 USERS = [
     ("priya", "Priya N.", "priya.n@example.com", "demand_owner", "C2", "own", ["PAYMENTS"], [], None),

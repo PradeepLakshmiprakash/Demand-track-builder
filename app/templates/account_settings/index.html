@@ -37,12 +37,14 @@
 </section>
 
 <section id="business-units" class="panel">
-  <div class="panel-head"><div><h2>Business units</h2><div class="hint">Retiring a BU keeps its demands and history; it just can't be picked for new ones.</div></div></div>
+  <div class="panel-head"><div><h2>Business units</h2><div class="hint">Retiring a BU keeps its demands and history; it just can't be picked for new ones. The LOB delivery head owns L1 escalations for the BU and is mailed about them (they don't sign in).</div></div></div>
   <div class="tbl bu">
-    <div class="tr th"><div>Name</div><div>In use</div><div>Status</div><div></div></div>
+    <div class="tr th"><div>Name</div><div>LOB delivery head</div><div>Delivery head email</div><div>In use</div><div>Status</div><div></div></div>
     {% for b, n_demands, n_users in bus %}
     <form method="post" action="/settings/business-units/{{ b.id }}" class="tr">
       <input type="text" name="name" value="{{ b.name }}" aria-label="Name for {{ b.name }}" required>
+      <input type="text" name="head_name" value="{{ b.delivery_head_name or '' }}" aria-label="Delivery head for {{ b.name }}" placeholder="Name">
+      <input type="email" name="head_email" value="{{ b.delivery_head_email or '' }}" aria-label="Delivery head email for {{ b.name }}" placeholder="name@company.com">
       <div class="small muted">{{ n_demands }} demands · {{ n_users }} users</div>
       <select name="active" aria-label="Status for {{ b.name }}"><option value="1" {{ 'selected' if b.active }}>Active</option><option value="0" {{ 'selected' if not b.active }}>Retired</option></select>
       <button class="btn small">Save</button>
@@ -50,7 +52,7 @@
     {% endfor %}
     <form method="post" action="/settings/business-units" class="tr">
       <input type="text" name="name" placeholder="New business unit" aria-label="New business unit" required>
-      <div></div><div></div>
+      <div></div><div></div><div></div><div></div>
       <button class="btn small">Add</button>
     </form>
   </div>

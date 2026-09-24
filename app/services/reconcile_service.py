@@ -275,10 +275,13 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
     prev = previous_import(db, imp)
     if prev is not None:
         prev_date = prev.sheet_date.strftime("%d %b") if prev.sheet_date else "the previous sheet"
+        # Only rows of a demand's current requisition count: after a resubmit the old ID is expected to go.
         prev_demands = {
             sub_demand[r.submission_id].id
             for r in rows_of(db, prev)
-            if r.submission_id is not None and r.submission_id in sub_demand
+            if r.submission_id is not None
+            and r.submission_id in sub_demand
+            and sub_demand[r.submission_id].submissions[0].id == r.submission_id
         }
         for d in demands:
             if d.id in prev_demands and d.id not in in_sheet and d.status_enum not in FINISHED:

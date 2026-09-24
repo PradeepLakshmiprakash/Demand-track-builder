@@ -15,6 +15,7 @@ from app.models import (
     Candidate,
     Demand,
     Escalation,
+    EscalationEvent,
     GtdSubmission,
     Interview,
     InterviewerProfile,
@@ -38,7 +39,16 @@ def load(db: Session, now: datetime | None = None) -> None:
     account = Account(**data.ACCOUNT, mail_time=time(9, 0), config=data.CONFIG, active=True)
     db.add(account)
     db.flush()
-    bus = {name: BusinessUnit(account_id=account.id, name=name, active=True) for name in data.BUSINESS_UNITS}
+    bus = {
+        name: BusinessUnit(
+            account_id=account.id,
+            name=name,
+            active=True,
+            delivery_head_name=data.DELIVERY_HEADS[name][0],
+            delivery_head_email=data.DELIVERY_HEADS[name][1],
+        )
+        for name in data.BUSINESS_UNITS
+    }
     db.add_all(bus.values())
     db.flush()
 
@@ -94,17 +104,17 @@ def load(db: Session, now: datetime | None = None) -> None:
 
     for ref, etype, esc_level, due_in, detail in data.ESCALATIONS:
         due = now + timedelta(days=due_in)
-        db.add(
-            Escalation(
-                demand_id=demands[ref].id,
-                type=etype,
-                level=esc_level,
-                status="open",
-                detail=detail,
-                opened_at=due - timedelta(days=account.l1_sla_days),
-                due_at=due,
-            )
-        )
+        opened = due - timedelta(days=account.l1_sla_days + (account.l2_sla_days if esc_level == 2 else 0))
+        esc = Escalation(
+            demand_id=demands[ref].id, type=etype, level=esc_level, status="open", detail=detail,
+            opened_at=opened, due_at=due, notified_level=esc_level,  # seeded as already mailed
+        )  # fmt: skip
+        db.add(esc)
+        db.flush()
+        db.add(EscalationEvent(escalation_id=esc.id, kind="opened", level=1, at=opened, note=detail))
+        if esc_level == 2:
+            db.add(EscalationEvent(escalation_id=esc.id, kind="promoted", level=2, at=due - timedelta(days=3),
+                                   note="L1 due date passed"))  # fmt: skip
 
     for ref, cand, rnd, iv_key, when in data.INTERVIEWS:
         d = demands[ref]

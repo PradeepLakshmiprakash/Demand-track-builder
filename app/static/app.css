@@ -161,7 +161,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); out
 section[id] { scroll-margin-top: 24px; }
 .map .tr { grid-template-columns: 1fr 1fr 220px; padding: 8px 20px; }
 .chan .tr { grid-template-columns: 1fr 1.4fr 180px; padding: 8px 20px; }
-.bu .tr { grid-template-columns: 1fr 160px 120px 110px; padding: 10px 20px; }
+.bu .tr { grid-template-columns: 130px 1fr 1.3fr 150px 110px 80px; padding: 10px 20px; }
 
 .soon { max-width: 640px; }
 
@@ -203,6 +203,15 @@ input.invalid { border-color: var(--esc-ink); background: #FFF8F6; }
 .match-actions { display: flex; flex-direction: column; gap: 8px; padding-left: 16px; border-left: 3px solid var(--line); }
 .sug { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 14px; }
 .match-actions summary { cursor: pointer; color: var(--brand); min-height: 32px; display: flex; align-items: center; }
+
+/* Escalations */
+.filters { gap: 16px; }
+.esc-split { grid-template-columns: minmax(0, 1fr) 420px; }
+.esc-list .tr { grid-template-columns: 170px minmax(0, 1fr) 120px 110px; text-decoration: none; color: var(--ink); }
+.esc-list a.tr:hover { background: #FAF9F5; }
+.esc-list a.tr.on { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand); }
+.esc-list .tr > div { min-width: 0; }
+.overdue { color: var(--esc-ink); font-weight: 600; }
 
 /* GTD queue */
 .gtd .tr { grid-template-columns: 100px minmax(0, 1fr) 100px 80px 60px 270px; }

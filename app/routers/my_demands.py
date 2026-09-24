@@ -12,7 +12,7 @@ from app.core.db import get_db
 from app.core.enums import DemandStatus, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
-from app.models import BusinessUnit, User
+from app.models import BusinessUnit, Escalation, User
 from app.services.demand_service import (
     FILTERS,
     can_change,
@@ -116,6 +116,14 @@ def demand_page(
         and demand.status_enum is DemandStatus.DRAFT
         and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
         history=stage_history(db, demand),
+        escalations=list(
+            db.scalars(
+                select(Escalation)
+                .where(Escalation.demand_id == demand.id)
+                .order_by(Escalation.opened_at.desc())
+            )
+        ),
+        sees_escalations=actor.role in (Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP),
         submitters=names,
         statuses={s.value: s.label for s in DemandStatus},
     )

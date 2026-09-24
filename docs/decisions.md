@@ -146,3 +146,41 @@ status mapping settings.
 **D26. Sample data.** `seed/sample_sheet.py` builds a made-up sheet in the real one's shape
 (`python -m seed.sample_sheet` writes `seed/sample_dp_sheet.xlsx`). It's the Phase 3 exit fixture:
 the real 09-Sep sheet is never committed.
+
+## Decisions made while building Phase 4
+
+**D27. The LOB delivery head is per business unit, not a user.** Account settings → Business units
+holds each BU's delivery head name and email. L1 escalation mails go to them (demand owner, admin
+demand owner and admin team copied); a BU without one falls back to the admin demand owner. L2 mails go
+to leadership users (delivery head and demand owner copied). Please confirm this matches how Discover
+works.
+
+**D28. Trigger details** (thresholds from Account settings):
+- *Not submitted:* in an admin mail, still no requisition ID at the next working day's mail time.
+- *Aging:* a linked demand (coverage required through offer in market) with no stage change for
+  `aging_days` calendar days.
+- *Past start date:* start date has passed, the demand is open and past draft, and the latest DP sheet
+  shows no DOJ or a DOJ after the start date.
+- *Missing, dropped, incorrect:* opened by reconciliation (Phase 3).
+- *Rejection limit, panel SLA:* wait for interview records (Phase 6).
+
+**D29. The sweep** runs every two hours (and from "Run sweep now" for the admin roles): open new
+escalations, promote L1 past its due date to L2 (new due date after the L2 working days; L2 past due
+stays L2), then mail. Mailing is tracked separately (`notified_level`), one mail per recipient group
+per sweep, so escalations opened by reconciliation get mailed and a failed mail is retried.
+
+**D30. Who resolves:** L1 by the admin demand owner or admin team; L2 by leadership (flow-artifact §1).
+Every resolution needs a reason from the account's list and an action:
+- *Resubmit* (link problems only): the demand goes back to Submitted, into the next admin mail, and
+  the new GTD ID chains to the old one. The demand's other open link escalations close with it.
+- *Extend due date:* stays open, back at L1 with the new date.
+- *Close demand:* the demand is closed, and all its open escalations close with it.
+- *No further action:* **added**, only allowed once the condition has cleared (e.g. the ID was linked a
+  day late). The screen says when a condition has cleared, but a person still closes it.
+
+**D31. Audit.** `escalation_events` records opened, notified, promoted, extended and resolved, with
+who and when. The escalation page shows it; demand owners see their demand's escalations on the demand
+page.
+
+**D32. Dropped is judged on the current requisition.** After a resubmit, the old ID leaving the DP
+sheet is expected and doesn't flag the demand as dropped.

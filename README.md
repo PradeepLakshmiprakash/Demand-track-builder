@@ -17,7 +17,8 @@ Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 | 1 | Foundation | **Done**: all tables + first migration, View-as switcher, User access, Account settings, demands list with scope filtering, seed |
 | 2 | Intake and GTD submission | **Done**: Raise demand (draft/submit, N positions, JD upload), demand page with history, GTD queue (link IDs, CSV for GTD entry), daily admin mail + scheduler |
 | 3 | DP sheet import and reconciliation | **Done**: upload with column mapping in settings, snapshot rows, exact / name-prefix / fuzzy matching, missing and dropped detection with escalations, match or create from row |
-| 4 | Escalation engine | Next |
+| 4 | Escalation engine | **Done**: not submitted / aging / past start triggers, two-hourly sweep, L1 → L2 promotion, mails to the BU delivery head and leadership, Escalations screen with resolve (resubmit, extend, close, no further action) and audit trail |
+| 5 | Rate card, approvals, leadership view | Next |
 
 ## Run locally (this machine)
 

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Escalations{% endblock %}
+{% macro due(e) %}{% set days = (now - e.due_at).days %}{% if e.status == 'open' and e.due_at < now %}<span class="overdue">Overdue{{ ' %d day%s' % (days, '' if days == 1 else 's') if days > 0 else '' }}</span>{% elif e.status == 'open' %}{{ e.due_at | at(tz, '%d %b') }}{% else %}{{ e.resolved_at | at(tz, '%d %b') }}{% endif %}{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">Opened automatically · closed only with a reason and an action</div>
+    <h1>Escalations</h1>
+  </div>
+  {% if actor.role.value in ('admin', 'admin_team') %}
+    <form method="post" action="/escalations/sweep"><button class="btn">Run sweep now</button></form>
+  {% endif %}
+</div>
+
+<form method="get" class="row filters" aria-label="Filter escalations">
+  <div class="pills" role="group" aria-label="Status">
+    {% for key, label in [('open', 'Open'), ('resolved', 'Resolved'), ('all', 'All')] %}
+      <a class="pill {{ 'on' if status == key }}" href="?status={{ key }}{% if level %}&level={{ level }}{% endif %}{% if type %}&type={{ type }}{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <input type="hidden" name="status" value="{{ status }}">
+  <label class="row small muted">Level
+    <select name="level" onchange="this.form.submit()" style="width:auto;min-height:40px">
+      <option value="">All</option><option value="1" {{ 'selected' if level == 1 }}>L1</option><option value="2" {{ 'selected' if level == 2 }}>L2</option>
+    </select>
+  </label>
+  <label class="row small muted">Trigger
+    <select name="type" onchange="this.form.submit()" style="width:auto;min-height:40px">
+      <option value="">All</option>
+      {% for t in types %}<option value="{{ t.value }}" {{ 'selected' if type == t.value }}>{{ t.label }}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button class="btn small">Apply</button></noscript>
+</form>
+
+<div class="split esc-split">
+  <section class="panel tbl esc-list" aria-label="Escalations">
+    <div class="tr th"><div>Trigger</div><div>Demand</div><div>Level</div><div>{{ 'Resolved' if status == 'resolved' else 'Due' }}</div></div>
+    {% for e, d in items %}
+      <a class="tr {{ 'on' if selected and selected.id == e.id }}" href="?status={{ status }}{% if level %}&level={{ level }}{% endif %}{% if type %}&type={{ type }}{% endif %}&id={{ e.id }}" {% if selected and selected.id == e.id %}aria-current="true"{% endif %}>
+        <div><span class="chip {{ chips[e.type] }}">{{ e.type_enum.label }}</span></div>
+        <div>
+          <div><span class="mono">{{ d.gtd_req_id or d.app_ref }}</span> {{ d.name }}</div>
+          <div class="note">{{ d.app_ref }} · {{ d.business_unit.name }} · {{ e.detail }}</div>
+        </div>
+        <div>L{{ e.level }} · {{ 'LOB head' if e.level == 1 else 'leadership' }}{% if e.status != 'open' %}<div class="note">{{ action_labels.get(e.action, '') if action_labels else e.action }}</div>{% endif %}</div>
+        <div>{{ due(e) }}</div>
+      </a>
+    {% else %}
+      <div class="empty">{{ 'No open escalations. Nothing has been missed.' if status == 'open' else 'None.' }}</div>
+    {% endfor %}
+  </section>
+
+  {% if selected %}
+  {% set e = selected %}
+  <aside class="panel panel-body editor stack">
+    <div>
+      <div class="eyebrow">{{ 'Resolve' if e.status == 'open' else 'Resolved' }}</div>
+      <h2 style="font-size:20px;margin-top:2px"><a class="mono" href="/demands/{{ sd.app_ref }}">{{ sd.gtd_req_id or sd.app_ref }}</a> {{ sd.name }}</h2>
+      <div class="small muted" style="margin-top:4px">{{ e.type_enum.label }} · L{{ e.level }} · {{ sd.app_ref }} · owner {{ sd.owner.name }} · {{ sd.status_enum.label }}</div>
+    </div>
+    <div class="small stack" style="gap:4px">
+      <div>{{ e.detail }}</div>
+      <div class="muted">Notified: {{ audience.names | join(', ') }}</div>
+      {% if e.status == 'open' %}<div class="muted">{{ 'Moves to L2' if e.level == 1 else 'Due' }}: {{ e.due_at | at(tz, '%d %b %Y') }}{% if e.due_at < now %} (overdue){% endif %}</div>{% endif %}
+    </div>
+    {% if cleared %}<div class="flash ok small">The condition has cleared since this opened. It still needs a person to close it.</div>{% endif %}
+
+    {% if e.status == 'open' and can_resolve %}
+    <form method="post" action="/escalations/{{ e.id }}/resolve" class="stack">
+      <label class="f">Reason
+        <select name="reason" required>
+          <option value="">Choose a reason</option>
+          {% for r in reasons %}<option>{{ r }}</option>{% endfor %}
+        </select>
+      </label>
+      <fieldset class="f radios"><legend>Action</legend>
+        {% for a in actions %}
+          <label><input type="radio" name="action" value="{{ a.value }}" {{ 'checked' if loop.first }} required> {{ a.label }}</label>
+        {% endfor %}
+      </fieldset>
+      <label class="f" id="extend-date">New due date<input type="date" name="extend_to"></label>
+      <label class="f">Comment<textarea name="comment" rows="3" placeholder="What was agreed, and with whom"></textarea></label>
+      <div><button class="btn primary">Resolve escalation</button></div>
+    </form>
+    {% elif e.status == 'open' %}
+      <div class="flash bad small">An L{{ e.level }} escalation is resolved by {{ 'the admin demand owner or admin team' if e.level == 1 else 'account leadership' }}.</div>
+    {% else %}
+      <div class="small"><strong>{{ action_labels.get(e.action) }}</strong> · {{ e.reason }}{% if e.comment %}<div class="muted">{{ e.comment }}</div>{% endif %}
+        <div class="muted">{{ names.get(e.resolved_by, '—') }} · {{ e.resolved_at | at(tz) }}</div></div>
+    {% endif %}
+
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">History</div>
+      <ol class="timeline">
+        {% for ev in e.events %}
+          <li><span class="title small">{{ ev.kind | capitalize }} · L{{ ev.level }}</span>
+            <span class="muted small">{{ ev.at | at(tz) }}{% if ev.actor_id %} · {{ names.get(ev.actor_id, '') }}{% endif %}</span>
+            {% if ev.note %}<span class="small">{{ ev.note }}</span>{% endif %}</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </aside>
+  {% endif %}
+</div>
+<script>
+(function () {
+  var box = document.getElementById('extend-date');
+  if (!box) return;
+  function sync() {
+    var on = document.querySelector('input[name=action][value=extend]');
+    box.hidden = !(on && on.checked);
+  }
+  document.querySelectorAll('input[name=action]').forEach(function (r) { r.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% endblock %}

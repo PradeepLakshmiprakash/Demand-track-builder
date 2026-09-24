@@ -50,5 +50,8 @@ class BusinessUnit(Base):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     name: Mapped[str] = mapped_column(String(60))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # L1 escalation owner for this BU. Not an app user: they're mailed, they don't sign in.
+    delivery_head_name: Mapped[str | None] = mapped_column(String(120))
+    delivery_head_email: Mapped[str | None] = mapped_column(String(254))
 
     account: Mapped[Account] = relationship(back_populates="business_units")

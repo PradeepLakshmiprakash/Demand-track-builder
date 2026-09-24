@@ -92,7 +92,16 @@ def link_requisition(db: Session, actor: Actor, demand_id: int, raw_req_id: str)
     if taken:
         raise GtdError(f"{req_id} is already linked to {taken}. A requisition ID can only be linked once.")
 
-    sub = GtdSubmission(demand_id=demand.id, gtd_req_id=req_id, submitted_by=actor.id)
+    # A resubmitted demand keeps its history: the new ID chains to the one it replaces.
+    previous = db.scalar(
+        select(GtdSubmission.id)
+        .where(GtdSubmission.demand_id == demand.id)
+        .order_by(GtdSubmission.submitted_at.desc(), GtdSubmission.id.desc())
+        .limit(1)
+    )
+    sub = GtdSubmission(
+        demand_id=demand.id, gtd_req_id=req_id, submitted_by=actor.id, previous_submission_id=previous
+    )
     db.add(sub)
     record_stage(db, demand, DemandStatus.SENT_TO_GTD, actor.id)
     try:
