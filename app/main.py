@@ -13,13 +13,24 @@ from app.core.db import get_db, new_session
 from app.core.nav import BY_KEY, home_for
 from app.core.security import VIEW_AS_COOKIE, Actor, current_user
 from app.core.templating import render
-from app.routers import account_settings, gtd_queue, my_demands, raise_demand, user_access, view_switcher
+from app.routers import (
+    account_settings,
+    excel_import,
+    gtd_queue,
+    my_demands,
+    raise_demand,
+    reconciliation,
+    user_access,
+    view_switcher,
+)
 
 # raise_demand before my_demands so /demands/new isn't read as a demand ref.
 ROUTERS = [
     raise_demand.router,
     my_demands.router,
     gtd_queue.router,
+    excel_import.router,
+    reconciliation.router,
     user_access.router,
     account_settings.router,
 ]

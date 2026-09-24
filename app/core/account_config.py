@@ -30,6 +30,45 @@ class StatusMapping(BaseModel):
         return v
 
 
+# DP sheet columns the app reads: field → (default header in the Discover sheet, required?).
+DP_FIELDS: dict[str, tuple[str, bool]] = {
+    "req_id": ("Code Requisition", True),
+    "demand_request_name": ("Demand Request Name", True),
+    "status": ("Status", True),
+    "status_group": ("Status Group", True),
+    "originator": ("ORIGINATOR_NAME", False),
+    "practice": ("Practice", False),
+    "grade": ("Local Grade", False),
+    "region": ("Region", False),
+    "start_date": ("Position Start Date", False),
+    "gettalent_req_id": ("GetTalent - Job Req ID", False),
+    "source": ("Source", False),
+    "candidate_name": ("Candidate Name", False),
+    "candidate_details": ("External Candidate Details", False),
+    "doj": ("DOJ", False),
+}
+DP_FIELD_LABELS = {
+    "req_id": "GTD requisition ID",
+    "demand_request_name": "Demand request name",
+    "status": "Status",
+    "status_group": "Status group",
+    "originator": "Originator (demand owner)",
+    "practice": "Practice",
+    "grade": "Grade",
+    "region": "Region",
+    "start_date": "Position start date",
+    "gettalent_req_id": "GetTalent requisition ID",
+    "source": "Supply source",
+    "candidate_name": "Candidate name",
+    "candidate_details": "Candidate details",
+    "doj": "Date of joining",
+}
+
+
+def _default_dp_columns() -> dict[str, str]:
+    return {k: header for k, (header, _) in DP_FIELDS.items()}
+
+
 class AccountConfig(BaseModel):
     timezone: str = "America/Chicago"
     practices: list[str] = []
@@ -42,6 +81,9 @@ class AccountConfig(BaseModel):
     supply_channels: list[SupplyChannel] = []
     status_mapping: list[StatusMapping] = []
     escalation_owners: dict[str, str] = {"L1": "LOB delivery head", "L2": "Account leadership"}
+    dp_columns: dict[str, str] = Field(default_factory=_default_dp_columns)
+    # Cell values the DP sheet uses for "empty".
+    dp_blank_values: list[str] = ["0", "-"]
     resolution_reasons: list[str] = [
         "Failed GTD basic checks",
         "No coverage available",

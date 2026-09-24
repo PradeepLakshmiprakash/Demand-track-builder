@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.account_config import AccountConfig, StatusMapping, SupplyChannel
+from app.core.account_config import DP_FIELD_LABELS, DP_FIELDS, AccountConfig, StatusMapping, SupplyChannel
 from app.models import Account, BusinessUnit, Demand, UserBusinessUnit
 
 
@@ -141,5 +141,25 @@ def update_supply_channels(db: Session, account_id: int, rows: list[dict[str, st
     acc = get_account(db, account_id)
     cfg: AccountConfig = acc.settings
     cfg.supply_channels = channels
+    acc.settings = cfg
+    db.commit()
+
+
+def update_dp_columns(db: Session, account_id: int, headers: dict[str, str], blanks: list[str]) -> None:
+    """Which DP sheet header holds each field. Required fields can't be left blank."""
+    columns = {}
+    for f, (default, required) in DP_FIELDS.items():
+        value = " ".join((headers.get(f) or "").split())
+        if not value and required:
+            raise SettingsError(f"{DP_FIELD_LABELS[f]} needs a column name.")
+        columns[f] = value or default
+    names = [v.casefold() for v in columns.values()]
+    dupes = sorted({v for v in names if names.count(v) > 1})
+    if dupes:
+        raise SettingsError("Each column can hold only one field: " + ", ".join(dupes) + ".")
+    acc = get_account(db, account_id)
+    cfg = acc.settings
+    cfg.dp_columns = columns
+    cfg.dp_blank_values = list(dict.fromkeys(b.strip() for b in blanks if b.strip()))
     acc.settings = cfg
     db.commit()

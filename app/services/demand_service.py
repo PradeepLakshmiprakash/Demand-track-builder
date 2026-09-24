@@ -195,18 +195,29 @@ def can_change(actor: Actor, demand: Demand) -> bool:
 
 
 def record_stage(
-    db: Session, demand: Demand, to: DemandStatus, actor_id: int | None, origin: StageOrigin = StageOrigin.APP
-) -> None:
-    """Every status change goes through here so it is written as a stage event."""
+    db: Session,
+    demand: Demand,
+    to: DemandStatus,
+    actor_id: int | None,
+    origin: StageOrigin = StageOrigin.APP,
+    import_id: int | None = None,
+) -> bool:
+    """Every status change goes through here so it is written as a stage event. True if it changed."""
     before = demand.status
     if before == to.value:
-        return
+        return False
     demand.status = to.value
     db.add(
         StageEvent(
-            demand_id=demand.id, from_stage=before, to_stage=to.value, origin=origin.value, actor_id=actor_id
+            demand_id=demand.id,
+            from_stage=before,
+            to_stage=to.value,
+            origin=origin.value,
+            actor_id=actor_id,
+            import_id=import_id,
         )
     )
+    return True
 
 
 def _resolve_bu(db: Session, actor: Actor, form: DemandForm) -> int:

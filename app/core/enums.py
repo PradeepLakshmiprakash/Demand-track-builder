@@ -180,6 +180,23 @@ class StageOrigin(StrEnum):
     IMPORT = "import"
 
 
+class RowOutcome(StrEnum):
+    """What reconciliation made of one DP sheet row."""
+
+    MATCHED = "matched"  # tier 1: its requisition ID is linked to a demand
+    PREFIX = "prefix"  # tier 2: [DM-…] in the name; linked automatically
+    CONFIRMED = "confirmed"  # tier 3 or manual: a person matched it, or created a demand from it
+    SUGGESTED = "suggested"  # unmatched, with fuzzy suggestions waiting for a person
+    UNMATCHED = "unmatched"  # unmatched, no suggestion
+    CONFLICT = "conflict"  # its [DM-…] demand is already linked to a different requisition ID
+    DUPLICATE = "duplicate"  # the same requisition ID appears earlier in the sheet
+    INVALID = "invalid"  # no requisition ID
+
+    @property
+    def needs_person(self) -> bool:
+        return self in (RowOutcome.SUGGESTED, RowOutcome.UNMATCHED, RowOutcome.CONFLICT)
+
+
 class ApprovalRoute(StrEnum):
     ADMIN = "admin"
     LEADERSHIP = "leadership"

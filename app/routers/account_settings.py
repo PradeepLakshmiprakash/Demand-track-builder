@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.account_config import DP_FIELD_LABELS, DP_FIELDS
 from app.core.db import get_db
 from app.core.enums import SHEET_STAGES
 from app.core.security import Actor, require_screen
@@ -48,6 +49,7 @@ def settings_page(
         cfg=account.settings,
         bus=[(b, *svc.bu_usage(db, b.id)) for b in account.business_units],
         stages=SHEET_STAGES,
+        dp_fields=[(f, DP_FIELD_LABELS[f], req) for f, (_, req) in DP_FIELDS.items()],
     )
 
 
@@ -105,3 +107,13 @@ async def save_channels(
     raw = {k: [str(v) for v in form.getlist(k)] for k in ("label", "sheet_marker", "needs_sourcing_req")}
     rows = _rows(raw, "label", "sheet_marker", "needs_sourcing_req")
     return _done("supply-channels", lambda: svc.update_supply_channels(db, actor.account_id, rows), db)
+
+
+@router.post("/settings/dp-columns")
+async def save_dp_columns(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    form = await request.form()
+    headers = {f: str(form.get(f"col_{f}") or "") for f in DP_FIELDS}
+    blanks = str(form.get("blank_values") or "").split(",")
+    return _done("dp-columns", lambda: svc.update_dp_columns(db, actor.account_id, headers, blanks), db)

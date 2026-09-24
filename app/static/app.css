@@ -192,6 +192,18 @@ input.invalid { border-color: var(--esc-ink); background: #FFF8F6; }
 .timeline li { display: flex; flex-direction: column; position: relative; }
 .timeline li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); }
 
+/* DP sheet import and reconciliation */
+.imports .tr { grid-template-columns: 150px minmax(0, 1fr) 60px minmax(0, 1.4fr) 200px 80px; }
+.plain .tr { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.cards.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.match-row { padding: 16px 20px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 12px; }
+.match-row:last-child { border-bottom: 0; }
+.match-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.match-head .note, .match-actions .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.match-actions { display: flex; flex-direction: column; gap: 8px; padding-left: 16px; border-left: 3px solid var(--line); }
+.sug { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 14px; }
+.match-actions summary { cursor: pointer; color: var(--brand); min-height: 32px; display: flex; align-items: center; }
+
 /* GTD queue */
 .gtd .tr { grid-template-columns: 100px minmax(0, 1fr) 100px 80px 60px 270px; }
 .link-form { display: flex; gap: 8px; align-items: center; }
@@ -202,13 +214,14 @@ input.invalid { border-color: var(--esc-ink); background: #FFF8F6; }
 @media (max-width: 1100px) {
   .split, .form-page { grid-template-columns: 1fr; }
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cards { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 760px) {
   .shell { flex-direction: column; }
   .side { width: 100%; height: auto; position: static; }
   main { padding: 24px 16px; }
-  .cards, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
+  .cards, .cards.six, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
   .tbl { overflow-x: auto; }
   .tbl .tr, .tbl .th { min-width: 860px; }
 }

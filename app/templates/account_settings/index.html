@@ -15,6 +15,7 @@
   <a class="pill" href="#lists">Practices and lists</a>
   <a class="pill" href="#supply-channels">Supply channels</a>
   <a class="pill" href="#status-mapping">DP sheet status mapping</a>
+  <a class="pill" href="#dp-columns">DP sheet columns</a>
 </nav>
 
 <section id="thresholds" class="panel">
@@ -111,6 +112,26 @@
       </div>
     </div>
     <div class="panel-body"><button class="btn primary">Save mapping</button></div>
+  </form>
+</section>
+
+<section id="dp-columns" class="panel">
+  <div class="panel-head"><div><h2>DP sheet columns</h2><div class="hint">The header text in the DP sheet for each field the app reads. Matched ignoring case and extra spaces. If the sheet's format changes, update it here.</div></div></div>
+  <form method="post" action="/settings/dp-columns">
+    <div class="tbl map">
+      <div class="tr th"><div>Field</div><div>Column header in the sheet</div><div></div></div>
+      {% for f, label, required in dp_fields %}
+      <div class="tr">
+        <label for="col_{{ f }}">{{ label }}</label>
+        <input type="text" id="col_{{ f }}" name="col_{{ f }}" value="{{ cfg.dp_columns.get(f, '') }}" {{ 'required' if required }}>
+        <div class="small muted">{{ 'Required' if required else 'Optional' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="panel-body stack">
+      <label class="f" style="max-width:420px">Values that mean "empty"<input type="text" name="blank_values" value="{{ cfg.dp_blank_values | join(', ') }}"><span class="hint">Comma-separated. The Discover sheet uses 0 and -.</span></label>
+      <div><button class="btn primary">Save columns</button></div>
+    </div>
   </form>
 </section>
 {% endblock %}

@@ -101,3 +101,48 @@ before their mail goes out.
 **D19. Not built yet from techstack.md:** per-account custom fields on the demand form (the
 `custom_fields` column exists). Planned with the Phase 8 second-account work unless Discover needs one
 sooner.
+
+## Phase 3 answers (24 Sep 2026): all recommendations accepted
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Read the real 09-Sep sheet? | Headers and status values only; no names or candidate data copied. It has one sheet, a header row and 30 rows. |
+| 2 | One row per requisition or per candidate? | One per requisition (30 rows, 30 distinct IDs), so each row sets its demand's stage. |
+| 3 | Is every upload the full sheet? | Yes. That's what makes "dropped" reliable. |
+| 4 | When does the grace period start? | From the day the requisition ID is linked, counted in working days to the sheet's date. |
+| 5 | Finished demands leaving the sheet | No escalation for staffed, cancelled or closed demands; only open ones are "dropped". |
+| 6 | Name-prefix match | Linked automatically and listed in the import summary. Fuzzy matches always wait for a person. |
+| 7 | Owner of a demand created from a sheet row | The sheet's originator if their name matches an active demand owner or admin demand owner; otherwise the admin picks. |
+| + | Older sheet uploaded after a newer one | Refused unless the uploader ticks "import it anyway". |
+
+## Decisions made while building Phase 3
+
+**D20. The DP sheet format is account configuration.** Account settings → DP sheet columns maps
+each field to its header text (matched ignoring case and spacing) and lists the values that mean
+empty (`0` and `-` in the Discover sheet). The parser finds the header row within the first 10 rows,
+refuses a sheet missing a required column (naming it), and warns about missing optional ones.
+
+**D21. Every row is a snapshot.** Rows keep the matching fields as columns and the full original row
+as JSON (`raw`), including the candidate details, which Phase 6 turns into candidate records. The
+uploaded file is kept too. The same file (by SHA-256) can't be imported twice; use "Re-run
+reconciliation" instead.
+
+**D22. Only the latest import is reconciled or acted on.** Older imports are shown read-only.
+Re-running is idempotent: unchanged stages and already-open escalations are no-ops, and rows a person
+matched stay matched.
+
+**D23. Fuzzy score** (0-100, suggestions from 60): name similarity 35%, originator vs owner 20%,
+practice 15, grade 10, region 5, start date within ±7 days up to 15. Up to three suggestions per row;
+identical bulk demands are offered as interchangeable slots in ref order. Matching a row to a demand
+that already has a different ID records the new ID and chains it to the old one (a mistyped ID).
+
+**D24. Reconciliation opens escalations now** (missing, dropped, incorrect) through
+`escalation_service.open_escalation`: L1, due after the account's L1 working days, at most one open per
+demand and type. Phase 4 adds the sweep, L1 → L2 promotion and resolving.
+
+**D25. A status with no mapping** leaves the demand "Linked" and shows a warning with a link to the
+status mapping settings.
+
+**D26. Sample data.** `seed/sample_sheet.py` builds a made-up sheet in the real one's shape
+(`python -m seed.sample_sheet` writes `seed/sample_dp_sheet.xlsx`). It's the Phase 3 exit fixture:
+the real 09-Sep sheet is never committed.
