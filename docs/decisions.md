@@ -304,3 +304,26 @@ account's panel hours (clears when feedback is in).
 (X-Api-Key, off unless `KARAT_API_KEY` is set) accepts {external_ref, candidate_name, gtd_req_id?,
 round, outcome, report_url?, comments?}, maps by GTD ID when given, otherwise leaves the candidate
 unmapped, and is idempotent on `external_ref`. We need Karat's real API/export details to finish it.
+
+**D47. An incorrect demand goes back to its owner.** Missing, dropped and incorrect escalations can be
+resolved with *send back to demand owner for correction*: the demand becomes **Returned for
+correction**, the owner gets a mail with the reason and what to fix, sees the same on the demand page,
+edits it and resubmits. It then goes into the admin mail as a resubmission and its new GTD ID chains to
+the old one. *Resubmit* stays for a demand that is right as it is (GTD lost it).
+
+**D48. Old requisition IDs don't drive a demand.** Once a demand has a newer ID, sheet rows for its
+old ID are marked *superseded* and ignored. While it is being corrected or resubmitted (returned,
+submitted or notified after its current ID was linked), rows for that ID are ignored too, so the
+next sheet doesn't reopen the escalation that was just settled or report the demand as dropped.
+
+**D49. Panel feedback moves the stage the day it's recorded.** Two app-driven stages sit between
+Coverage required and Profiles with client: **Interviewing** (a candidate is in the panel) and
+**Selected by panel**. Each demand has *client interview required* (set when it's raised, default
+yes): if yes, a panel select moves it to Selected by panel; if no, the panel's decision is final and
+it moves to Offer in process and raises the offer approval. All candidates rejected with nothing
+pending → back to Coverage required. The demand owner gets a mail when a candidate is selected.
+
+**D50. Sheet vs panel.** The DP sheet lags the panel by about a week. A sheet that still says
+Linked / Coverage required doesn't pull back a demand the panel has moved (the reconciliation page
+lists these as "sheet behind the panel"); a sheet stage that is further on always wins. Interview
+activity counts as movement for the aging escalation.

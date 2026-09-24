@@ -10,10 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.db import get_db
-from app.core.enums import DemandStatus, Role, Scope
+from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
-from app.models import BusinessUnit, Escalation, User
+from app.models import BusinessUnit, Demand, Escalation, User
 from app.services import interview_service
 from app.services.demand_service import (
     FILTERS,
@@ -115,7 +115,7 @@ def demand_page(
         d=demand,
         can_change=can_change(actor, demand) and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
         can_submit=can_edit(actor, demand)
-        and demand.status_enum is DemandStatus.DRAFT
+        and demand.status_enum in (DemandStatus.DRAFT, DemandStatus.RETURNED)
         and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
         history=stage_history(db, demand),
         escalations=list(
@@ -131,6 +131,7 @@ def demand_page(
         people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
         submitters=names,
         statuses={s.value: s.label for s in DemandStatus},
+        returned=_returned(db, demand),
     )
 
 
@@ -167,3 +168,22 @@ async def decide_round(
         return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#interviews", status_code=303)
     msg = f"{iv.round} approved: staffing schedules it" if iv.status == "open" else f"{iv.round} declined"
     return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#interviews", status_code=303)
+
+
+def _returned(db: Session, demand: Demand) -> dict[str, Any] | None:
+    """Why the demand was sent back: the escalation resolved with "send back for correction"."""
+    esc = db.scalar(
+        select(Escalation)
+        .where(Escalation.demand_id == demand.id, Escalation.action == ResolutionAction.RETURN.value)
+        .order_by(Escalation.resolved_at.desc())
+        .limit(1)
+    )
+    if esc is None:
+        return None
+    who = db.get(User, esc.resolved_by) if esc.resolved_by else None
+    return {
+        "reason": esc.reason,
+        "comment": esc.comment,
+        "at": esc.resolved_at,
+        "by": who.name if who else "the admin",
+    }

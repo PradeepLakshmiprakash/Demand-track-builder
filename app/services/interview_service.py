@@ -49,6 +49,8 @@ INTERVIEW_STAGES = frozenset(
     {
         DemandStatus.LINKED,
         DemandStatus.COVERAGE_REQUIRED,
+        DemandStatus.INTERVIEWING,
+        DemandStatus.PANEL_SELECTED,
         DemandStatus.PROFILES_WITH_CLIENT,
         DemandStatus.OFFER_IN_PROCESS,
     }
@@ -58,6 +60,13 @@ SEARCH_MIN = 70
 
 class InterviewError(ValueError):
     pass
+
+
+def _progress(db: Session, demand_id: int | None, actor_id: int | None) -> None:
+    """Let the demand's stage follow its panel records (pipeline_service)."""
+    from app.services import pipeline_service  # it imports margin_service, which imports this module
+
+    pipeline_service.apply_for(db, demand_id, actor_id)
 
 
 # --- Candidates ------------------------------------------------------------------------------------
@@ -172,11 +181,15 @@ def map_candidate(db: Session, actor: Actor, candidate_id: int, demand_id: int) 
             iv.candidate_id, iv.demand_id = clash.id, d.id
         clash.cv_path = clash.cv_path or c.cv_path
         db.delete(c)
+        db.flush()
+        _progress(db, d.id, actor.id)
         db.commit()
         return clash
     c.demand_id = d.id
     for iv in db.scalars(select(Interview).where(Interview.candidate_id == c.id)):
         iv.demand_id = d.id
+    db.flush()
+    _progress(db, d.id, actor.id)
     db.commit()
     return c
 
@@ -266,6 +279,7 @@ def record_feedback(
     db.flush()
     if fb.needs_next_round:
         request_next_round(db, account, interview, interviewer_id, fb.next_round_note)
+    _progress(db, interview.demand_id, interviewer_id)
     db.commit()
     return interview
 
@@ -313,6 +327,8 @@ def decide_next_round(
         raise InterviewError("Add a note: why no further round.")
     iv.status = (InterviewStatus.OPEN if approve else InterviewStatus.DECLINED).value
     iv.decided_by, iv.decided_at, iv.decision_note = actor.id, datetime.now(UTC), (note or "").strip() or None
+    db.flush()
+    _progress(db, iv.demand_id, actor.id)
     db.commit()
     return iv
 
@@ -363,6 +379,7 @@ def schedule(
     db.flush()
     if newly_assigned:
         _send_invite(db, db.get_one(Account, actor.account_id), iv)
+    _progress(db, iv.demand_id, actor.id)
     db.commit()
     return iv
 
@@ -555,6 +572,8 @@ def record_external(
     )
     db.add(iv)
     c.current_stage = f"{round_} {outcome}"
+    db.flush()
+    _progress(db, iv.demand_id, None)
     db.commit()
     return iv
 

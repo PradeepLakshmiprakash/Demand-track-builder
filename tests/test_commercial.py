@@ -305,9 +305,10 @@ def test_phase5_exit_leadership_numbers_match_manual_calculation(client: Client,
 
     # Pipeline and headline counts, by hand from the seed + sample sheet.
     pipeline = {k: n for k, _, n in o.pipeline}
-    assert pipeline == {"before_gtd": 2, "gtd": 2, "wip": 4, "client": 2, "offer": 4, "staffed": 1,
-                        "cancelled": 1, "incorrect": 1}  # fmt: skip
-    assert (o.open, o.live, o.need_coverage, o.missing_rates) == (15, 17, 4, 0)
+    # DM-000142 has a scheduled panel interview, so it's Interviewing, not waiting for coverage.
+    assert pipeline == {"before_gtd": 2, "gtd": 2, "wip": 3, "interviewing": 1, "selected": 0, "client": 2,
+                        "offer": 4, "staffed": 1, "cancelled": 1, "incorrect": 1}  # fmt: skip
+    assert (o.open, o.live, o.need_coverage, o.missing_rates) == (15, 17, 3, 0)
 
     cca = next(s for s in o.by_practice if s.name == "CCA-FS")
     assert cca.total == 9

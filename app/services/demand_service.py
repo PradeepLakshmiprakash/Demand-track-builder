@@ -94,6 +94,7 @@ def _describe(d: Demand, escs: list[Escalation], today: date) -> tuple[str, str,
         DemandStatus.MISSING: "Not in the DP sheet after the grace period",
         DemandStatus.DROPPED: "Was in the DP sheet, gone from the latest one",
         DemandStatus.INCORRECT: "DP sheet marks it as an incorrect demand",
+        DemandStatus.RETURNED: "Sent back to you for correction: fix it and resubmit",
     }
     note = notes.get(s, "")
     if escs:
@@ -105,7 +106,7 @@ def _describe(d: Demand, escs: list[Escalation], today: date) -> tuple[str, str,
     if past_start:
         late = (today - d.start_date).days  # type: ignore[operator]
         note = f"{late} days past start date" + (f" · {note}" if note else "")
-    attention = bool(escs) or past_start or s in LINK_PROBLEMS
+    attention = bool(escs) or past_start or s in LINK_PROBLEMS or s is DemandStatus.RETURNED
     return label, chip, note, attention
 
 
@@ -127,9 +128,16 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
         ):
             escs.setdefault(e.demand_id, []).append(e)
 
+    from app.services.pipeline_service import notes as panel_notes  # pipeline_service imports this module
+
+    progress = panel_notes(db, demands)
     rows = []
     for d in demands:
         label, chip, note, attention = _describe(d, escs.get(d.id, []), today)
+        if d.id in progress and not note:
+            note = progress[d.id]
+        elif d.id in progress:
+            note = f"{note} · {progress[d.id]}"
         rows.append(
             DemandRow(
                 demand=d,
@@ -172,7 +180,8 @@ def summary(rows: list[DemandRow]) -> dict[str, int]:
 
 # --- Intake: raise, edit, submit (Phase 2) ---------------------------------------------------------
 
-EDITABLE = frozenset({DemandStatus.DRAFT, DemandStatus.SUBMITTED})  # locked once it's in the admin mail
+# Locked once it's in the admin mail; a demand sent back for correction opens up again.
+EDITABLE = frozenset({DemandStatus.DRAFT, DemandStatus.SUBMITTED, DemandStatus.RETURNED})
 
 
 class DemandError(ValueError):
@@ -255,6 +264,7 @@ def _check(cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date) -
 def _apply(demand: Demand, form: DemandForm) -> None:
     for field in (
         "name", "practice", "grade", "category", "type", "replaced_resource", "position_type",
+        "client_interview_required",
         "primary_skills", "secondary_skills", "exp_min", "exp_max", "start_date", "region",
         "location", "work_mode", "hiring_manager",
     ):  # fmt: skip
@@ -326,7 +336,7 @@ def update_demand(
 
 
 def _submit(db: Session, actor: Actor, demand: Demand) -> None:
-    if demand.status_enum is DemandStatus.DRAFT:
+    if demand.status_enum in (DemandStatus.DRAFT, DemandStatus.RETURNED):
         record_stage(db, demand, DemandStatus.SUBMITTED, actor.id)
         demand.submitted_at = datetime.now(UTC)
 

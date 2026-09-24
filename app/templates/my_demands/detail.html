@@ -12,11 +12,15 @@
   <div class="row">
     {% if can_change %}<a class="btn" href="/demands/{{ d.app_ref }}/edit">Edit</a>{% endif %}
     {% if can_submit %}
-      <form method="post" action="/demands/{{ d.app_ref }}/submit"><button class="btn primary">Submit to admin</button></form>
+      <form method="post" action="/demands/{{ d.app_ref }}/submit"><button class="btn primary">{{ 'Resubmit to admin' if d.status == 'returned' else 'Submit to admin' }}</button></form>
     {% endif %}
   </div>
 </div>
 
+{% if d.status == 'returned' and returned %}
+<div class="flash bad" role="alert"><strong>Sent back for correction</strong> by {{ returned.by }} on {{ returned.at | at(tz, '%d %b') }}: {{ returned.reason }}{% if returned.comment %}. {{ returned.comment }}{% endif %}.
+  {% if can_change %}Correct it with Edit, then resubmit; it goes back to the admin team for GTD.{% endif %}</div>
+{% endif %}
 <div class="split">
   <div class="stack">
     <section class="panel panel-body">
@@ -25,6 +29,7 @@
         {{ field('Practice', d.practice) }}{{ field('Grade', d.grade) }}{{ field('Category', d.category) }}
         {{ field('Type', d.type ~ (' · replacing ' ~ d.replaced_resource if d.replaced_resource else '')) }}
         {{ field('Position', d.position_type) }}{{ field('Name on GTD', d.gtd_name) }}
+        {{ field('Client interview', 'Required' if d.client_interview_required else 'Not required: panel decision is final') }}
       </div>
     </section>
     <section class="panel panel-body">

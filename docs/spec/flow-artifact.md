@@ -1,8 +1,8 @@
 # Demand Tracker — Application Flows
 
-Version 1.2 · 24 Sep 2026 — updated to match what is built through Phase 6 (see §14 for what changed since 1.1).
+Version 1.3 · 24 Sep 2026 — updated to match what is built through Phase 6 plus the wiring fixes (see §14–§15 for what changed since 1.1).
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D46 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D50 in `docs/decisions.md`.
 
 ---
 
@@ -98,6 +98,7 @@ One demand = one position. **Number of positions** (1–20) creates N demands, e
 | | Category | Open / Proactive (proactive covers shadow, bench, NGT) |
 | | Type | New / Replacement (replacement captures who is replaced) |
 | | Position type | Billable / Non-billable |
+| | Client interview | Required (a panel select goes to the client next) / not required (the panel's decision is final) |
 | Requirements | Primary / secondary skills | Comma-separated; used to route interviewers |
 | | Experience | Min–max years |
 | | Job description | PDF, Word or text, up to 5 MB |
@@ -196,11 +197,15 @@ A row's Source cell (e.g. `VMS`, `Sogeti`) is matched to a channel for offers an
 
 ### 6.3 Stages
 
-1. **Coverage required** — sourcing across the channels; interviews happen here (§7).
-2. **Profiles with client** — client interview.
-3. **Offer in process** — client selected; margin approval (§8).
-4. **Offer in market** — offer out, BGV, DOJ set.
-5. **Staffed** — allocation; billing starts on DOJ.
+1. **Coverage required** — sourcing across the channels.
+2. **Interviewing** — a candidate is in the panel (set by the app from interview records, §7).
+3. **Selected by panel** — a candidate was selected and the demand needs a client interview (set by the app).
+4. **Profiles with client** — client interview.
+5. **Offer in process** — client selected, or the panel selected on a demand with no client interview; margin approval (§8).
+6. **Offer in market** — offer out, BGV, DOJ set.
+7. **Staffed** — allocation; billing starts on DOJ.
+
+**Sheet vs panel.** The DP sheet lags the panel by about a week, so the app moves a demand forward on panel records the day they're entered. A sheet that still says Linked or Coverage required doesn't pull it back (listed on Reconciliation as "sheet behind the panel"); a sheet stage further on always wins.
 
 Every stage change is a timestamped stage event (from the app or from an import), which feeds aging and the history on the demand page.
 
@@ -223,6 +228,8 @@ Every stage change is a timestamped stage event (from the app or from an import)
 7. **CVs** are attached on Candidates by the admin roles; the invite's CV link works while the feedback link is live.
 
 Every recommendation is an interview record with its date, so the rejection count and the panel deadline (§9) are exact.
+
+8. **Stage follows the panel.** After every schedule, recommendation, round decision or mapping: a candidate in play → **Interviewing**; a candidate selected with nothing pending → **Selected by panel** if the demand needs a client interview, otherwise **Offer in process** (offer approval raised). All candidates rejected → back to Coverage required. The demand owner is mailed when a candidate is selected. Whether a client interview is required is set when the demand is raised.
 
 Interview statuses: waiting for demand owner (an asked-for round) → declined, or to be scheduled → scheduled (interviewer assigned, link sent) → feedback in.
 
@@ -287,7 +294,9 @@ flowchart LR
 - **Who:** L1 by the admin demand owner or admin team; L2 by leadership or the admin demand owner.
 - **Reason** from the account's list: failed GTD basic checks, no coverage available, duplicate demand, withdrawn by client, client budget pending, unknown.
 - **Action:**
-  - *Resubmit* (link problems only): the demand goes back to Submitted and into the next admin mail; its new GTD ID chains to the old one. Its other open link escalations close with it.
+  - *Send back to demand owner for correction* (link problems only): the demand becomes Returned for correction and the owner is mailed the reason and what to fix. The owner edits and resubmits; it goes into the admin mail as a resubmission and its new GTD ID chains to the old one. Its other open link escalations close with it.
+  - *Resubmit* (link problems only): for a demand that is right as it is. It goes back to Submitted and into the next admin mail; its new GTD ID chains to the old one. Its other open link escalations close with it.
+  - While a demand is being corrected or resubmitted, and after it has a new ID, sheet rows for its old ID are ignored (listed on Reconciliation), so they can't reopen the escalation or mark it dropped.
   - *Extend due date:* stays open, back at L1, with the new date.
   - *Close demand:* the demand is closed and all its open escalations close with it.
   - *No further action:* only once the condition has cleared (e.g. the ID was linked a day late); the screen shows when a condition has cleared.
@@ -311,9 +320,9 @@ flowchart LR
 
 | Phase | Status | Set by |
 |---|---|---|
-| Before GTD | `draft`, `submitted`, `notified`, `sent_to_gtd` | App |
+| Before GTD | `draft`, `submitted`, `notified`, `returned`, `sent_to_gtd` | App |
 | Linking | `linked`, `missing`, `dropped`, `incorrect` | Reconciliation |
-| Coverage | Coverage required → Profiles with client → Offer in process → Offer in market → Staffed | DP sheet (mapped) |
+| Coverage | Coverage required → Interviewing → Selected by panel → Profiles with client → Offer in process → Offer in market → Staffed | DP sheet (mapped); Interviewing, Selected by panel and a panel-final Offer in process from interview records |
 | End | `cancelled`, `closed` | DP sheet, or an escalation resolved with "close" |
 
 ### 11.2 Interview
@@ -370,3 +379,9 @@ flowchart LR
 - §9: precise triggers, sweep, delivery heads and leadership as L1/L2, who resolves, "no further action", audit trail.
 - §10: working-days loss formula, projection, what counts, overview contents and audience.
 - §11–§13: interview status catalog, all answers so far, open items.
+
+## 15. Changes in 1.3
+
+- §3.1: *client interview required* on the demand (does a panel select go to the client, or is the panel final).
+- §6.3, §7, §11: Interviewing and Selected by panel stages, set from interview records the day they're entered; a lagging sheet doesn't undo them.
+- §9.3: *send back to demand owner for correction* (Returned for correction); old or outgoing requisition IDs in the sheet are ignored.

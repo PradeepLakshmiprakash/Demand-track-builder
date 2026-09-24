@@ -81,13 +81,15 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
 
 # Pipeline groups, in the order the demand moves through them.
 GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [
-    ("before_gtd", "Before GTD", (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)),
+    ("before_gtd", "Before GTD", (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED, DemandStatus.RETURNED)),
     (
         "gtd",
         "With GTD, not in sheet yet",
         (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING, DemandStatus.DROPPED),
     ),
     ("wip", "Work in progress", (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)),
+    ("interviewing", "Interviewing (panel)", (DemandStatus.INTERVIEWING,)),
+    ("selected", "Selected by panel", (DemandStatus.PANEL_SELECTED,)),
     ("client", "Profiles with client", (DemandStatus.PROFILES_WITH_CLIENT,)),
     ("offer", "Offer in market or process", (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)),
     ("staffed", "Staffed", (DemandStatus.STAFFED,)),
@@ -95,7 +97,7 @@ GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [
     ("incorrect", "Incorrect demand", (DemandStatus.INCORRECT,)),
 ]
 GROUP_OF = {s: key for key, _, statuses in GROUPS for s in statuses}
-OPEN_GROUPS = ("before_gtd", "gtd", "wip", "client", "offer", "incorrect")
+OPEN_GROUPS = ("before_gtd", "gtd", "wip", "interviewing", "selected", "client", "offer", "incorrect")
 
 
 @dataclass

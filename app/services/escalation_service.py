@@ -69,6 +69,8 @@ AGING_STAGES = frozenset(
     {
         DemandStatus.LINKED,
         DemandStatus.COVERAGE_REQUIRED,
+        DemandStatus.INTERVIEWING,
+        DemandStatus.PANEL_SELECTED,
         DemandStatus.PROFILES_WITH_CLIENT,
         DemandStatus.OFFER_IN_PROCESS,
         DemandStatus.OFFER_IN_MARKET,
@@ -499,7 +501,8 @@ def can_resolve(actor: Actor, esc: Escalation) -> bool:
 def allowed_actions(db: Session, account: Account, esc: Escalation, demand: Demand) -> list[ResolutionAction]:
     actions = [ResolutionAction.EXTEND, ResolutionAction.CLOSE]
     if esc.type_enum in LINK_TYPES and demand.status_enum not in FINISHED:
-        actions.insert(0, ResolutionAction.RESUBMIT)
+        # Resubmit as it is (GTD lost it), or send back to the owner to correct it first.
+        actions[0:0] = [ResolutionAction.RETURN, ResolutionAction.RESUBMIT]
     if is_cleared(db, account, esc, demand, datetime.now(UTC)):
         actions.append(ResolutionAction.NO_ACTION)
     return actions
@@ -556,10 +559,14 @@ def resolve(
     if act is ResolutionAction.RESUBMIT:
         # Back into the next admin mail; the new GTD ID will chain to the old one (gtd_service).
         record_stage(db, demand, DemandStatus.SUBMITTED, actor.id, StageOrigin.APP)
+    elif act is ResolutionAction.RETURN:
+        # The owner corrects and resubmits; it then goes into the admin mail as a resubmission.
+        record_stage(db, demand, DemandStatus.RETURNED, actor.id, StageOrigin.APP)
+        _mail_owner_returned(db, demand, reason, comment)
     elif act is ResolutionAction.CLOSE:
         record_stage(db, demand, DemandStatus.CLOSED, actor.id, StageOrigin.APP)
     _close(db, esc, actor.id, reason, act, comment, now)
-    if act in (ResolutionAction.CLOSE, ResolutionAction.RESUBMIT):
+    if act in (ResolutionAction.CLOSE, ResolutionAction.RESUBMIT, ResolutionAction.RETURN):
         # The demand's other link problems are settled by the same decision.
         for other in db.scalars(
             select(Escalation).where(
@@ -574,6 +581,22 @@ def resolve(
                 )
     db.commit()
     return esc
+
+
+def _mail_owner_returned(db: Session, demand: Demand, reason: str, comment: str | None) -> None:
+    owner = db.get_one(User, demand.owner_id)
+    if not owner.active:
+        return
+    link = f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+    text = (
+        f"{demand.app_ref} ({demand.name}) was sent back to you for correction.\n"
+        f"Reason: {reason}"
+        + (f"\nWhat to fix: {comment}" if comment else "")
+        + f"\n\nCorrect it and resubmit; it then goes back to the admin team for GTD:\n{link}"
+    )
+    mail.send(
+        mail.Mail(to=[owner.email], subject=f"[{demand.app_ref}] Please correct and resubmit", text=text)
+    )
 
 
 def _close(

@@ -40,7 +40,7 @@ from app.core.enums import (
 )
 from app.core.workdays import add_working_days
 from app.models import Account, BusinessUnit, Demand, ExcelImport, ExcelRow, GtdSubmission, StageEvent, User
-from app.services import interview_service, margin_service
+from app.services import interview_service, margin_service, pipeline_service
 from app.services.demand_service import record_stage
 from app.services.escalation_service import open_escalation
 
@@ -48,6 +48,8 @@ log = logging.getLogger("demand_tracker.reconcile")
 PREFIX = re.compile(r"\[(DM-\d{6})\]")
 LINKABLE = (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)  # tier-2/3 targets without an ID
 EXPECTED = (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING)  # has an ID, not yet seen in a sheet
+# Back with the owner or the admin team for a new GTD entry: the old ID's rows wait for the new one.
+RESUBMITTING = (DemandStatus.RETURNED, DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)
 SUGGEST_MIN = 60
 SUGGEST_MAX = 3
 
@@ -75,6 +77,9 @@ class Summary:
     unmapped_statuses: list[str] = field(default_factory=list)
     new_escalations: list[str] = field(default_factory=list)
     offers: list[str] = field(default_factory=list)  # new offer approvals raised from the sheet
+    superseded: list[str] = field(default_factory=list)  # rows for replaced requisition IDs, ignored
+    resubmitting: list[str] = field(default_factory=list)  # rows of IDs about to be replaced, ignored
+    held: list[str] = field(default_factory=list)  # sheet behind the panel progress recorded in the app
     warnings: list[str] = field(default_factory=list)
     as_of: str = ""
 
@@ -157,6 +162,22 @@ def _suggest(rows: list[ExcelRow], candidates: list[Demand]) -> None:
 # --- The run ---------------------------------------------------------------------------------------
 
 
+def _resubmitting(db: Session, d: Demand) -> bool:
+    """Sent back for correction or resubmission after its current ID was linked (not a demand whose
+    first ID was just recorded, which is still Submitted until this run moves it)."""
+    if d.status_enum not in RESUBMITTING or not d.submissions:
+        return False
+    if d.status_enum is DemandStatus.RETURNED:
+        return True
+    since = db.scalar(
+        select(StageEvent.at)
+        .where(StageEvent.demand_id == d.id, StageEvent.to_stage == d.status)
+        .order_by(StageEvent.at.desc())
+        .limit(1)
+    )
+    return since is not None and since > d.submissions[0].submitted_at
+
+
 def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None = None) -> Summary:
     latest = latest_import(db, imp.account_id)
     if latest is None or latest.id != imp.id:
@@ -203,6 +224,24 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
         seen.add(row.gtd_req_id)
 
         sub = subs.get(row.gtd_req_id)
+        if sub is not None and sub_demand[sub.id].submissions[0].id != sub.id:
+            # An ID the demand has since replaced (resubmitted): it must not drive the demand any more.
+            current = sub_demand[sub.id].submissions[0]
+            row.outcome, row.submission_id, row.match_tier = RowOutcome.SUPERSEDED.value, None, None
+            row.note = (
+                f"{row.gtd_req_id} was replaced by {current.gtd_req_id} on {sub_demand[sub.id].app_ref}; "
+                "this row is ignored."
+            )
+            summary.superseded.append(f"{sub_demand[sub.id].app_ref} ({row.gtd_req_id})")
+            continue
+        if sub is not None and _resubmitting(db, sub_demand[sub.id]):
+            # Sent back for correction or resubmission: this ID is on its way out, so it doesn't move the
+            # demand or reopen the escalation that was just settled.
+            d = sub_demand[sub.id]
+            row.outcome, row.submission_id, row.match_tier = RowOutcome.SUPERSEDED.value, None, None
+            row.note = f"{d.app_ref} is being resubmitted; this row waits for its new requisition ID."
+            summary.resubmitting.append(f"{d.app_ref} ({row.gtd_req_id})")
+            continue
         if sub is not None:
             if not (kept or (row.outcome == RowOutcome.PREFIX.value and row.submission_id == sub.id)):
                 row.outcome, row.match_tier = RowOutcome.MATCHED.value, 1
@@ -253,6 +292,9 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             stage = (
                 DemandStatus.LINKED if d.status_enum in (*LINKABLE, *EXPECTED, DemandStatus.DROPPED) else None
             )
+        if stage is not None and pipeline_service.sheet_yields(db, d, stage):
+            summary.held.append(d.app_ref)  # the sheet hasn't caught up with the panel yet
+            stage = None
         if stage is not None:
             _move(db, d, stage, actor_id, imp, summary)
         if stage is DemandStatus.INCORRECT:
@@ -269,6 +311,13 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             channel = margin_service.channel_for_source(cfg, row.source)
             if margin_service.ensure_offer(db, account, d, row.candidate_name, channel) is not None:
                 summary.offers.append(d.app_ref)
+
+    # Panel progress recorded in the app moves demands the sheet hasn't caught up with.
+    for demand_id in in_sheet:
+        d = next(x for x in demands if x.id == demand_id)
+        before = d.status_enum
+        if pipeline_service.apply(db, account, d, actor_id) is not None:
+            summary.stage_changes.append({"ref": d.app_ref, "from": before.label, "to": d.status_enum.label})
 
     # 3. Sent to GTD, not in the sheet: awaiting within the grace period, then missing.
     for d in demands:
@@ -298,7 +347,12 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             and sub_demand[r.submission_id].submissions[0].id == r.submission_id
         }
         for d in demands:
-            if d.id in prev_demands and d.id not in in_sheet and d.status_enum not in FINISHED:
+            if (
+                d.id in prev_demands
+                and d.id not in in_sheet
+                and d.status_enum not in FINISHED
+                and not _resubmitting(db, d)
+            ):
                 summary.dropped.append(d.app_ref)
                 _move(db, d, DemandStatus.DROPPED, actor_id, imp, summary)
                 _escalate(db, account, d, EscalationType.DROPPED,

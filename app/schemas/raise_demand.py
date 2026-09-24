@@ -27,6 +27,8 @@ class DemandForm(BaseModel):
     type: Literal["New", "Replacement"] = "New"
     replaced_resource: str | None = Field(None, max_length=120)
     position_type: Literal["Billable", "Non-billable"] = "Billable"
+    # Does a panel select go on to a client interview, or is the panel's decision final?
+    client_interview_required: bool = True
     primary_skills: list[str] = []
     secondary_skills: list[str] = []
     exp_min: int | None = Field(None, ge=0, le=50)

@@ -127,6 +127,14 @@
 </section>
 {% endif %}
 
+{% if s.get('superseded') or s.get('resubmitting') or s.get('held') %}
+<section class="panel panel-body stack" style="gap:8px">
+  {% if s.get('superseded') %}<div><strong>Replaced requisition IDs, ignored:</strong> {{ s.superseded | join(', ') }}. These demands were resubmitted; only their current ID counts.</div>{% endif %}
+  {% if s.get('resubmitting') %}<div><strong>Being resubmitted, ignored:</strong> {{ s.resubmitting | join(', ') }}. Sent back for correction or resubmission; these rows wait for the new requisition ID.</div>{% endif %}
+  {% if s.get('held') %}<div><strong>Sheet behind the panel:</strong> {% for ref in s.held %}<a class="mono" href="/demands/{{ ref }}">{{ ref }}</a>{{ ', ' if not loop.last }}{% endfor %} kept their interview progress; the sheet still says coverage required.</div>{% endif %}
+</section>
+{% endif %}
+
 {% if s.get('prefix') or s.get('awaiting') %}
 <section class="panel panel-body stack" style="gap:8px">
   {% if s.get('prefix') %}<div><strong>Linked by name prefix:</strong> {% for ref in s.prefix %}{{ dref(ref) }}{{ ', ' if not loop.last }}{% endfor %}. Their requisition IDs were recorded from the sheet.</div>{% endif %}

@@ -69,6 +69,7 @@ class DemandStatus(StrEnum):
     SUBMITTED = "submitted"
     NOTIFIED = "notified"
     SENT_TO_GTD = "sent_to_gtd"
+    RETURNED = "returned"  # sent back to the demand owner to correct, then resubmit
     # Linking (set by reconciliation)
     LINKED = "linked"
     MISSING = "missing"
@@ -76,6 +77,9 @@ class DemandStatus(StrEnum):
     INCORRECT = "incorrect"
     # Coverage (DP sheet status, mapped through account config)
     COVERAGE_REQUIRED = "coverage_required"
+    # Interview progress, set by the app from panel records (the DP sheet lags; see pipeline_service)
+    INTERVIEWING = "interviewing"
+    PANEL_SELECTED = "panel_selected"
     PROFILES_WITH_CLIENT = "profiles_with_client"
     OFFER_IN_PROCESS = "offer_in_process"
     OFFER_IN_MARKET = "offer_in_market"
@@ -103,11 +107,14 @@ STATUS_META: dict[DemandStatus, tuple[str, str, str]] = {
     DemandStatus.SUBMITTED: ("Submitted", "gray", "before_gtd"),
     DemandStatus.NOTIFIED: ("In admin mail", "gray", "before_gtd"),
     DemandStatus.SENT_TO_GTD: ("Sent to GTD", "blue", "before_gtd"),
+    DemandStatus.RETURNED: ("Returned for correction", "risk", "before_gtd"),
     DemandStatus.LINKED: ("Linked", "teal", "linking"),
     DemandStatus.MISSING: ("Missing from sheet", "esc", "linking"),
     DemandStatus.DROPPED: ("Dropped from sheet", "esc", "linking"),
     DemandStatus.INCORRECT: ("Incorrect demand", "esc", "linking"),
     DemandStatus.COVERAGE_REQUIRED: ("Coverage required", "teal", "coverage"),
+    DemandStatus.INTERVIEWING: ("Interviewing", "teal", "coverage"),
+    DemandStatus.PANEL_SELECTED: ("Selected by panel", "blue", "coverage"),
     DemandStatus.PROFILES_WITH_CLIENT: ("Profiles with client", "teal", "coverage"),
     DemandStatus.OFFER_IN_PROCESS: ("Offer in process", "blue", "coverage"),
     DemandStatus.OFFER_IN_MARKET: ("Offer in market", "blue", "coverage"),
@@ -120,6 +127,20 @@ BEFORE_GTD = frozenset(s for s in DemandStatus if s.phase == "before_gtd")
 LINK_PROBLEMS = frozenset({DemandStatus.MISSING, DemandStatus.DROPPED, DemandStatus.INCORRECT})
 # No further work expected: not "open", never "past start".
 FINISHED = frozenset({DemandStatus.STAFFED, DemandStatus.CANCELLED, DemandStatus.CLOSED})
+
+# Coverage stages in the order a demand moves through them. The app may move a demand forward on
+# interview evidence; the DP sheet may move it anywhere (pipeline_service decides who wins).
+PROGRESS_ORDER: tuple[DemandStatus, ...] = (
+    DemandStatus.LINKED,
+    DemandStatus.COVERAGE_REQUIRED,
+    DemandStatus.INTERVIEWING,
+    DemandStatus.PANEL_SELECTED,
+    DemandStatus.PROFILES_WITH_CLIENT,
+    DemandStatus.OFFER_IN_PROCESS,
+    DemandStatus.OFFER_IN_MARKET,
+    DemandStatus.STAFFED,
+)
+APP_PROGRESS = frozenset({DemandStatus.INTERVIEWING, DemandStatus.PANEL_SELECTED})
 
 # Stages a DP sheet status may map to (account settings → status mapping).
 SHEET_STAGES: tuple[DemandStatus, ...] = (
@@ -174,6 +195,7 @@ class ResolutionAction(StrEnum):
     EXTEND = "extend"  # stays open at L1 with a new due date
     CLOSE = "close"  # the demand is closed
     NO_ACTION = "no_action"  # the condition has already cleared (e.g. the ID was linked late)
+    RETURN = "return"  # back to the demand owner to correct; they resubmit
 
     @property
     def label(self) -> str:
@@ -182,6 +204,7 @@ class ResolutionAction(StrEnum):
             "extend": "Extend due date",
             "close": "Close demand",
             "no_action": "No further action (condition cleared)",
+            "return": "Send back to demand owner for correction",
         }[self.value]
 
 
@@ -209,6 +232,7 @@ class RowOutcome(StrEnum):
     CONFLICT = "conflict"  # its [DM-…] demand is already linked to a different requisition ID
     DUPLICATE = "duplicate"  # the same requisition ID appears earlier in the sheet
     INVALID = "invalid"  # no requisition ID
+    SUPERSEDED = "superseded"  # an ID the demand has since replaced (resubmitted); ignored
 
     @property
     def needs_person(self) -> bool:

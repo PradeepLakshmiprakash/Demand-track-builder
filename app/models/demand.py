@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     ForeignKey,
@@ -58,6 +59,8 @@ class Demand(Base):
     category: Mapped[str] = mapped_column(String(20), default="Open")
     type: Mapped[str] = mapped_column(String(20), default="New")
     position_type: Mapped[str] = mapped_column(String(20), default="Billable")
+    # Known when the demand is raised: does a panel select go to a client interview, or is it final?
+    client_interview_required: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     replaced_resource: Mapped[str | None] = mapped_column(String(120))
     primary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     secondary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)

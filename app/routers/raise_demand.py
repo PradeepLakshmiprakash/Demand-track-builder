@@ -25,6 +25,7 @@ guard = require_screen("raise")
 
 FIELDS = (
     "bu_id", "name", "practice", "grade", "category", "type", "replaced_resource", "position_type",
+    "client_interview_required",
     "primary_skills", "secondary_skills", "exp_min", "exp_max", "client_rate", "start_date", "region",
     "location", "work_mode", "hiring_manager", "positions",
 )  # fmt: skip
@@ -36,6 +37,7 @@ def _values(demand: Demand | None, actor: Actor) -> dict[str, Any]:
             "category": "Open",
             "type": "New",
             "position_type": "Billable",
+            "client_interview_required": True,
             "positions": 1,
             "region": "US",
         }

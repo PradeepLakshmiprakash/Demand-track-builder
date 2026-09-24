@@ -51,6 +51,10 @@
           {% for t in ['Billable', 'Non-billable'] %}<label><input type="radio" name="position_type" value="{{ t }}" {{ 'checked' if (v.position_type or 'Billable') == t }}> {{ t }}</label>{% endfor %}
         </fieldset>
       </div>
+      <fieldset class="f radios"><legend>Client interview</legend>
+        <label><input type="radio" name="client_interview_required" value="true" {{ 'checked' if v.client_interview_required in (none, true, 'true', 'True') }}> Required: a panel select goes to the client next</label>
+        <label><input type="radio" name="client_interview_required" value="false" {{ 'checked' if v.client_interview_required in (false, 'false', 'False') }}> Not required: the panel's decision is final</label>
+      </fieldset>
       <label class="f" id="replaced">Who is being replaced<input type="text" name="replaced_resource" value="{{ v.replaced_resource or '' }}" maxlength="120"></label>
       {% if not demand %}
       <label class="f" style="max-width:220px">Number of positions<input type="number" name="positions" min="1" max="20" value="{{ v.positions or 1 }}"><span class="hint">Creates one demand per position</span></label>
@@ -91,9 +95,9 @@
     </fieldset>
 
     <div class="row">
-      {% if not demand or demand.status == 'draft' %}
-        <button class="btn" type="submit" name="action" value="draft">Save draft</button>
-        <button class="btn primary" type="submit" name="action" value="submit">Submit to admin</button>
+      {% if not demand or demand.status in ('draft', 'returned') %}
+        <button class="btn" type="submit" name="action" value="draft">{{ 'Save' if demand and demand.status == 'returned' else 'Save draft' }}</button>
+        <button class="btn primary" type="submit" name="action" value="submit">{{ 'Resubmit to admin' if demand and demand.status == 'returned' else 'Submit to admin' }}</button>
       {% else %}
         <button class="btn primary" type="submit" name="action" value="save">Save changes</button>
       {% endif %}
