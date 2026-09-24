@@ -40,7 +40,7 @@
           <div>{{ u.role_enum.label }}</div>
           <div class="small">
             {% set bn = u.business_units | map(attribute='name') | list %}
-            {{ 'All BUs' if u.visibility_scope == 'full' else (bn | join(', ') or '—') }}{% if u.practices %} · {{ u.practices | join(', ') }}{% endif %}
+            {{ 'All BUs' if u.visibility_scope == 'full' else (bn | join(', ') or '—') }}{% if u.practices %} · {{ u.practices | join(', ') }}{% endif %}{% if u.other_accounts %} · also in {{ u.other_accounts | join(', ') }}{% endif %}
           </div>
           <div>
             {% if not u.active %}<span class="chip gray">Inactive</span>

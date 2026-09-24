@@ -12,7 +12,7 @@ from app.core.db import get_db
 from app.core.enums import FINISHED, DemandStatus, Role, RowOutcome
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import BusinessUnit, Demand, ExcelImport, User
+from app.models import BusinessUnit, Demand, ExcelImport, User, member_of
 from app.services import escalation_service, import_service, reconcile_service
 from app.services.reconcile_service import ReconcileError
 
@@ -52,8 +52,7 @@ def reconciliation_page(
         owners = list(
             db.scalars(
                 select(User)
-                .where(User.active, User.role.in_([Role.DEMAND_OWNER.value, Role.ADMIN.value]),
-                       User.accounts.any(id=actor.account_id))
+                .where(member_of(actor.account_id, Role.DEMAND_OWNER, Role.ADMIN))
                 .options(selectinload(User.business_units))
                 .order_by(User.name)
             )

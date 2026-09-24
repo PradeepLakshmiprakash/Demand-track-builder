@@ -40,7 +40,7 @@ from app.core.enums import (
     Role,
 )
 from app.core.security import Actor
-from app.models import Account, Candidate, Demand, Interview, InterviewerProfile, User
+from app.models import Account, Candidate, Demand, Interview, InterviewerProfile, User, member_of
 
 CV_EXTENSIONS = {".pdf", ".doc", ".docx", ".rtf", ".txt"}
 ROUNDS = ("L1", "L2")
@@ -371,9 +371,7 @@ def schedule(
         who = db.scalar(
             select(User).where(
                 User.id == interviewer_id,
-                User.active,
-                User.role == Role.INTERVIEWER.value,
-                User.accounts.any(id=actor.account_id),
+                member_of(actor.account_id, Role.INTERVIEWER),
             )
         )
         if who is None:
@@ -605,7 +603,7 @@ def assigned_to(db: Session, actor: Actor) -> list[tuple[Interview, Candidate, D
         select(Interview, Candidate, Demand)
         .join(Candidate, Candidate.id == Interview.candidate_id)
         .outerjoin(Demand, Demand.id == Interview.demand_id)
-        .where(Interview.interviewer_id == actor.id)
+        .where(Interview.interviewer_id == actor.id, Candidate.account_id == actor.account_id)
         .order_by(Interview.status.desc(), Interview.scheduled_at.nulls_last(), Interview.id.desc())
     ).all()
     return [(i, c, d) for i, c, d in rows]

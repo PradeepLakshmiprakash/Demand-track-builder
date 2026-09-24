@@ -39,7 +39,17 @@ from app.core.enums import (
     StageOrigin,
 )
 from app.core.workdays import add_working_days
-from app.models import Account, BusinessUnit, Demand, ExcelImport, ExcelRow, GtdSubmission, StageEvent, User
+from app.models import (
+    Account,
+    BusinessUnit,
+    Demand,
+    ExcelImport,
+    ExcelRow,
+    GtdSubmission,
+    StageEvent,
+    User,
+    member_of,
+)
 from app.services import interview_service, margin_service, pipeline_service
 from app.services.demand_service import record_stage
 from app.services.escalation_service import open_escalation
@@ -470,15 +480,7 @@ def owner_for_originator(db: Session, account_id: int, originator: str | None) -
     """The sheet's originator, if their name matches an active demand owner or admin demand owner."""
     if not originator:
         return None
-    people = list(
-        db.scalars(
-            select(User).where(
-                User.active,
-                User.role.in_([Role.DEMAND_OWNER.value, Role.ADMIN.value]),
-                User.accounts.any(id=account_id),
-            )
-        )
-    )
+    people = list(db.scalars(select(User).where(member_of(account_id, Role.DEMAND_OWNER, Role.ADMIN))))
     best = max(
         people, key=lambda u: fuzz.token_sort_ratio(u.name.casefold(), originator.casefold()), default=None
     )
@@ -494,12 +496,12 @@ def create_from_row(
     imp, row = _actionable_row(db, account_id, row_id)
     owner = db.scalar(
         select(User)
-        .where(User.id == owner_id, User.active, User.accounts.any(id=account_id))
-        .options(selectinload(User.business_units))
+        .where(User.id == owner_id, member_of(account_id, Role.DEMAND_OWNER, Role.ADMIN))
+        .options(selectinload(User.business_units), selectinload(User.memberships))
     )
-    if owner is None or owner.role not in (Role.DEMAND_OWNER.value, Role.ADMIN.value):
+    if owner is None:
         raise ReconcileError("Pick an active demand owner or admin demand owner as the owner.")
-    if owner.role == Role.DEMAND_OWNER.value:
+    if owner.membership(account_id).role == Role.DEMAND_OWNER.value:  # type: ignore[union-attr]
         bus = [b for b in owner.business_units if b.account_id == account_id]
         if len(bus) != 1:
             raise ReconcileError(f"{owner.name} has no single business unit.")

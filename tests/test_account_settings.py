@@ -29,7 +29,7 @@ def admin(client: Client) -> Client:
 
 
 def account(db: Session) -> Account:
-    return db.query(Account).one()
+    return db.query(Account).filter(Account.name == "Discover NA").one()
 
 
 def test_update_thresholds(admin: Client, db: Session) -> None:

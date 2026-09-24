@@ -3,6 +3,9 @@
 `current_user` resolves the acting user. Today it reads the dev-only "View as" cookie; in Phase 7 it
 reads the SSO session instead. Nothing downstream changes, because every screen depends on `Actor`,
 and an Actor's role, BUs, practices and scope always come from the User access page.
+
+A person can belong to several accounts with a different role in each. The Actor is always one
+person *in one account*: the account picked with the switcher (cookie), else their first.
 """
 
 from collections.abc import Callable
@@ -15,9 +18,10 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.enums import Role, Scope
-from app.models import Account, User
+from app.models import User, UserAccount
 
 VIEW_AS_COOKIE = "dt_view_as"
+ACCOUNT_COOKIE = "dt_account"
 
 
 class AccessRemoved(HTTPException):
@@ -40,6 +44,8 @@ class Actor:
     bu_ids: frozenset[int]
     bu_names: tuple[str, ...]
     practices: tuple[str, ...]
+    is_platform_admin: bool = False
+    accounts: tuple[tuple[int, str], ...] = ()  # every account this person may switch to
 
     @property
     def is_full(self) -> bool:
@@ -56,25 +62,35 @@ class Actor:
         return f"{self.scope.label} · {where}"
 
 
-def actor_from_user(db: Session, user: User) -> Actor:
+def usable_memberships(user: User) -> list[UserAccount]:
+    return [m for m in user.memberships if m.active and m.account.active]
+
+
+def actor_from_user(db: Session, user: User, account_id: int | None = None) -> Actor:
     if not user.active:
         raise AccessRemoved()
-    account: Account | None = user.accounts[0] if user.accounts else None
-    if account is None:
+    usable = usable_memberships(user)
+    if not usable:
+        if any(m.account.active for m in user.memberships):
+            raise AccessRemoved()
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not assigned to an account.")
+    m = next((x for x in usable if x.account_id == account_id), usable[0])
+    account = m.account
     bus = [b for b in user.business_units if b.account_id == account.id]
     return Actor(
         id=user.id,
         name=user.name,
         email=user.email,
-        role=user.role_enum,
-        scope=user.scope_enum,
-        level=user.level,
+        role=m.role_enum,
+        scope=m.scope_enum,
+        level=m.level,
         account_id=account.id,
         account_name=account.name,
         bu_ids=frozenset(b.id for b in bus),
         bu_names=tuple(b.name for b in bus),
-        practices=tuple(user.practices),
+        practices=tuple(p for p in user.practices if p in set(account.settings.practices)),
+        is_platform_admin=user.is_platform_admin,
+        accounts=tuple((x.account_id, x.account.name) for x in usable),
     )
 
 
@@ -83,15 +99,18 @@ def _load_user(db: Session, user_id: int) -> User | None:
         select(User)
         .where(User.id == user_id)
         .options(
-            selectinload(User.accounts), selectinload(User.business_units), selectinload(User.practice_links)
+            selectinload(User.memberships).selectinload(UserAccount.account),
+            selectinload(User.business_units),
+            selectinload(User.practice_links),
         )
     )
 
 
 def default_view_user_id(db: Session) -> int | None:
     """Who the switcher shows before anyone picks: the first active demand owner."""
+    owner = select(UserAccount.user_id).where(UserAccount.role == Role.DEMAND_OWNER.value, UserAccount.active)
     return db.scalar(
-        select(User.id).where(User.active, User.role == Role.DEMAND_OWNER.value).order_by(User.id).limit(1)
+        select(User.id).where(User.active, User.id.in_(owner)).order_by(User.id).limit(1)
     ) or db.scalar(select(User.id).where(User.active).order_by(User.id).limit(1))
 
 
@@ -106,7 +125,14 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> Actor:
     user = _load_user(db, user_id) if user_id else None
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No users yet. Run the seed script.")
-    return actor_from_user(db, user)
+    raw_account = request.cookies.get(ACCOUNT_COOKIE, "")
+    return actor_from_user(db, user, int(raw_account) if raw_account.isdigit() else None)
+
+
+def require_platform_admin(actor: Actor = Depends(current_user)) -> Actor:
+    if not actor.is_platform_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a platform admin can manage accounts.")
+    return actor
 
 
 def require_role(*roles: Role) -> Callable[..., Actor]:

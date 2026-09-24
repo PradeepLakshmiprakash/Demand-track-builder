@@ -2,6 +2,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -15,6 +16,7 @@ from app.core.security import VIEW_AS_COOKIE, Actor, current_user
 from app.core.templating import render
 from app.routers import (
     account_settings,
+    accounts,
     approvals,
     candidates,
     escalations,
@@ -51,6 +53,7 @@ ROUTERS = [
     integrations.router,
     user_access.router,
     account_settings.router,
+    accounts.router,
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -79,8 +82,9 @@ def create_app() -> FastAPI:
         app.include_router(r)
 
     @app.get("/", include_in_schema=False)
-    def home(actor: Actor = Depends(current_user)) -> RedirectResponse:
-        return RedirectResponse(home_for(actor.role), status_code=303)
+    def home(request: Request, actor: Actor = Depends(current_user)) -> RedirectResponse:
+        msg = request.query_params.get("msg")
+        return RedirectResponse(home_for(actor.role) + (f"?msg={quote(msg)}" if msg else ""), status_code=303)
 
     @app.get("/soon/{key}", response_class=HTMLResponse, include_in_schema=False)
     def coming_soon(

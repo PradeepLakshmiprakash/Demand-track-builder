@@ -17,7 +17,7 @@ from app.core.db import get_db
 from app.core.enums import InterviewStatus, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import Account, Candidate, Demand, Interview, User
+from app.models import Account, Candidate, Demand, Interview, User, member_of
 from app.services import interview_service as svc
 from app.services.interview_service import InterviewError
 
@@ -104,13 +104,7 @@ def candidates_page(
         else {},
         "requisitions": svc.open_requisitions(db, actor.account_id),
         "interviewers": list(
-            db.scalars(
-                select(User)
-                .where(
-                    User.active, User.role == Role.INTERVIEWER.value, User.accounts.any(id=actor.account_id)
-                )
-                .order_by(User.name)
-            )
+            db.scalars(select(User).where(member_of(actor.account_id, Role.INTERVIEWER)).order_by(User.name))
         ),
         "is_admin": actor.role is Role.ADMIN,
     }

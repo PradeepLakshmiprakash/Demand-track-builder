@@ -61,12 +61,25 @@ def update_thresholds(db: Session, account_id: int, data: dict[str, str]) -> Non
 def update_lists(db: Session, account_id: int, lists: dict[str, list[str]]) -> None:
     acc = get_account(db, account_id)
     cfg = acc.settings
-    for key in ("practices", "grades", "regions", "work_modes", "categories", "resolution_reasons"):
+    keys = (
+        "practices",
+        "grades",
+        "regions",
+        "work_modes",
+        "categories",
+        "resolution_reasons",
+        "interview_ratings",
+    )
+    for key in keys:
         if key in lists:
             values = list(dict.fromkeys(v.strip() for v in lists[key] if v.strip()))
             if not values:
                 raise SettingsError(f"{key.replace('_', ' ').capitalize()} can't be empty.")
             setattr(cfg, key, values)
+    for level in ("L1", "L2"):
+        label = " ".join(lists.get(f"escalation_owner_{level.lower()}", [])).strip()
+        if label:
+            cfg.escalation_owners[level] = label[:80]
     acc.settings = cfg
     db.commit()
 

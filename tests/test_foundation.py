@@ -52,7 +52,10 @@ def test_rows_and_summary_for_priya(db: Session) -> None:
     assert filter_counts(rows) == {"all": 8, "attention": 4, "before_gtd": 2, "linked": 5, "finished": 1}
 
 
-def test_seed_is_single_account(db: Session) -> None:
+def test_seed_has_two_accounts(db: Session) -> None:
     from app.models import Account
 
-    assert [a.name for a in db.scalars(select(Account))] == ["Discover NA"]
+    assert [a.name for a in db.scalars(select(Account).order_by(Account.id))] == [
+        "Discover NA",
+        "Acme Insurance",
+    ]

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Accounts{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">Platform admin</div>
+    <h1>Accounts</h1>
+    <div class="lede">One account per client. Create it and name its admin demand owner; they set up everything else (business units, lists, channels, DP sheet format, thresholds, people, rate card) in the account's own settings.</div>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>Client accounts</h2></div><span class="chip gray">{{ rows | length }}</span></div>
+  <div class="tbl plain">
+    {% for r in rows %}
+    <div class="tr">
+      <div>
+        <div class="title">{{ r.account.name }} {% if not r.account.active %}<span class="chip gray">Inactive</span>{% endif %}{% if r.account.id == actor.account_id %} <span class="chip teal">You're here</span>{% endif %}</div>
+        <div class="note">{{ r.members }} people · {{ r.open_demands }} open demands · {{ r.account.settings.timezone }} · admin demand owner: {{ r.admins | join(', ') or 'none' }}</div>
+      </div>
+      <form method="post" action="/platform/accounts/{{ r.account.id }}/active">
+        {% if r.account.active %}
+          <input type="hidden" name="active" value="0">
+          <button class="btn small danger" {{ 'disabled' if r.account.id == actor.account_id }}>Deactivate</button>
+        {% else %}
+          <input type="hidden" name="active" value="1">
+          <button class="btn small">Reactivate</button>
+        {% endif %}
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel" id="new">
+  <div class="panel-head"><div><h2>New account</h2><div class="hint">Deactivating an account blocks access to it and stops its mails and escalations; nothing is deleted.</div></div></div>
+  <form method="post" action="/platform/accounts" class="panel-body stack">
+    <div class="grid2">
+      <label class="f">Client account name<input type="text" name="name" required minlength="2" maxlength="120" placeholder="e.g. Acme Insurance"></label>
+      <label class="f">Time zone<input type="text" name="timezone" required value="America/New_York"><span class="hint">IANA name, e.g. America/Chicago, Europe/London</span></label>
+      <label class="f">Start from
+        <select name="copy_from">
+          <option value="">Blank settings</option>
+          {% for a in templates %}<option value="{{ a.id }}">Copy settings from {{ a.name }}</option>{% endfor %}
+        </select>
+        <span class="hint">Copies lists, supply channels, DP sheet columns and status mapping, and thresholds. Never business units, people, rates or demands.</span>
+      </label>
+    </div>
+    <div class="grid2">
+      <label class="f">Admin demand owner's name<input type="text" name="admin_name" required minlength="2" maxlength="120"></label>
+      <label class="f">Their email<input type="email" name="admin_email" required maxlength="254"><span class="hint">Someone who already works in another account keeps one login and gets this account too.</span></label>
+    </div>
+    <div><button class="btn primary">Create account</button></div>
+  </form>
+</section>
+{% endblock %}

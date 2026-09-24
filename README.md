@@ -20,7 +20,8 @@ Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 | 4 | Escalation engine | **Done**: not submitted / aging / past start triggers, two-hourly sweep, L1 → L2 promotion, mails to the BU delivery head and leadership, Escalations screen with resolve (resubmit, extend, close, no further action) and audit trail |
 | 5 | Rate card, approvals, leadership view | **Done**: dated rate card, offers priced from the DP sheet and routed by the margin cut-off, revenue loss, leadership overview |
 | 6 | Interviews | **Done**: candidates mapped to requisitions (from the DP sheet, panelists, Karat stub), panelist recommendations, L2 requests approved by the demand owner, scheduling placeholders, invite + no-sign-in feedback link, CVs, interviewer alerts, rejection-limit and panel-SLA escalations |
-| 7 | Production readiness | Next |
+| 7 | Production readiness | Deferred to last (SSO, AWS, backups, UAT) |
+| 8 | Second account | **Done**: role per account membership, account switcher, platform Accounts screen (create from blank or a copy of another account's settings, deactivate), Acme Insurance seeded with its own DP sheet format; exit test onboards a third client through the screens only |
 
 ## Run locally (this machine)
 
@@ -33,7 +34,8 @@ scripts\db-start.cmd
 
 Open http://localhost:8010 and use **View as** in the sidebar to switch persona.
 
-Or just run `scriptsun.cmd`: it starts the database if needed and serves the app in that window.
+Or just run `scripts
+un.cmd`: it starts the database if needed and serves the app in that window.
 
 `.env` holds `DATABASE_URL` and `TEST_DATABASE_URL` (see `.env.example`). With Docker instead:
 `docker compose up`, then `docker compose exec app python -m seed`.
@@ -65,7 +67,8 @@ app/routers/     view_switcher, my_demands, raise_demand, gtd_queue, excel_impor
                  user_access, account_settings
 app/templates/   base.html + one folder per screen
 migrations/      Alembic
-seed/            Discover NA dummy data (python -m seed) and a sample DP sheet (python -m seed.sample_sheet)
+seed/            Discover NA + Acme Insurance dummy data (python -m seed); sample DP sheets
+                 (python -m seed.sample_sheet, python -m seed.sample_sheet_acme)
 tests/
 ```
 
@@ -80,5 +83,7 @@ tests/
 | Admin team | Farah Q., Deepak L. | Full account; GTD queue, DP sheet import, reconciliation, escalations |
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
+
+**Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Sanjay M. (leadership) and Vikram P. (interviewer) work in both accounts and switch between them in the sidebar. Kavya R. is also the **platform admin** (Accounts screen).
 
 All names are placeholders. Never commit a real DP sheet: it carries candidate personal data.

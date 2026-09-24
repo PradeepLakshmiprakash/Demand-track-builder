@@ -17,7 +17,7 @@ from app.core import mail
 from app.core.config import get_settings
 from app.core.enums import DemandStatus, Role
 from app.core.workdays import add_working_days
-from app.models import Account, Demand, NotificationBatch, User
+from app.models import Account, Demand, NotificationBatch, User, UserAccount
 from app.services.demand_service import record_stage
 
 ADMIN_ROLES = (Role.ADMIN.value, Role.ADMIN_TEAM.value)
@@ -55,8 +55,9 @@ def recipients(db: Session, account_id: int) -> list[User]:
     return list(
         db.scalars(
             select(User)
-            .where(User.active, User.role.in_(ADMIN_ROLES), User.accounts.any(id=account_id))
-            .order_by(User.role, User.name)
+            .join(UserAccount, (UserAccount.user_id == User.id) & (UserAccount.account_id == account_id))
+            .where(User.active, UserAccount.active, UserAccount.role.in_(ADMIN_ROLES))
+            .order_by(UserAccount.role, User.name)
         )
     )
 

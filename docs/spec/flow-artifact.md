@@ -1,8 +1,8 @@
 # Demand Tracker — Application Flows
 
-Version 1.3 · 24 Sep 2026 — updated to match what is built through Phase 6 plus the wiring fixes (see §14–§15 for what changed since 1.1).
+Version 1.4 · 24 Sep 2026 — updated to match what is built through Phase 8 (see §14–§16 for what changed since 1.1).
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D52 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D56 in `docs/decisions.md`.
 
 ---
 
@@ -42,9 +42,15 @@ Flow:
 
 Login comes in Phase 7 (SSO). Until then a **View as** menu in the sidebar switches the whole app to any seeded user. It's a development aid, turned off by configuration in production.
 
-### 1.3 Seed data
+### 1.3 Accounts and people in more than one
 
-All seeded data belongs to **one account: Discover NA**, with placeholder people and candidates. A made-up DP sheet in the real sheet's shape (`seed/sample_sheet.py`) stands in for the 09-Sep sheet; real sheets carry candidate personal data and are never committed.
+Each client is an **account**. A person's role, visibility and level belong to their **membership** of an account, so one person can work in several accounts with one login (e.g. leadership or an interviewer covering two clients) and a different role in each. They switch accounts in the sidebar; everything they see is the current account's. Deactivating someone on User access removes them from that account only.
+
+A **platform admin** (separate from any role inside an account) creates accounts on the **Accounts** screen: a name, time zone, a start from blank settings or a copy of another account's settings (lists, channels, DP sheet columns and status mapping, thresholds; never business units, people, rates or demands) and the first admin demand owner. They can deactivate an account: its people lose access to it, its mails and escalations stop, nothing is deleted.
+
+### 1.4 Seed data
+
+Seeded data has **two accounts**: Discover NA, and a made-up **Acme Insurance** with its own BUs, practices, grades, channels, DP sheet format (`seed/sample_sheet_acme.py`), ratings and thresholds. Sanjay and Vikram work in both. For Discover, with placeholder people and candidates. A made-up DP sheet in the real sheet's shape (`seed/sample_sheet.py`) stands in for the 09-Sep sheet; real sheets carry candidate personal data and are never committed.
 
 ---
 
@@ -386,3 +392,9 @@ flowchart LR
 - §6.3, §7, §11: Interviewing and Selected by panel stages, set from interview records the day they're entered; a lagging sheet doesn't undo them.
 - §9.3: *send back to demand owner for correction* (Returned for correction); old or outgoing requisition IDs in the sheet are ignored.
 - §8: the demand owner sees each offer's approval progress (no rates or margin) and is mailed the decision; the date of joining and candidate stages follow the DP sheet (D51–D52).
+
+## 16. Changes in 1.4 (Phase 8, second account)
+
+- §1.1, §1.3: role, visibility and level per account membership; account switcher; platform admin and the Accounts screen (D53–D55).
+- §1.4: Acme Insurance seeded as a second, differently configured account.
+- Account settings also hold the interview rating dimensions and the L1/L2 escalation owner labels (D56).

@@ -7,7 +7,7 @@ from app.models.escalation import Escalation, EscalationEvent
 from app.models.gtd import GtdSubmission, NotificationBatch
 from app.models.interview import Candidate, Interview
 from app.models.sheet import ExcelImport, ExcelRow, StageEvent
-from app.models.user import InterviewerProfile, User, UserAccount, UserBusinessUnit, UserPractice
+from app.models.user import InterviewerProfile, User, UserAccount, UserBusinessUnit, UserPractice, member_of
 
 __all__ = [
     "Account",
@@ -27,6 +27,7 @@ __all__ = [
     "StageEvent",
     "User",
     "UserAccount",
+    "member_of",
     "UserBusinessUnit",
     "UserPractice",
 ]

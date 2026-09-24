@@ -69,6 +69,9 @@
       <label class="f">Work modes<textarea name="work_modes" rows="4">{{ cfg.work_modes | join('\n') }}</textarea></label>
       <label class="f">Categories<textarea name="categories" rows="4">{{ cfg.categories | join('\n') }}</textarea></label>
       <label class="f">Escalation reasons<textarea name="resolution_reasons" rows="6">{{ cfg.resolution_reasons | join('\n') }}</textarea></label>
+      <label class="f">Interview ratings<textarea name="interview_ratings" rows="4">{{ cfg.interview_ratings | join('\n') }}</textarea><span class="hint">What a panelist rates, each 1 to 5</span></label>
+      <label class="f">Who owns L1 escalations<input type="text" name="escalation_owner_l1" value="{{ cfg.escalation_owners.get('L1', '') }}"><span class="hint">Mailed per BU: the BU's delivery head</span></label>
+      <label class="f">Who owns L2 escalations<input type="text" name="escalation_owner_l2" value="{{ cfg.escalation_owners.get('L2', '') }}"></label>
     </div>
     <div><button class="btn primary">Save lists</button></div>
   </form>

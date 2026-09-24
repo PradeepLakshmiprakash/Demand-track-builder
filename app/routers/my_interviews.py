@@ -55,7 +55,9 @@ async def feedback_on_assigned(
     interview_id: int, request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     iv = db.get(Interview, interview_id)
-    if iv is None or iv.interviewer_id != actor.id:
+    cand = db.get(Candidate, iv.candidate_id) if iv is not None else None
+    # Someone who interviews in two accounts gives feedback in the account the interview belongs to.
+    if iv is None or cand is None or iv.interviewer_id != actor.id or cand.account_id != actor.account_id:
         raise HTTPException(404, "Interview not found.")
     account = db.get_one(Account, actor.account_id)
     form = await request.form()
@@ -64,7 +66,7 @@ async def feedback_on_assigned(
             db,
             account,
             actor.id,
-            db.get_one(Candidate, iv.candidate_id),
+            cand,
             feedback_from_form(form, account.settings.interview_ratings, iv.round),
             iv,
         )

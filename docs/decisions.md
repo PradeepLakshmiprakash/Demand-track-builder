@@ -338,3 +338,27 @@ Rates and margin appear only for the admin demand owner and leadership.
 from the latest sheet and how many days it is after the requested start. Candidates named on the
 row take its stage (Profiles with client, Offer in market, Staffed); an offer's own stage (Offer
 approved / declined) is kept when the next sheet still says Offer in process.
+
+## Phase 8: second account (24 Sep)
+
+**D53. A role belongs to a person's membership of an account.** Role, visibility scope, level and
+active move from `users` to `user_accounts` (migration 0009). One person, one login, several accounts,
+a different role in each; the sidebar has an account switcher for people in more than one. Adding an
+existing person's email on User access gives them a membership in this account instead of an error.
+Deactivating on User access removes access to that account only. Each account shows only its own
+business units and practices for a person.
+
+**D54. A platform admin creates and deactivates accounts.** A flag on the person, separate from any
+role inside an account (seeded: Kavya). The Accounts screen creates an account from blank settings or a
+copy of another account's settings (lists, channels, DP sheet columns and status mapping, thresholds;
+never business units, people, rates or demands) and names its first admin demand owner, who sets up
+the rest in Account settings. Deactivating keeps all data; people lose access and the jobs skip it.
+
+**D55. The second account is a made-up client, Acme Insurance,** configured unlike Discover in every
+setting (time zone, BUs, practices, grade names, channels, DP sheet headers, column order and blanks,
+statuses, ratings, thresholds, margin cut-off). Phase 8's exit test creates a third account and sets it
+up through the screens only, then takes a demand from raise to an approved offer. Requisition IDs stay
+unique across all accounts (GTD is one system); demand refs share one sequence.
+
+**D56. The last two client-specific settings moved to Account settings:** the interview rating
+dimensions and the L1/L2 escalation owner labels.

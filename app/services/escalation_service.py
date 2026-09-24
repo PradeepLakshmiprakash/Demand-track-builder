@@ -57,6 +57,7 @@ from app.models import (
     Interview,
     StageEvent,
     User,
+    member_of,
 )
 from app.services.demand_service import record_stage
 
@@ -389,13 +390,7 @@ class Audience:
 
 
 def _users(db: Session, account_id: int, *roles: Role) -> list[User]:
-    return list(
-        db.scalars(
-            select(User).where(
-                User.active, User.role.in_([r.value for r in roles]), User.accounts.any(id=account_id)
-            )
-        )
-    )
+    return list(db.scalars(select(User).where(member_of(account_id, *roles))))
 
 
 def audience(db: Session, account: Account, esc: Escalation, demand: Demand) -> Audience:

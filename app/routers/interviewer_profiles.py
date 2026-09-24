@@ -12,7 +12,7 @@ from app.core.db import get_db
 from app.core.enums import InterviewStatus, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import Account, Interview, InterviewerProfile, User
+from app.models import Account, Interview, InterviewerProfile, User, member_of
 from app.schemas.user_access import _split
 from app.services import interview_service as svc
 
@@ -28,7 +28,7 @@ def profiles_page(
     rows = db.execute(
         select(User, InterviewerProfile)
         .outerjoin(InterviewerProfile, InterviewerProfile.user_id == User.id)
-        .where(User.role == Role.INTERVIEWER.value, User.accounts.any(id=actor.account_id))
+        .where(member_of(actor.account_id, Role.INTERVIEWER, active=False))
         .order_by(User.active.desc(), User.name)
     ).all()
     reqs = svc.open_requisitions(db, actor.account_id)
@@ -54,9 +54,7 @@ async def save(
     user_id: int, request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     u = db.scalar(
-        select(User).where(
-            User.id == user_id, User.role == Role.INTERVIEWER.value, User.accounts.any(id=actor.account_id)
-        )
+        select(User).where(User.id == user_id, member_of(actor.account_id, Role.INTERVIEWER, active=False))
     )
     if u is None:
         return RedirectResponse("/interviewers?err=Interviewer+not+found", status_code=303)

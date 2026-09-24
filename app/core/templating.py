@@ -68,7 +68,9 @@ def render(
         "menu": menu,
         "active_nav": max(hits, key=lambda n: len(n.path)).key if hits else None,
         "path": request.url.path,
-        "switcher": switcher_options(db) if (db is not None and settings.view_switcher_enabled) else None,
+        "switcher": switcher_options(db, actor.account_id if actor else None)
+        if (db is not None and settings.view_switcher_enabled)
+        else None,
         "tz": _account_tz(db, actor),
         "msg": request.query_params.get("msg"),
         "err": request.query_params.get("err"),

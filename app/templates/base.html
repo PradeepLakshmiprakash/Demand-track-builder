@@ -16,6 +16,20 @@
       <div class="name">Demand tracker</div>
     </div>
 
+    {% if actor and actor.accounts | length > 1 %}
+    <details class="viewas acct-switch">
+      <summary class="cap-row">
+        <span class="who">{{ actor.account_name }}<small>Switch account</small></span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5l4 4 4-4"/></svg>
+      </summary>
+      <div class="menu" role="menu" aria-label="Accounts you work in">
+        {% for aid, aname in actor.accounts %}
+          <a role="menuitem" href="/switch-account/{{ aid }}" class="{{ 'on' if aid == actor.account_id }}"><span>{{ aname }}</span></a>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
     {% if switcher %}
     <details class="viewas">
       <summary class="cap-row">
@@ -45,6 +59,10 @@
         <a class="nav-link soon {{ 'active' if item.key == active_nav }}" href="/soon/{{ item.key }}">{{ item.label_for(actor.role) }} <span class="tag">P{{ item.phase }}</span></a>
       {% endif %}
     {% endfor %}
+
+    {% if actor and actor.is_platform_admin %}
+      <a class="nav-link platform {{ 'active' if path.startswith('/platform') }}" href="/platform/accounts">Accounts <span class="tag">Platform</span></a>
+    {% endif %}
 
     {% if actor %}
     <div class="side-foot">Access: {{ actor.scope.label | lower }}<br>{{ 'All BUs' if actor.is_full else (actor.bu_names | join(', ') or 'No BU') }} · {{ actor.account_name }}</div>

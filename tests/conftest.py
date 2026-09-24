@@ -40,8 +40,8 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import new_session  # noqa: E402
-from app.core.security import VIEW_AS_COOKIE  # noqa: E402
-from app.models import BusinessUnit, User  # noqa: E402
+from app.core.security import ACCOUNT_COOKIE, VIEW_AS_COOKIE  # noqa: E402
+from app.models import Account, BusinessUnit, User  # noqa: E402
 from seed.load import load  # noqa: E402
 
 get_settings.cache_clear()
@@ -90,10 +90,21 @@ def bu_id(name: str) -> int:
     return bid
 
 
+def account_id(name: str) -> int:
+    with new_session() as s:
+        aid = s.scalar(select(Account.id).where(Account.name == name))
+    assert aid, name
+    return aid
+
+
 class Client(TestClient):
-    def as_user(self, email_prefix: str) -> "Client":
-        """Act as a seeded user, e.g. client.as_user('priya')."""
+    def as_user(self, email_prefix: str, account: str | None = None) -> "Client":
+        """Act as a seeded user, e.g. client.as_user('priya'), in their first account or the one named."""
         self.cookies.set(VIEW_AS_COOKIE, str(user_id(email_prefix)))
+        if ACCOUNT_COOKIE in self.cookies:
+            del self.cookies[ACCOUNT_COOKIE]
+        if account is not None:
+            self.cookies.set(ACCOUNT_COOKIE, str(account_id(account)))
         return self
 
 

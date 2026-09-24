@@ -97,7 +97,7 @@
             <label class="f">Owner of the new demand
               <select name="owner_id" required>
                 <option value="">Choose…</option>
-                {% for u in owners %}<option value="{{ u.id }}" {{ 'selected' if guess and guess.id == u.id }}>{{ u.name }} · {{ 'All BUs' if u.role == 'admin' else u.business_units | map(attribute='name') | join(', ') }}</option>{% endfor %}
+                {% for u in owners %}<option value="{{ u.id }}" {{ 'selected' if guess and guess.id == u.id }}>{{ u.name }} · {{ u.business_units | selectattr('account_id', 'equalto', actor.account_id) | map(attribute='name') | join(', ') if u.membership(actor.account_id).role == 'demand_owner' else 'All BUs' }}</option>{% endfor %}
               </select>
               {% if guess %}<span class="hint">Matches the sheet's originator.</span>{% elif r.originator %}<span class="hint">No user matches "{{ r.originator }}".</span>{% endif %}
             </label>

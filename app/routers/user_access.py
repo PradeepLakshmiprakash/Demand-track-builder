@@ -13,7 +13,7 @@ from app.core.db import get_db
 from app.core.enums import ALLOWED_SCOPES, Role, Scope
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import BusinessUnit, User
+from app.models import BusinessUnit
 from app.schemas.user_access import UserForm, UserOut
 from app.services import user_service
 from app.services.account_service import get_account
@@ -41,7 +41,7 @@ def _page(
     request: Request,
     actor: Actor,
     db: Session,
-    selected: User | None,
+    selected: user_service.Member | None,
     *,
     draft: dict[str, Any] | None = None,
     error: str | None = None,
@@ -108,7 +108,10 @@ async def update_user(
         user = user_service.update_user(db, actor, user_id, UserForm.model_validate(raw))
     except (ValidationError, UserAccessError) as e:
         db.rollback()
-        selected = db.get(User, user_id)
+        try:
+            selected = user_service.get_user(db, actor.account_id, user_id)
+        except UserAccessError:
+            selected = None
         return _page(request, actor, db, selected, draft=raw, error=_message(e))
     return RedirectResponse(f"/users?id={user.id}&msg=Changes+saved", status_code=303)
 

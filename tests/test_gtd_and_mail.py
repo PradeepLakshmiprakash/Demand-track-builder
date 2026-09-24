@@ -30,7 +30,7 @@ def by_ref(db: Session, ref: str) -> Demand:
 
 
 def account(db: Session) -> Account:
-    return db.scalars(select(Account)).one()
+    return db.scalars(select(Account).where(Account.name == "Discover NA")).one()
 
 
 # --- Daily admin mail ------------------------------------------------------------------------------

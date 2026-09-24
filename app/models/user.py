@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, func
+from sqlalchemy import Boolean, CheckConstraint, ColumnElement, ForeignKey, Index, String, and_, func, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,9 +10,53 @@ from app.models.account import Account, BusinessUnit
 
 
 class User(Base):
-    """A person. Role and visibility are data set on the User access page; login only identifies them."""
+    """A person. What they do and see is set per account on their membership (UserAccount), from the
+    User access page; login only identifies them."""
 
     __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(254))
+    name: Mapped[str] = mapped_column(String(120))
+    # False blocks sign-in everywhere. Access to one account is UserAccount.active.
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Creates and deactivates accounts (Accounts screen); separate from any role inside an account.
+    is_platform_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    accounts: Mapped[list[Account]] = relationship(
+        secondary="user_accounts", order_by=Account.id, viewonly=True
+    )
+    business_units: Mapped[list[BusinessUnit]] = relationship(
+        secondary="user_business_units", order_by=BusinessUnit.id
+    )
+    practice_links: Mapped[list["UserPractice"]] = relationship(cascade="all, delete-orphan")
+    interviewer_profile: Mapped["InterviewerProfile | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+    memberships: Mapped[list["UserAccount"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", order_by="UserAccount.account_id"
+    )
+
+    def membership(self, account_id: int) -> "UserAccount | None":
+        return next((m for m in self.memberships if m.account_id == account_id), None)
+
+    @property
+    def practices(self) -> list[str]:
+        return sorted(p.practice for p in self.practice_links)
+
+
+# Emails are unique regardless of case.
+Index("uq_users_email_lower", func.lower(User.email), unique=True)
+
+
+class UserAccount(Base):
+    """A person's membership of one account: their role, visibility and level there."""
+
+    __tablename__ = "user_accounts"
     __table_args__ = (
         CheckConstraint(check_in("role", Role), name="role_valid"),
         CheckConstraint(check_in("visibility_scope", Scope), name="scope_valid"),
@@ -25,25 +69,15 @@ class User(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(254))
-    name: Mapped[str] = mapped_column(String(120))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(20))
     level: Mapped[str | None] = mapped_column(String(10))
     visibility_scope: Mapped[str] = mapped_column(String(24))
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
-    accounts: Mapped[list[Account]] = relationship(secondary="user_accounts", order_by=Account.id)
-    business_units: Mapped[list[BusinessUnit]] = relationship(
-        secondary="user_business_units", order_by=BusinessUnit.id
-    )
-    practice_links: Mapped[list["UserPractice"]] = relationship(cascade="all, delete-orphan")
-    interviewer_profile: Mapped["InterviewerProfile | None"] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    user: Mapped[User] = relationship(back_populates="memberships")
+    account: Mapped[Account] = relationship()
 
     @property
     def role_enum(self) -> Role:
@@ -53,20 +87,16 @@ class User(Base):
     def scope_enum(self) -> Scope:
         return Scope(self.visibility_scope)
 
-    @property
-    def practices(self) -> list[str]:
-        return sorted(p.practice for p in self.practice_links)
 
-
-# Emails are unique regardless of case.
-Index("uq_users_email_lower", func.lower(User.email), unique=True)
-
-
-class UserAccount(Base):
-    __tablename__ = "user_accounts"
-
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+def member_of(account_id: int, *roles: Role, active: bool = True) -> ColumnElement[bool]:
+    """Filter for select(User): members of the account (optionally with these roles), active by default."""
+    sub = select(UserAccount.user_id).where(UserAccount.account_id == account_id)
+    if roles:
+        sub = sub.where(UserAccount.role.in_([r.value for r in roles]))
+    if active:
+        sub = sub.where(UserAccount.active)
+        return and_(User.active, User.id.in_(sub))
+    return User.id.in_(sub)
 
 
 class UserBusinessUnit(Base):

@@ -1,4 +1,4 @@
-"""python -m seed : wipe the database contents and load the Discover NA dummy data."""
+"""python -m seed : wipe the database contents and load the dummy data (Discover NA and Acme Insurance)."""
 
 import sys
 
@@ -15,6 +15,10 @@ def main() -> None:
     print(
         "Seeded Discover NA: 4 BUs, 11 users, 18 demands, 6 open escalations, 2 interviews,"
         " 64 rate card rows."
+    )
+    print(
+        "Seeded Acme Insurance: 3 BUs, 6 people (Sanjay and Vikram shared with Discover),"
+        " 6 demands, 1 interview, 15 rate card rows. Kavya is the platform admin."
     )
 
 

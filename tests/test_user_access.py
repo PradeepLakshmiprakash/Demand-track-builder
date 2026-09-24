@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import User, UserAccount
 from tests.conftest import Client, bu_id, user_id
 
 
@@ -26,6 +26,13 @@ def _get(db: Session, email: str) -> User:
     return db.scalars(select(User).where(User.email == email)).one()
 
 
+def _m(db: Session, email: str) -> UserAccount:
+    """Their membership of Discover NA, where role and visibility live."""
+    return db.scalars(
+        select(UserAccount).join(User).where(User.email == email, UserAccount.account_id == 1)
+    ).one()
+
+
 @pytest.fixture
 def admin(client: Client) -> Client:
     return client.as_user("kavya")
@@ -35,7 +42,8 @@ def test_add_demand_owner(admin: Client, db: Session) -> None:
     r = admin.post("/users", data=_form())
     assert r.status_code == 303
     u = _get(db, "test.user@example.com")
-    assert (u.role, u.visibility_scope) == ("demand_owner", "own")
+    m = _m(db, "test.user@example.com")
+    assert (m.role, m.visibility_scope) == ("demand_owner", "own")
     assert [b.name for b in u.business_units] == ["DATA"]
     assert u.created_by == user_id("kavya")
     assert [a.name for a in u.accounts] == ["Discover NA"]
@@ -44,13 +52,13 @@ def test_add_demand_owner(admin: Client, db: Session) -> None:
 def test_leadership_is_forced_to_full_account(admin: Client, db: Session) -> None:
     admin.post("/users", data=_form(role="leadership", scope="own"))
     u = _get(db, "test.user@example.com")
-    assert u.visibility_scope == "full"
+    assert _m(db, "test.user@example.com").visibility_scope == "full"
     assert {b.name for b in u.business_units} == {"CARDS", "BANKING", "PAYMENTS", "DATA"}
 
 
 def test_demand_owner_cannot_be_given_full_account(admin: Client, db: Session) -> None:
     admin.post("/users", data=_form(scope="full"))
-    assert _get(db, "test.user@example.com").visibility_scope == "own"
+    assert _m(db, "test.user@example.com").visibility_scope == "own"
 
 
 def test_add_interviewer_with_profile(admin: Client, db: Session) -> None:
@@ -61,7 +69,7 @@ def test_add_interviewer_with_profile(admin: Client, db: Session) -> None:
         ),
     )
     u = _get(db, "test.user@example.com")
-    assert u.visibility_scope == "assigned_interviews"
+    assert _m(db, "test.user@example.com").visibility_scope == "assigned_interviews"
     assert u.interviewer_profile is not None
     assert u.interviewer_profile.skills == ["Java", "AWS"]
     assert u.interviewer_profile.max_grade == "C2"
@@ -83,7 +91,7 @@ def test_interviewer_may_cover_several_bus(admin: Client, db: Session) -> None:
 def test_admin_team_is_forced_to_full_account(admin: Client, db: Session) -> None:
     admin.post("/users", data=_form(role="admin_team", scope="own"))
     u = _get(db, "test.user@example.com")
-    assert u.visibility_scope == "full"
+    assert _m(db, "test.user@example.com").visibility_scope == "full"
     assert {b.name for b in u.business_units} == {"CARDS", "BANKING", "PAYMENTS", "DATA"}
 
 
@@ -117,7 +125,7 @@ def test_deactivated_user_keeps_demands(admin: Client, db: Session) -> None:
 def test_cannot_deactivate_yourself(admin: Client, db: Session) -> None:
     r = admin.post(f"/users/{user_id('kavya')}/active", data={"active": "0"}, follow_redirects=False)
     assert "err=" in r.headers["location"]
-    assert _get(db, "kavya.r@example.com").active
+    assert _m(db, "kavya.r@example.com").active
 
 
 def test_last_admin_cannot_be_demoted(admin: Client, db: Session) -> None:
@@ -126,12 +134,12 @@ def test_last_admin_cannot_be_demoted(admin: Client, db: Session) -> None:
         f"/users/{kavya}", data=_form(name="Kavya R.", email="kavya.r@example.com", role="demand_owner")
     )
     assert r.status_code == 400 and "at least one active admin" in r.text
-    assert _get(db, "kavya.r@example.com").role == "admin"
+    assert _m(db, "kavya.r@example.com").role == "admin"
 
 
 def test_database_enforces_scope_rule(db: Session) -> None:
-    u = db.get_one(User, user_id("priya"))
-    u.visibility_scope = "full"
+    m = _m(db, "priya.n@example.com")
+    m.visibility_scope = "full"
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
