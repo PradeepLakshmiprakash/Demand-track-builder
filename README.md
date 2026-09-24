@@ -33,6 +33,8 @@ scripts\db-start.cmd
 
 Open http://localhost:8010 and use **View as** in the sidebar to switch persona.
 
+Or just run `scriptsun.cmd`: it starts the database if needed and serves the app in that window.
+
 `.env` holds `DATABASE_URL` and `TEST_DATABASE_URL` (see `.env.example`). With Docker instead:
 `docker compose up`, then `docker compose exec app python -m seed`.
 
