@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Account overview{% endblock %}
+{% macro breakdown(title, head, slices) %}
+<section class="panel">
+  <div class="panel-head"><h2>{{ title }}</h2></div>
+  <div class="tbl slices">
+    <div class="tr th"><div>{{ head }}</div><div>Mix</div><div class="num">Demands</div><div class="num">Revenue lost</div></div>
+    {% for s in slices %}
+    <div class="tr">
+      <div class="title">{{ s.name }}</div>
+      <div class="small muted">{{ s.mix }}</div>
+      <div class="num">{{ s.total }}</div>
+      <div class="num">{{ s.lost | money if s.lost else '—' }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">Leadership · {{ actor.account_name }} · all BUs</div>
+    <h1>Account overview</h1>
+  </div>
+  <div class="small muted">{% if latest %}DP sheet of {{ latest.sheet_date | d }} · {% endif %}as of {{ o.today | d }}</div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="k">Open demands</div><div class="v">{{ o.open }}</div><div class="s">of {{ o.live }} past draft{% if latest %} · {{ latest.row_count }} in the sheet{% endif %}</div></div>
+  <div class="card"><div class="k">Still need coverage</div><div class="v">{{ o.need_coverage }}</div><div class="s">No profile with the client yet</div></div>
+  <div class="card {{ 'warn' if o.at_risk }}"><div class="k">Past start date, unfilled</div><div class="v">{{ o.at_risk | length }}</div>
+    <div class="s">{% if o.at_risk %}{{ o.at_risk | map(attribute='days_late') | min }} to {{ o.at_risk | map(attribute='days_late') | max }} days late{% else %}None{% endif %}</div></div>
+  <div class="card {{ 'warn' if o.lost_to_date }}"><div class="k">Revenue lost to date</div><div class="v">{{ o.lost_to_date | money }}</div>
+    <div class="s">Hourly bill rate × {{ '%g' % o.hours_per_day }} h × working days late{% if o.projected %} · {{ o.projected | money }} more by the DOJs set{% endif %}{% if o.missing_rates %} · {{ o.missing_rates }} late demand{{ 's' if o.missing_rates > 1 }} with no bill rate{% endif %}</div></div>
+</div>
+
+{% if escalations or offers_waiting %}
+<div class="row small">
+  {% if escalations %}<a class="pill" href="/escalations?level=2">{{ escalations.get(2, 0) }} escalation{{ 's' if escalations.get(2, 0) != 1 }} at L2 · {{ escalations.get(1, 0) }} at L1</a>{% endif %}
+  {% if offers_waiting %}<a class="pill" href="/approvals">{{ offers_waiting }} offer{{ 's' if offers_waiting != 1 }} below the margin cut-off waiting for you</a>{% endif %}
+</div>
+{% endif %}
+
+<section class="panel panel-body">
+  <h2>Pipeline by stage</h2>
+  <div class="hint" style="margin-top:4px">Every demand past draft, by where it is now.</div>
+  <div class="bars" role="list" aria-label="Demands by stage">
+    {% for key, label, n in o.pipeline %}
+    <div class="bar-row" role="listitem" title="{{ label }}: {{ n }} demand{{ 's' if n != 1 }}">
+      <div class="bar-label">{{ label }}</div>
+      <div class="bar-track"><div class="bar {{ 'bar-risk' if key == 'incorrect' or key == 'gtd' }}" style="width: {{ (100 * n / max_group) | round(1) }}%"></div></div>
+      <div class="bar-value">{{ n }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>Revenue at risk · past start date</h2><div class="hint">Open demands whose requested start has passed with no DOJ on or before it. Days late count to today.</div></div></div>
+  <div class="tbl risk">
+    <div class="tr th"><div>GTD req</div><div>Demand</div><div>Grade</div><div>Start</div><div class="num">Days late</div><div>DOJ</div><div class="num">Lost to date</div></div>
+    {% for x in o.at_risk %}{% set d = x.demand %}
+    <a class="tr link" href="/demands/{{ d.app_ref }}">
+      <div class="mono">{{ d.gtd_req_id or d.app_ref }}</div>
+      <div><div class="title">{{ d.name }}</div><div class="note">{{ d.status_enum.label }} · {{ d.business_unit.name }}</div></div>
+      <div>{{ d.grade }}</div>
+      <div>{{ d.start_date | d('%d %b') }}</div>
+      <div class="num"><strong>{{ x.days_late }}</strong></div>
+      <div>{{ x.doj | d('%d %b') if x.doj else 'Not set' }}</div>
+      <div class="num">{{ x.lost | money }}</div>
+    </a>
+    {% else %}
+    <div class="empty">No open demand is past its start date.</div>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="grid2 align-start">
+  {{ breakdown('By practice', 'Practice', o.by_practice) }}
+  {{ breakdown('By business unit', 'BU', o.by_bu) }}
+</div>
+{% endblock %}

@@ -69,7 +69,8 @@ AGING_STAGES = frozenset(
         DemandStatus.OFFER_IN_MARKET,
     }
 )
-RESOLVERS = {1: (Role.ADMIN, Role.ADMIN_TEAM), 2: (Role.LEADERSHIP,)}
+# L1: admin demand owner and admin team. L2: leadership, and the admin demand owner (confirmed 24 Sep).
+RESOLVERS = {1: (Role.ADMIN, Role.ADMIN_TEAM), 2: (Role.LEADERSHIP, Role.ADMIN)}
 
 
 class EscalationError(ValueError):
@@ -427,7 +428,7 @@ def _compose(
 
 
 def can_resolve(actor: Actor, esc: Escalation) -> bool:
-    """L1 is the admin demand owner and admin team's; L2 is leadership's (flow-artifact §1)."""
+    """L1: admin demand owner and admin team. L2: leadership and the admin demand owner."""
     return esc.status == EscalationStatus.OPEN.value and actor.role in RESOLVERS[esc.level]
 
 
@@ -459,7 +460,11 @@ def resolve(
     if esc.status != EscalationStatus.OPEN.value:
         raise EscalationError("This escalation is already resolved.")
     if not can_resolve(actor, esc):
-        who = "the admin demand owner or admin team" if esc.level == 1 else "account leadership"
+        who = (
+            "the admin demand owner or admin team"
+            if esc.level == 1
+            else "leadership or the admin demand owner"
+        )
         raise EscalationError(f"An L{esc.level} escalation is resolved by {who}.")
     account = db.get_one(Account, actor.account_id)
     if reason not in account.settings.resolution_reasons:

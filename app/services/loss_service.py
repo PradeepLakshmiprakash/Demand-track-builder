@@ -1,0 +1,172 @@
+"""Start date and revenue loss (flow-artifact §10), and the leadership overview's numbers.
+
+    days late          = (DOJ or today) − requested start date, when positive; counted to today at most
+    working days late  = working days from the start date up to that end (weekends excluded)
+    revenue lost       = hourly client bill rate × billable hours per day × working days late
+
+Only live demands count: past draft, not cancelled or closed. A staffed demand that joined late keeps
+its loss. A DOJ still in the future adds a projection on top of the loss to date. Demands with no
+bill rate are counted as late but their loss is unknown, and the overview says how many.
+"""
+
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from decimal import Decimal
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.core.enums import DemandStatus
+from app.core.workdays import is_working_day
+from app.models import Account, Demand
+from app.services.escalation_service import current_doj
+
+NOT_LIVE = frozenset({DemandStatus.DRAFT, DemandStatus.CANCELLED, DemandStatus.CLOSED})
+
+
+def working_days(start: date, end: date) -> int:
+    """Working days d with start <= d < end."""
+    n, d = 0, start
+    while d < end:
+        n += is_working_day(d)
+        d += timedelta(days=1)
+    return n
+
+
+@dataclass
+class Loss:
+    demand: Demand
+    doj: date | None
+    days_late: int  # calendar days, to today at most
+    working_days_late: int
+    lost: Decimal | None  # to date; None when the bill rate is missing
+    projected: Decimal | None  # extra loss until a future DOJ
+
+    @property
+    def filled(self) -> bool:
+        """Joined, or has a DOJ on or before the start: not at risk any more."""
+        return self.demand.status_enum is DemandStatus.STAFFED or (
+            self.doj is not None and self.demand.start_date is not None and self.doj <= self.demand.start_date
+        )
+
+
+def losses(db: Session, account_id: int, today: date) -> list[Loss]:
+    account = db.get_one(Account, account_id)
+    hours = Decimal(str(account.settings.billable_hours_per_day))
+    doj = current_doj(db, account_id)
+    out = []
+    for d in db.scalars(
+        select(Demand)
+        .where(Demand.account_id == account_id, Demand.status.notin_([s.value for s in NOT_LIVE]))
+        .options(selectinload(Demand.submissions), selectinload(Demand.business_unit))
+    ):
+        if d.start_date is None:
+            continue
+        j = doj.get(d.id)
+        end = min(j, today) if j else today
+        if end <= d.start_date:
+            continue
+        wd = working_days(d.start_date, end)
+        daily = d.client_rate * hours if d.client_rate is not None else None
+        projected = None
+        if j and j > today and daily is not None:
+            projected = daily * working_days(max(today, d.start_date), j)
+        out.append(
+            Loss(d, j, (end - d.start_date).days, wd, daily * wd if daily is not None else None, projected)
+        )
+    return sorted(out, key=lambda x: (-x.days_late, x.demand.app_ref))
+
+
+# --- Leadership overview -----------------------------------------------------------------------------
+
+# Pipeline groups, in the order the demand moves through them.
+GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [
+    ("before_gtd", "Before GTD", (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)),
+    (
+        "gtd",
+        "With GTD, not in sheet yet",
+        (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING, DemandStatus.DROPPED),
+    ),
+    ("wip", "Work in progress", (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)),
+    ("client", "Profiles with client", (DemandStatus.PROFILES_WITH_CLIENT,)),
+    ("offer", "Offer in market or process", (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)),
+    ("staffed", "Staffed", (DemandStatus.STAFFED,)),
+    ("cancelled", "Cancelled or closed", (DemandStatus.CANCELLED, DemandStatus.CLOSED)),
+    ("incorrect", "Incorrect demand", (DemandStatus.INCORRECT,)),
+]
+GROUP_OF = {s: key for key, _, statuses in GROUPS for s in statuses}
+OPEN_GROUPS = ("before_gtd", "gtd", "wip", "client", "offer", "incorrect")
+
+
+@dataclass
+class Slice:
+    name: str
+    total: int = 0
+    open: int = 0
+    by_group: dict[str, int] = field(default_factory=dict)
+    lost: Decimal = Decimal(0)
+
+    @property
+    def mix(self) -> str:
+        labels = {k: label.lower() for k, label, _ in GROUPS}
+        return " · ".join(f"{n} {labels[k]}" for k, n in self.by_group.items() if n)
+
+
+@dataclass
+class Overview:
+    today: date
+    pipeline: list[tuple[str, str, int]]  # key, label, count
+    open: int
+    live: int
+    need_coverage: int
+    at_risk: list[Loss]  # past start, not filled
+    lost_to_date: Decimal
+    projected: Decimal
+    missing_rates: int
+    by_practice: list[Slice]
+    by_bu: list[Slice]
+    hours_per_day: float
+
+
+def overview(db: Session, account_id: int, today: date) -> Overview:
+    account = db.get_one(Account, account_id)
+    demands = list(
+        db.scalars(
+            select(Demand)
+            .where(Demand.account_id == account_id, Demand.status != DemandStatus.DRAFT.value)
+            .options(selectinload(Demand.business_unit))
+        )
+    )
+    counts = {key: 0 for key, _, _ in GROUPS}
+    for d in demands:
+        counts[GROUP_OF[d.status_enum]] += 1
+
+    loss = losses(db, account_id, today)
+    lost_by_demand = {x.demand.id: x.lost or Decimal(0) for x in loss}
+
+    def slices(key_of: object) -> list[Slice]:
+        acc: dict[str, Slice] = {}
+        for d in demands:
+            name = key_of(d) or "—"  # type: ignore[operator]
+            s = acc.setdefault(name, Slice(name, by_group={k: 0 for k, _, _ in GROUPS}))
+            g = GROUP_OF[d.status_enum]
+            s.total += 1
+            s.open += g in OPEN_GROUPS
+            s.by_group[g] += 1
+            s.lost += lost_by_demand.get(d.id, Decimal(0))
+        return sorted(acc.values(), key=lambda s: (-s.total, s.name))
+
+    return Overview(
+        today=today,
+        pipeline=[(k, label, counts[k]) for k, label, _ in GROUPS],
+        open=sum(counts[k] for k in OPEN_GROUPS),
+        live=len(demands),
+        need_coverage=counts["wip"],
+        at_risk=[x for x in loss if not x.filled],
+        lost_to_date=sum((x.lost for x in loss if x.lost is not None), Decimal(0)),
+        projected=sum((x.projected for x in loss if x.projected is not None), Decimal(0)),
+        missing_rates=sum(x.lost is None for x in loss),
+        by_practice=slices(lambda d: d.practice),
+        by_bu=slices(lambda d: d.business_unit.name),
+        hours_per_day=account.settings.billable_hours_per_day,
+    )

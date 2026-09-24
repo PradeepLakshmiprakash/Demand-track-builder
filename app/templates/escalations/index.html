@@ -84,7 +84,7 @@
       <div><button class="btn primary">Resolve escalation</button></div>
     </form>
     {% elif e.status == 'open' %}
-      <div class="flash bad small">An L{{ e.level }} escalation is resolved by {{ 'the admin demand owner or admin team' if e.level == 1 else 'account leadership' }}.</div>
+      <div class="flash bad small">An L{{ e.level }} escalation is resolved by {{ 'the admin demand owner or admin team' if e.level == 1 else 'leadership or the admin demand owner' }}.</div>
     {% else %}
       <div class="small"><strong>{{ action_labels.get(e.action) }}</strong> · {{ e.reason }}{% if e.comment %}<div class="muted">{{ e.comment }}</div>{% endif %}
         <div class="muted">{{ names.get(e.resolved_by, '—') }} · {{ e.resolved_at | at(tz) }}</div></div>

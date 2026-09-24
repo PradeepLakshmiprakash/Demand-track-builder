@@ -81,6 +81,8 @@ class AccountConfig(BaseModel):
     supply_channels: list[SupplyChannel] = []
     status_mapping: list[StatusMapping] = []
     escalation_owners: dict[str, str] = {"L1": "LOB delivery head", "L2": "Account leadership"}
+    # Revenue lost = hourly bill rate × these hours × working days late (flow-artifact §10).
+    billable_hours_per_day: float = Field(8.0, gt=0, le=24)
     dp_columns: dict[str, str] = Field(default_factory=_default_dp_columns)
     # Cell values the DP sheet uses for "empty".
     dp_blank_values: list[str] = ["0", "-"]

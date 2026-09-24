@@ -24,7 +24,7 @@ def _same(label: str, *roles: Role) -> dict[Role, str]:
 
 
 NAV: tuple[NavItem, ...] = (
-    NavItem("overview", "/overview", _same("Account overview", LD), phase=5),
+    NavItem("overview", "/overview", _same("Account overview", LD), phase=5, ready=True),
     NavItem(
         "demands",
         "/demands",
@@ -36,8 +36,8 @@ NAV: tuple[NavItem, ...] = (
     NavItem("import", "/imports", _same("DP sheet import", AD, AT), phase=3, ready=True),
     NavItem("reconciliation", "/reconciliation", _same("Reconciliation", AD, AT), phase=3, ready=True),
     NavItem("escalations", "/escalations", _same("Escalations", AD, AT, LD), phase=4, ready=True),
-    NavItem("approvals", "/approvals", _same("Offer approvals", AD, LD), phase=5),
-    NavItem("rate_card", "/rate-card", _same("Rate card", AD), phase=5),
+    NavItem("approvals", "/approvals", _same("Offer approvals", AD, LD), phase=5, ready=True),
+    NavItem("rate_card", "/rate-card", _same("Rate card", AD), phase=5, ready=True),
     NavItem("interviews", "/interviews", _same("My interviews", IV), phase=6),
     NavItem("interviewer_profiles", "/interviewers", _same("Interviewer profiles", AD), phase=6),
     NavItem("users", "/users", _same("User access", AD), ready=True),

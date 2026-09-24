@@ -39,6 +39,7 @@ from app.core.enums import (
 )
 from app.core.workdays import add_working_days
 from app.models import Account, BusinessUnit, Demand, ExcelImport, ExcelRow, GtdSubmission, StageEvent, User
+from app.services import margin_service
 from app.services.demand_service import record_stage
 from app.services.escalation_service import open_escalation
 
@@ -71,6 +72,7 @@ class Summary:
     stage_changes: list[dict[str, str]] = field(default_factory=list)
     unmapped_statuses: list[str] = field(default_factory=list)
     new_escalations: list[str] = field(default_factory=list)
+    offers: list[str] = field(default_factory=list)  # new offer approvals raised from the sheet
     warnings: list[str] = field(default_factory=list)
     as_of: str = ""
 
@@ -255,6 +257,11 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             summary.incorrect.append(d.app_ref)
             detail = f"DP sheet of {as_of:%d %b} marks {row.gtd_req_id} as '{row.status}'"
             _escalate(db, account, d, EscalationType.INCORRECT, detail, now, summary)
+        if stage is DemandStatus.OFFER_IN_PROCESS and row.candidate_name:
+            # The offer needs a margin approval (§8); once per candidate.
+            channel = margin_service.channel_for_source(cfg, row.source)
+            if margin_service.ensure_offer(db, account, d, row.candidate_name, channel) is not None:
+                summary.offers.append(d.app_ref)
 
     # 3. Sent to GTD, not in the sheet: awaiting within the grace period, then missing.
     for d in demands:

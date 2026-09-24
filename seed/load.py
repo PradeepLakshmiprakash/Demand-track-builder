@@ -19,6 +19,7 @@ from app.models import (
     GtdSubmission,
     Interview,
     InterviewerProfile,
+    RateCard,
     StageEvent,
     User,
     UserPractice,
@@ -70,6 +71,7 @@ def load(db: Session, now: datetime | None = None) -> None:
     demands: dict[str, Demand] = {}
     for ref, owner, bu, name, practice, grade, start, status, req, extra in data.DEMANDS:
         fields: dict[str, Any] = {**data.DEFAULTS, **extra}  # type: ignore[dict-item]
+        fields["client_rate"] = data.BILL_RATES.get(ref, fields["client_rate"])
         fields["client_rate"] = Decimal(str(fields["client_rate"]))
         d = Demand(
             app_ref=ref,
@@ -115,6 +117,23 @@ def load(db: Session, now: datetime | None = None) -> None:
         if esc_level == 2:
             db.add(EscalationEvent(escalation_id=esc.id, kind="promoted", level=2, at=due - timedelta(days=3),
                                    note="L1 due date passed"))  # fmt: skip
+
+    for channel, factor in data.CHANNEL_FACTOR.items():
+        for region, rf in data.REGION_FACTOR.items():
+            for grade, base in data.GRADE_COST.items():
+                cost = Decimal(str(round(base * factor * rf, 2)))
+                db.add(
+                    RateCard(
+                        account_id=account.id,
+                        grade=grade,
+                        practice=None,
+                        region=region,
+                        channel=channel,
+                        cost_rate=cost,
+                        effective_from=data.RATES_FROM,
+                        created_by=admin.id,
+                    )
+                )
 
     for ref, cand, rnd, iv_key, when in data.INTERVIEWS:
         d = demands[ref]

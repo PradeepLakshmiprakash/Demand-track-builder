@@ -213,6 +213,35 @@ input.invalid { border-color: var(--esc-ink); background: #FFF8F6; }
 .esc-list .tr > div { min-width: 0; }
 .overdue { color: var(--esc-ink); font-weight: 600; }
 
+/* Rate card and approvals */
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rates .tr { grid-template-columns: 1.3fr 70px 70px 1fr 110px 120px 120px 150px; }
+.rates .tr.past { color: #8C877C; }
+.end-rate summary { cursor: pointer; color: var(--brand); }
+.offer { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 16px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line-soft); }
+.offer:last-child { border-bottom: 0; }
+.offer .title { font-weight: 500; }
+.offer .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.margin { font-size: 22px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.margin.below { color: var(--warn-ink); }
+.decide { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.decide input[type=text] { width: 240px; min-height: 36px; }
+.decide select { width: auto; min-height: 36px; }
+
+/* Leadership overview */
+.align-start { align-items: start; }
+.bars { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.bar-row { display: grid; grid-template-columns: 210px minmax(0, 1fr) 40px; gap: 12px; align-items: center; font-size: 14px; }
+.bar-row:hover .bar { filter: brightness(1.15); }
+.bar-row:hover .bar-label { color: var(--ink); }
+.bar-label { color: var(--muted); }
+.bar-track { height: 14px; }
+.bar { height: 14px; min-width: 2px; background: var(--brand); border-radius: 0 4px 4px 0; }
+.bar-risk { background: #B5533C; }
+.bar-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.risk .tr { grid-template-columns: 90px minmax(0, 1fr) 60px 80px 90px 80px 120px; }
+.slices .tr { grid-template-columns: 110px minmax(0, 1fr) 80px 110px; }
+
 /* GTD queue */
 .gtd .tr { grid-template-columns: 100px minmax(0, 1fr) 100px 80px 60px 270px; }
 .link-form { display: flex; gap: 8px; align-items: center; }

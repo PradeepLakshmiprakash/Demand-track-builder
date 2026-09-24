@@ -65,6 +65,16 @@ ROWS: list[Row] = [
 ]  # fmt: skip
 
 
+# Placeholder candidate per requisition (the real sheet's Candidate Name column).
+CANDIDATES = {
+    "DIT7AF": "Candidate A",
+    "BPTONE": "Candidate B",
+    "0ZTQQE": "Candidate C",
+    "IXT3SF": "Candidate D",
+    "43TUIX": "Candidate E",
+}
+
+
 def build(rows: Iterable[Row] = ROWS, *, title: bool = True, headers: list[str] | None = None) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -73,11 +83,26 @@ def build(rows: Iterable[Row] = ROWS, *, title: bool = True, headers: list[str] 
         ws.append(["Discover NA PSCM coverage summary (sample)"])
     ws.append(headers or HEADERS)
     for orig, req, name, practice, grade, region, start, source, doj, status, group in rows:
-        ws.append([
-            orig, req, name, practice, grade, "-", None, "Candidate 1: sample line\nCandidate 2: sample line",
-            region, datetime.combine(start, datetime.min.time()), 1, source, 0,
-            datetime.combine(doj, datetime.min.time()) if doj else None, status, group,
-        ])  # fmt: skip
+        ws.append(
+            [
+                orig,
+                req,
+                name,
+                practice,
+                grade,
+                "-",
+                None,
+                "Candidate 1: sample line\nCandidate 2: sample line",
+                region,
+                datetime.combine(start, datetime.min.time()),
+                1,
+                source,
+                CANDIDATES.get(req, 0),
+                datetime.combine(doj, datetime.min.time()) if doj else None,
+                status,
+                group,
+            ]
+        )
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

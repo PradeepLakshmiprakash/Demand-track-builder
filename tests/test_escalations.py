@@ -285,7 +285,7 @@ def test_who_may_resolve_each_level(db: Session) -> None:
     l1 = open_esc(db, "DM-000139", "missing")
     l2 = open_esc(db, "DM-000121", "past_start")
     assert l1 is not None and l2 is not None
-    with pytest.raises(EscalationError, match="resolved by account leadership"):
+    with pytest.raises(EscalationError, match="resolved by leadership or the admin demand owner"):
         svc.resolve(db, actor(db, "farah"), l2.id, reason="Unknown", action="close", comment=None)
     with pytest.raises(EscalationError, match="admin demand owner or admin team"):
         svc.resolve(db, actor(db, "sanjay"), l1.id, reason="Unknown", action="close", comment=None)
@@ -322,6 +322,13 @@ def test_leadership_sees_l2_resolve_form_only(client: Client, db: Session) -> No
     assert l1 is not None and l2 is not None
     assert "Resolve escalation" not in client.get(f"/escalations?id={l1.id}").text
     assert "Resolve escalation" in client.get(f"/escalations?id={l2.id}").text
+
+
+def test_admin_demand_owner_can_resolve_l2(db: Session) -> None:
+    l2 = open_esc(db, "DM-000121", "past_start")
+    assert l2 is not None and l2.level == 2
+    svc.resolve(db, actor(db, "kavya"), l2.id, reason="Client budget pending", action="close", comment=None)
+    assert db.get_one(Escalation, l2.id).status == "resolved"
 
 
 @pytest.mark.parametrize("who", ["priya", "vikram"])

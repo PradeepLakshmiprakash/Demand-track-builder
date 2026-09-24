@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Offer approvals{% endblock %}
+{% macro offer(a, d, c, decide) %}
+<div class="offer" id="a{{ a.id }}">
+  <div class="offer-main">
+    <div class="title">{{ c.name }} · <a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a></div>
+    <div class="note">{{ d.name }} · {{ d.grade }} · {{ d.region }} · {{ channels.get(a.channel, a.channel or 'channel unknown') }}</div>
+    {% if a.route %}
+    <div class="note">Bill {{ a.bill_rate | money(true) }}/h · cost {{ a.cost_rate | money(true) }}/h · rate card on {{ a.priced_on | d }}</div>
+    {% endif %}
+  </div>
+  <div class="margin {{ 'below' if a.route == 'leadership' }}">{{ '%.1f' % a.margin_pct if a.margin_pct is not none else '—' }}%</div>
+  {% if decide %}
+  <form method="post" action="/approvals/{{ a.id }}/decide" class="decide">
+    <input type="text" name="comment" placeholder="{{ 'Why the exception (required)' if a.route == 'leadership' else 'Comment (required to decline)' }}" aria-label="Comment for {{ c.name }}">
+    <button class="btn small primary" name="decision" value="approved">Approve</button>
+    <button class="btn small danger" name="decision" value="declined">Decline</button>
+  </form>
+  {% elif a.decision %}
+  <div class="small"><span class="chip {{ 'done' if a.decision == 'approved' else 'esc' }}">{{ a.decision | capitalize }}</span>{% if a.comment %}<div class="muted">{{ a.comment }}</div>{% endif %}<div class="muted">{{ a.decided_at | at(tz, '%d %b %Y') }}</div></div>
+  {% else %}
+  <span class="chip {{ 'risk' if a.route == 'leadership' else 'gray' }}">{{ 'Below ' ~ ('%g' % cutoff) ~ '% · with leadership' if a.route == 'leadership' else 'With the admin demand owner' }}</span>
+  {% endif %}
+</div>
+{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · all BUs</div>
+    <h1>Offer approvals</h1>
+    <div class="lede">Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with the cost from the rate card on the offer date. {{ '%g' % cutoff }}% and above: the admin demand owner approves. Below {{ '%g' % cutoff }}%: leadership decides.</div>
+  </div>
+  {% if is_admin %}<a class="btn" href="/rate-card">Rate card</a>{% endif %}
+</div>
+
+<section class="panel">
+  <div class="panel-head"><h2>Waiting for you</h2><span class="chip {{ 'risk' if b.mine else 'teal' }}">{{ b.mine | length }}</span></div>
+  {% for a, d, c in b.mine %}{{ offer(a, d, c, true) }}{% else %}<div class="empty">Nothing waiting for your decision.</div>{% endfor %}
+</section>
+
+{% if b.others %}
+<section class="panel">
+  <div class="panel-head"><h2>Waiting for {{ 'leadership' if actor.role.value == 'admin' else 'the admin demand owner' }}</h2><span class="chip gray">{{ b.others | length }}</span></div>
+  {% for a, d, c in b.others %}{{ offer(a, d, c, false) }}{% endfor %}
+</section>
+{% endif %}
+
+{% if b.blocked %}
+<section class="panel">
+  <div class="panel-head"><div><h2>Can't be priced yet</h2><div class="hint">Re-priced automatically once the missing rate is added.</div></div><span class="chip esc">{{ b.blocked | length }}</span></div>
+  {% for a, d, c in b.blocked %}
+  <div class="offer">
+    <div class="offer-main">
+      <div class="title">{{ c.name }} · <a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a></div>
+      <div class="note">{{ d.name }} · {{ d.grade }} · {{ d.region }}</div>
+      <div class="note" style="color:var(--esc-ink)">{{ a.blocked_reason }}</div>
+    </div>
+    {% if is_admin and not a.channel %}
+    <form method="post" action="/approvals/{{ a.id }}/channel" class="decide">
+      <select name="channel" aria-label="Supply channel for {{ c.name }}" required><option value="">Supply channel…</option>{% for k, label in channels.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+      <button class="btn small">Set</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if b.without_request and is_admin %}
+<section class="panel">
+  <div class="panel-head"><div><h2>At offer stage, no approval yet</h2><div class="hint">The DP sheet had no candidate name for these. Raise the approval by hand.</div></div><span class="chip gray">{{ b.without_request | length }}</span></div>
+  {% for d in b.without_request %}
+  <form method="post" action="/approvals/request" class="offer">
+    <input type="hidden" name="demand_id" value="{{ d.id }}">
+    <div class="offer-main"><div class="title"><a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a> {{ d.name }}</div><div class="note">{{ d.grade }} · {{ d.region }}</div></div>
+    <div class="decide">
+      <input type="text" name="candidate" placeholder="Candidate name" aria-label="Candidate for {{ d.app_ref }}" required>
+      <select name="channel" aria-label="Supply channel for {{ d.app_ref }}" required><option value="">Channel…</option>{% for k, label in channels.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+      <button class="btn small">Raise</button>
+    </div>
+  </form>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if b.decided %}
+<section class="panel">
+  <div class="panel-head"><h2>Decided</h2><span class="chip gray">{{ b.decided | length }}</span></div>
+  {% for a, d, c in b.decided[:20] %}{{ offer(a, d, c, false) }}{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Rate card{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>Rate card</h1>
+    <div class="lede">Vendor cost per hour, by grade, practice, region and supply channel. Rates are dated history: to change a rate, add a new one from the date it applies, and the previous one ends the day before. Offer margins use the rate in force on the offer date.</div>
+  </div>
+  <a class="btn" href="?history={{ '0' if history else '1' }}">{{ 'Hide past rates' if history else 'Show past rates' }}</a>
+</div>
+
+<section class="panel">
+  <div class="panel-head"><h2>Add a rate</h2></div>
+  <form method="post" action="/rate-card" class="panel-body stack">
+    <div class="grid4">
+      <label class="f">Supply channel<select name="channel" required><option value="">Choose…</option>{% for k, label in channels.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+      <label class="f">Region<select name="region" required>{% for r in cfg.regions %}<option>{{ r }}</option>{% endfor %}</select></label>
+      <label class="f">Grade<select name="grade" required><option value="">Choose…</option>{% for g in cfg.grades %}<option>{{ g }}</option>{% endfor %}</select></label>
+      <label class="f">Practice<select name="practice"><option value="">Any practice</option>{% for p in cfg.practices %}<option>{{ p }}</option>{% endfor %}</select></label>
+      <label class="f">Cost per hour ($)<input type="number" name="cost_rate" min="0" step="0.01" required></label>
+      <label class="f">From<input type="date" name="effective_from" value="{{ today.isoformat() }}" required></label>
+      <label class="f">Until <span class="hint">(optional)</span><input type="date" name="effective_to"></label>
+    </div>
+    <div><button class="btn primary">Add rate</button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>{{ 'All rates' if history else 'Current and upcoming rates' }}</h2><span class="chip gray">{{ rows | length }}</span></div>
+  <div class="tbl rates">
+    <div class="tr th"><div>Channel</div><div>Region</div><div>Grade</div><div>Practice</div><div>Cost / h</div><div>From</div><div>Until</div><div></div></div>
+    {% for r in rows %}
+    <div class="tr {{ 'past' if r.effective_to and r.effective_to < today }}">
+      <div>{{ channels.get(r.channel, r.channel) }}</div>
+      <div>{{ r.region }}</div>
+      <div>{{ r.grade }}</div>
+      <div>{{ r.practice or 'Any' }}</div>
+      <div class="num">{{ r.cost_rate | money(true) }}</div>
+      <div>{{ r.effective_from | d }}</div>
+      <div>{{ r.effective_to | d if r.effective_to else 'Open' }}</div>
+      <div>
+        {% if not r.effective_to or r.effective_to >= today %}
+        <details class="end-rate"><summary class="small">End…</summary>
+          <form method="post" action="/rate-card/{{ r.id }}/end" class="row" style="margin-top:6px">
+            <input type="date" name="last_day" value="{{ today.isoformat() }}" aria-label="Last day for this rate" required style="width:auto">
+            <button class="btn small">End</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="empty">No rates yet. Offers can't be priced until the rate card has an entry for their grade, region and channel.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

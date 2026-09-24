@@ -152,8 +152,7 @@ the real 09-Sep sheet is never committed.
 **D27. The LOB delivery head is per business unit, not a user.** Account settings → Business units
 holds each BU's delivery head name and email. L1 escalation mails go to them (demand owner, admin
 demand owner and admin team copied); a BU without one falls back to the admin demand owner. L2 mails go
-to leadership users (delivery head and demand owner copied). Please confirm this matches how Discover
-works.
+to leadership users (delivery head and demand owner copied). Confirmed 24 Sep.
 
 **D28. Trigger details** (thresholds from Account settings):
 - *Not submitted:* in an admin mail, still no requisition ID at the next working day's mail time.
@@ -169,7 +168,8 @@ escalations, promote L1 past its due date to L2 (new due date after the L2 worki
 stays L2), then mail. Mailing is tracked separately (`notified_level`), one mail per recipient group
 per sweep, so escalations opened by reconciliation get mailed and a failed mail is retried.
 
-**D30. Who resolves:** L1 by the admin demand owner or admin team; L2 by leadership (flow-artifact §1).
+**D30. Who resolves:** L1 by the admin demand owner or admin team; L2 by leadership or the admin
+demand owner (confirmed 24 Sep, with D27 and the "no further action" action).
 Every resolution needs a reason from the account's list and an action:
 - *Resubmit* (link problems only): the demand goes back to Submitted, into the next admin mail, and
   the new GTD ID chains to the old one. The demand's other open link escalations close with it.
@@ -184,3 +184,36 @@ page.
 
 **D32. Dropped is judged on the current requisition.** After a resubmit, the old ID leaving the DP
 sheet is expected and doesn't flag the demand as dropped.
+
+## Decisions made while building Phase 5
+
+**D33. Rate card is dated history.** Cost per hour by grade, practice (blank = any, a practice-specific
+rate wins), region and supply channel. A rate is never edited: adding one for the same key closes the
+open-ended previous row the day before; an overlap with a bounded row is refused. The seed carries a
+made-up card (64 rows) so offers can be priced; replace it with Discover's real vendor rates.
+
+**D34. Offers come from the DP sheet.** When a demand reaches Offer in process and its row names a
+candidate, reconciliation creates the candidate and an offer approval (once per candidate). The supply
+channel is read from the sheet's Source cell against the supply channels in settings. The admin demand
+owner can raise one by hand when the sheet has no name, and set a missing channel.
+
+**D35. Pricing.** Margin = (client bill rate − cost rate) ÷ client bill rate, using the rate in force on
+the offer date (kept on the approval, so later rate changes don't move old offers). At or above the
+account's cut-off → the admin demand owner decides; below → leadership decides at their discretion.
+An offer missing its bill rate, channel or rate card entry waits unpriced with the reason and is
+re-priced when the screen loads or the rate card changes. A decline needs a comment; so does a
+below-cut-off approval (the exception's reason). Decisions record approver, margin and time. The
+approval doesn't move the demand's stage; the DP sheet still does.
+
+**D36. Revenue loss** (please confirm): days late = (DOJ or today) − start date, counted to today at
+most; revenue lost to date = hourly bill rate × billable hours per day (Account settings, default 8) ×
+**working** days late. The spec says "daily bill rate × days late"; working days avoid charging
+weekends. A future DOJ adds a separate "more by the DOJs set" projection. Staffed demands that joined
+late keep their loss; cancelled, closed and draft demands don't count. A late demand with no bill rate
+is counted but its loss is shown as unknown, never guessed.
+
+**D37. Leadership overview.** Open demands, still-need-coverage, past start unfilled (with the range
+of days late) and revenue lost to date; open escalations and offers waiting for leadership; pipeline by
+stage (single-hue bars, the two problem stages in a warning tone, counts labelled); revenue at risk
+list; breakdowns by practice and by BU. Leadership only for now; say if the admin demand owner should
+see it too.

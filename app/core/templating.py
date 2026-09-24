@@ -26,7 +26,15 @@ def _at(value: datetime | None, tz: str | None = None, fmt: str = "%d %b %Y, %H:
     return value.astimezone(ZoneInfo(tz)).strftime(fmt) if tz else value.strftime(fmt)
 
 
+def _money(value: object, cents: bool = False) -> str:
+    """$12,345 (or $95.50 with cents); em dash when unknown."""
+    if value is None:
+        return "—"
+    return f"${value:,.2f}" if cents else f"${value:,.0f}"
+
+
 templates.env.filters["d"] = _fmt_date
+templates.env.filters["money"] = _money
 templates.env.filters["at"] = _at
 
 
