@@ -16,6 +16,7 @@ from app.core.account_config import AccountConfig
 from app.core.enums import FINISHED, Role, Scope
 from app.core.security import Actor
 from app.models import Account, Demand, User, UserAccount
+from app.services.user_service import interviewer_conflict
 
 THRESHOLDS = (
     "grace_days", "l1_sla_days", "l2_sla_days", "panel_timer_hours", "aging_days", "rejection_limit",
@@ -100,6 +101,8 @@ def create_account(
     db.flush()
 
     admin = db.scalar(select(User).where(func.lower(User.email) == admin_email.lower()))
+    if admin is not None and (why := interviewer_conflict(admin, account.id, Role.ADMIN)):
+        raise PlatformError(why)
     if admin is None:
         admin = User(name=admin_name, email=admin_email, active=True, created_by=actor.id)
         db.add(admin)

@@ -362,3 +362,8 @@ unique across all accounts (GTD is one system); demand refs share one sequence.
 
 **D56. The last two client-specific settings moved to Account settings:** the interview rating
 dimensions and the L1/L2 escalation owner labels.
+
+**D57. An interviewer belongs to exactly one account** (user, 24 Sep). Someone who works in another
+account can't be given the interviewer role, and an interviewer can't be added to another account in
+any role, including as a new account's first admin. Other roles may span accounts. Acme has its own
+interviewer (Nadia K.); Vikram is Discover's only.

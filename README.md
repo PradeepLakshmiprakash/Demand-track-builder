@@ -84,6 +84,6 @@ tests/
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
 
-**Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Sanjay M. (leadership) and Vikram P. (interviewer) work in both accounts and switch between them in the sidebar. Kavya R. is also the **platform admin** (Accounts screen).
+**Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Nadia K. is Acme's interviewer. Sanjay M. (leadership) works in both accounts and switches between them in the sidebar; an interviewer belongs to one account only. Kavya R. is also the **platform admin** (Accounts screen).
 
 All names are placeholders. Never commit a real DP sheet: it carries candidate personal data.

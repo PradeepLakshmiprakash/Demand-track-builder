@@ -2,7 +2,8 @@
 
 It is deliberately unlike Discover NA: another time zone, other business units, practices, grade
 names, supply channels, DP sheet columns and statuses, rating dimensions and thresholds. Sanjay
-(leadership) and Vikram (interviewer) work in both accounts with one login. All names are placeholders.
+(leadership) works in both accounts with one login; interviewers belong to one account only.
+All names are placeholders.
 
 Demand refs DM-000101..106 sit below Discover's seeded range, so new demands still continue after
 Discover's highest ref.
@@ -78,35 +79,104 @@ DELIVERY_HEADS = {
 }
 
 # key, name, email, role, level, scope, BUs, practices, interviewer (skills, max grade).
-# "sanjay" and "vikram" already exist (Discover): they get a second membership, not a second login.
+# "sanjay" already exists (Discover): he gets a second membership, not a second login. Interviewers
+# belong to one account only, so Acme has its own (Nadia).
 USERS = [
     ("grace", "Grace H.", "grace.h@example.com", "admin", "L6", "full", BUSINESS_UNITS, [], None),
     ("tomas", "Tomas R.", "tomas.r@example.com", "admin_team", "L3", "full", BUSINESS_UNITS, [], None),
     ("lena", "Lena W.", "lena.w@example.com", "demand_owner", "L5", "own", ["CLAIMS"], [], None),
     ("marco", "Marco B.", "marco.b@example.com", "demand_owner", "L5", "own_bu_read", ["POLICY"], [], None),
     ("sanjay", "", "sanjay.m@example.com", "leadership", "L6", "full", BUSINESS_UNITS, [], None),
-    ("vikram", "", "vikram.p@example.com", "interviewer", "L5", "assigned_interviews", ["CLAIMS"],
-     ["APP-ENG"], (["Java", "Spring Boot", "AWS"], "L5")),
-]  # fmt: skip
+    (
+        "nadia",
+        "Nadia K.",
+        "nadia.k@example.com",
+        "interviewer",
+        "L5",
+        "assigned_interviews",
+        ["CLAIMS", "DIGITAL"],
+        ["APP-ENG"],
+        (["Java", "Spring Boot", "AWS", "Kotlin"], "L5"),
+    ),
+]
 
 J, S, A = "Java", "Spring Boot", "AWS"
 
 # ref, owner, BU, name, practice, grade, start, status, req id, extra fields
 DEMANDS = [
-    ("DM-000101", "lena", "CLAIMS", "Claims Platform Java Engineer", "APP-ENG", "L4", date(2026, 11, 2),
-     "coverage_required", "AC1001", {"primary_skills": [J, S, A], "client_rate": 92}),
-    ("DM-000102", "lena", "CLAIMS", "Claims Data Engineer (Spark)", "DATA-ENG", "L3", date(2026, 11, 9),
-     "sent_to_gtd", "AC1002", {"primary_skills": ["Spark", "Python"], "client_rate": 80}),
-    ("DM-000103", "marco", "POLICY", "Policy Admin QA Automation Lead", "QA-AUTO", "L5", date(2026, 10, 19),
-     "offer_in_process", "AC1003", {"primary_skills": ["Selenium", "Java"], "client_rate": 100}),
-    ("DM-000104", "marco", "POLICY", "Policy Portal React Developer", "APP-ENG", "L3", date(2026, 11, 16),
-     "submitted", None, {"primary_skills": ["React", "TypeScript"], "client_rate": 78}),
-    ("DM-000105", "grace", "DIGITAL", "Digital Mobile Engineer", "APP-ENG", "L4", date(2026, 10, 26),
-     "profiles_with_client", "AC1005", {"primary_skills": ["Kotlin", "Swift"], "client_rate": 95,
-                                        "client_interview_required": True}),
-    ("DM-000106", "lena", "CLAIMS", "Claims Intake Analyst", "DATA-ENG", "L2", date(2026, 9, 1),
-     "draft", None, {"primary_skills": ["SQL"], "client_rate": 60}),
-]  # fmt: skip
+    (
+        "DM-000101",
+        "lena",
+        "CLAIMS",
+        "Claims Platform Java Engineer",
+        "APP-ENG",
+        "L4",
+        date(2026, 11, 2),
+        "coverage_required",
+        "AC1001",
+        {"primary_skills": [J, S, A], "client_rate": 92},
+    ),
+    (
+        "DM-000102",
+        "lena",
+        "CLAIMS",
+        "Claims Data Engineer (Spark)",
+        "DATA-ENG",
+        "L3",
+        date(2026, 11, 9),
+        "sent_to_gtd",
+        "AC1002",
+        {"primary_skills": ["Spark", "Python"], "client_rate": 80},
+    ),
+    (
+        "DM-000103",
+        "marco",
+        "POLICY",
+        "Policy Admin QA Automation Lead",
+        "QA-AUTO",
+        "L5",
+        date(2026, 10, 19),
+        "offer_in_process",
+        "AC1003",
+        {"primary_skills": ["Selenium", "Java"], "client_rate": 100},
+    ),
+    (
+        "DM-000104",
+        "marco",
+        "POLICY",
+        "Policy Portal React Developer",
+        "APP-ENG",
+        "L3",
+        date(2026, 11, 16),
+        "submitted",
+        None,
+        {"primary_skills": ["React", "TypeScript"], "client_rate": 78},
+    ),
+    (
+        "DM-000105",
+        "grace",
+        "DIGITAL",
+        "Digital Mobile Engineer",
+        "APP-ENG",
+        "L4",
+        date(2026, 10, 26),
+        "profiles_with_client",
+        "AC1005",
+        {"primary_skills": ["Kotlin", "Swift"], "client_rate": 95, "client_interview_required": True},
+    ),
+    (
+        "DM-000106",
+        "lena",
+        "CLAIMS",
+        "Claims Intake Analyst",
+        "DATA-ENG",
+        "L2",
+        date(2026, 9, 1),
+        "draft",
+        None,
+        {"primary_skills": ["SQL"], "client_rate": 60},
+    ),
+]
 
 DEFAULTS = {
     "category": "Committed",
@@ -122,4 +192,4 @@ CHANNEL_FACTOR = {"bench": 0.8, "partner": 1.0, "contract": 1.1}
 RATES_FROM = date(2026, 1, 1)
 
 # demand ref, candidate placeholder, round, interviewer key, scheduled (y, m, d, h, min) in UTC
-INTERVIEWS = [("DM-000101", "Candidate P", "L1", "vikram", (2026, 9, 28, 14, 0))]
+INTERVIEWS = [("DM-000101", "Candidate P", "L1", "nadia", (2026, 9, 28, 14, 0))]

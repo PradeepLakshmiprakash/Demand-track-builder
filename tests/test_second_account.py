@@ -72,19 +72,64 @@ def test_shared_person_has_a_role_per_account_and_switches(client: Client) -> No
     assert ACME in overview and "Switch account" in overview
     assert {d["app_ref"] for d in c.get("/api/demands").json()} >= {"DM-000101", "DM-000103"}
 
-    v = client.as_user("vikram")
-    assert "Candidate A" in v.get("/interviews").text and "Candidate P" not in v.get("/interviews").text
-    v.get(f"/switch-account/{account_id(ACME)}")
-    acme_page = v.get("/interviews").text
-    assert "Candidate P" in acme_page and "Candidate A" not in acme_page
+    # Interviewers stay inside their one account.
+    assert "Candidate A" in client.as_user("vikram").get("/interviews").text
+    assert "Candidate P" not in client.get("/interviews").text
+    nadia = client.as_user("nadia").get("/interviews").text
+    assert "Candidate P" in nadia and "Candidate A" not in nadia
 
 
-def test_a_shared_person_shows_only_this_accounts_practices(client: Client) -> None:
-    discover = client.as_user("kavya").get("/api/users").json()
-    vikram = next(u for u in discover if u["email"] == "vikram.p@example.com")
-    assert vikram["practices"] == ["CCA-FS"]
-    acme = client.as_user("grace").get("/api/users").json()
-    assert next(u for u in acme if u["email"] == "vikram.p@example.com")["practices"] == ["APP-ENG"]
+def _person(email: str, role: str, bu: str = "CLAIMS") -> dict[str, object]:
+    scope = {"demand_owner": "own", "interviewer": "assigned_interviews"}.get(role, "full")
+    return {
+        "name": "ignored",
+        "email": email,
+        "role": role,
+        "level": "L4",
+        "scope": scope,
+        "bu_ids": [str(bu_id(bu))],
+        "practices": ["APP-ENG"],
+        "skills": "Java",
+    }
+
+
+def test_an_interviewer_cannot_join_a_second_account(client: Client, db: Session) -> None:
+    grace = client.as_user("grace")
+    for role in ("interviewer", "demand_owner", "leadership"):
+        r = grace.post("/users", data=_person("vikram.p@example.com", role))
+        assert r.status_code == 400 and "is an interviewer in Discover NA" in r.text, role
+    vikram = db.scalars(select(User).where(User.email == "vikram.p@example.com")).one()
+    assert [m.account.name for m in vikram.memberships] == [DISCOVER]
+
+
+def test_someone_in_another_account_cannot_become_an_interviewer(client: Client) -> None:
+    r = client.as_user("grace").post("/users", data=_person("priya.n@example.com", "interviewer"))
+    assert r.status_code == 400 and "already works in Discover NA" in r.text
+    # and a shared person can't be switched to interviewer in either account
+    form = {
+        "name": "Sanjay M.",
+        "email": "sanjay.m@example.com",
+        "role": "interviewer",
+        "level": "L6",
+        "scope": "assigned_interviews",
+        "bu_ids": [str(bu_id("CLAIMS"))],
+        "practices": ["APP-ENG"],
+    }
+    r = client.post(f"/users/{user_id('sanjay')}", data=form)
+    assert r.status_code == 400 and "already works in Discover NA" in r.text
+
+
+def test_an_interviewer_cannot_be_a_new_accounts_admin(client: Client) -> None:
+    form = {
+        "name": "Nova Co",
+        "timezone": "America/Chicago",
+        "copy_from": "",
+        "admin_name": "Vikram P.",
+        "admin_email": "vikram.p@example.com",
+    }
+    r = client.as_user("kavya").post("/platform/accounts", data=form)
+    assert "err=" in r.headers["location"] and "interviewer" in r.headers["location"]
+    assert "Nova Co" not in client.get("/platform/accounts").text
 
 
 def test_adding_an_existing_person_gives_them_a_second_account(client: Client, db: Session) -> None:

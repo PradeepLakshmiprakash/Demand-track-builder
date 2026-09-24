@@ -8,6 +8,8 @@ Rules (flow-artifact §1.1):
 - Deactivating removes access immediately; demands and history stay.
 - Role, visibility and level are per account (UserAccount). One person can work in several accounts
   with one login; adding an existing person to another account gives them a membership there.
+- An interviewer belongs to exactly one account: nobody who works in another account can be an
+  interviewer here, and an interviewer can't be added to another account in any role.
 """
 
 from dataclasses import dataclass
@@ -116,8 +118,24 @@ def get_user(db: Session, account_id: int, user_id: int) -> Member:
     return Member(m.user, m)
 
 
+def interviewer_conflict(user: User, account_id: int, role: Role) -> str | None:
+    """Why this person can't hold this role in this account, when an interviewer would span two accounts."""
+    others = [x for x in user.memberships if x.account_id != account_id]
+    if not others:
+        return None
+    rule = "An interviewer belongs to one account only."
+    iv = next((x for x in others if x.role == Role.INTERVIEWER.value), None)
+    if iv is not None:
+        return f"{user.name} is an interviewer in {iv.account.name}. {rule}"
+    if role is Role.INTERVIEWER:
+        return f"{user.name} already works in {', '.join(x.account.name for x in others)}. {rule}"
+    return None
+
+
 def _apply(db: Session, actor: Actor, user: User, m: UserAccount, form: UserForm) -> None:
     account = db.get_one(Account, actor.account_id)
+    if user.id is not None and (why := interviewer_conflict(user, actor.account_id, form.role)):
+        raise UserAccessError(why)
     account_bus = list(
         db.scalars(
             select(BusinessUnit).where(BusinessUnit.account_id == actor.account_id, BusinessUnit.active)

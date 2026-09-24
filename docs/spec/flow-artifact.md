@@ -2,7 +2,7 @@
 
 Version 1.4 · 24 Sep 2026 — updated to match what is built through Phase 8 (see §14–§16 for what changed since 1.1).
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D56 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D57 in `docs/decisions.md`.
 
 ---
 
@@ -44,13 +44,13 @@ Login comes in Phase 7 (SSO). Until then a **View as** menu in the sidebar switc
 
 ### 1.3 Accounts and people in more than one
 
-Each client is an **account**. A person's role, visibility and level belong to their **membership** of an account, so one person can work in several accounts with one login (e.g. leadership or an interviewer covering two clients) and a different role in each. They switch accounts in the sidebar; everything they see is the current account's. Deactivating someone on User access removes them from that account only.
+Each client is an **account**. A person's role, visibility and level belong to their **membership** of an account, so one person can work in several accounts with one login (e.g. leadership covering two clients) and a different role in each. **An interviewer belongs to exactly one account**: nobody who works in another account can be made an interviewer, and an interviewer can't be added to another account in any role. They switch accounts in the sidebar; everything they see is the current account's. Deactivating someone on User access removes them from that account only.
 
 A **platform admin** (separate from any role inside an account) creates accounts on the **Accounts** screen: a name, time zone, a start from blank settings or a copy of another account's settings (lists, channels, DP sheet columns and status mapping, thresholds; never business units, people, rates or demands) and the first admin demand owner. They can deactivate an account: its people lose access to it, its mails and escalations stop, nothing is deleted.
 
 ### 1.4 Seed data
 
-Seeded data has **two accounts**: Discover NA, and a made-up **Acme Insurance** with its own BUs, practices, grades, channels, DP sheet format (`seed/sample_sheet_acme.py`), ratings and thresholds. Sanjay and Vikram work in both. For Discover, with placeholder people and candidates. A made-up DP sheet in the real sheet's shape (`seed/sample_sheet.py`) stands in for the 09-Sep sheet; real sheets carry candidate personal data and are never committed.
+Seeded data has **two accounts**: Discover NA, and a made-up **Acme Insurance** with its own BUs, practices, grades, channels, DP sheet format (`seed/sample_sheet_acme.py`), ratings and thresholds. Sanjay works in both; Acme has its own interviewer (Nadia). For Discover, with placeholder people and candidates. A made-up DP sheet in the real sheet's shape (`seed/sample_sheet.py`) stands in for the 09-Sep sheet; real sheets carry candidate personal data and are never committed.
 
 ---
 
