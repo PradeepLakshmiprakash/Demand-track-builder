@@ -27,6 +27,15 @@
 </section>
 
 <section class="panel">
+  <div class="panel-head"><div><h2>Upload rates</h2><div class="hint">A .csv or .xlsx with the columns {{ upload_columns | join(', ') }}. Practice can be "Any"; Until can be blank. All or nothing: if any row is wrong, nothing is imported and every problem is listed. The download is in the same format, so it doubles as the template.</div></div></div>
+  <form method="post" action="/rate-card/upload" enctype="multipart/form-data" class="panel-body row">
+    <label class="f" style="flex:1;max-width:420px">Rates file<input type="file" name="file" accept=".csv,.xlsx" required></label>
+    <button class="btn primary" style="align-self:flex-end">Import rates</button>
+    <a class="btn" style="align-self:flex-end" href="/rate-card/export.csv{{ '?history=1' if history else '' }}">Download rates (CSV)</a>
+  </form>
+</section>
+
+<section class="panel">
   <div class="panel-head"><h2>{{ 'All rates' if history else 'Current and upcoming rates' }}</h2><span class="chip gray">{{ rows | length }}</span></div>
   <div class="tbl rates">
     <div class="tr th"><div>Channel</div><div>Region</div><div>Grade</div><div>Practice</div><div>Cost / h</div><div>From</div><div>Until</div><div></div></div>

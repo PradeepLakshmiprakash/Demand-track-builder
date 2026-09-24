@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.account_config import AccountConfig
@@ -349,3 +349,74 @@ def test_billable_hours_is_an_account_setting(client: Client, db: Session) -> No
     o = loss_service.overview(db, 1, SHEET_DAY)
     x = next(x for x in o.at_risk if x.demand.app_ref == "DM-000121")
     assert x.lost == Decimal(95) * Decimal("7.5") * manual_working_days(date(2026, 8, 3), SHEET_DAY)
+
+
+# --- Rate card bulk upload --------------------------------------------------------------------------
+
+UPLOAD = (
+    "Channel,Region,Grade,Practice,Cost per hour,From,Until\n"
+    "Sogeti,US,C1,Any,$63.50,2027-01-01,\n"
+    "subcon_vms,US,C2,DMN-FS,70,2027-01-01,2027-12-31\n"
+)
+
+
+def test_upload_rates_csv(client: Client, db: Session) -> None:
+    client.as_user("kavya")
+    r = client.post("/rate-card/upload", files={"file": ("rates.csv", UPLOAD.encode(), "text/csv")})
+    assert "2+rates+imported" in r.headers["location"] or "2%20rates%20imported" in r.headers["location"]
+    kw = {"region": "US", "on": date(2027, 2, 1)}
+    c1 = rate_card_service.lookup(db, 1, grade="C1", practice=None, channel="sogeti", **kw)  # type: ignore[arg-type]
+    assert c1 is not None and c1.cost_rate == Decimal("63.50")
+    old = rate_card_service.lookup(
+        db, 1, grade="C1", practice=None, channel="sogeti", region="US", on=date(2026, 12, 31)
+    )
+    assert old is not None and old.effective_to == date(2026, 12, 31)  # superseded, not edited
+    dmn = rate_card_service.lookup(db, 1, grade="C2", practice="DMN-FS", channel="subcon_vms", **kw)  # type: ignore[arg-type]
+    assert dmn is not None and dmn.effective_to == date(2027, 12, 31)
+
+
+def test_upload_rates_xlsx(client: Client, db: Session) -> None:
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(rate_card_service.UPLOAD_COLUMNS)
+    ws.append(["FTE external hire", "CA", "E1", "Any", 101, date(2027, 3, 1), None])
+    buf = io.BytesIO()
+    wb.save(buf)
+    client.as_user("kavya").post(
+        "/rate-card/upload", files={"file": ("rates.xlsx", buf.getvalue(), "application/octet-stream")}
+    )
+    r = rate_card_service.lookup(
+        db, 1, grade="E1", practice=None, channel="fte", region="CA", on=date(2027, 3, 1)
+    )
+    assert r is not None and r.cost_rate == Decimal("101.00")
+
+
+def test_upload_is_all_or_nothing(client: Client, db: Session) -> None:
+    bad = UPLOAD + "Carrier pigeon,US,C1,Any,10,2027-01-01,\nSogeti,US,Z9,Any,10,2027-01-01,\n"
+    before = db.scalar(select(func.count()).select_from(RateCard))
+    r = client.as_user("kavya").post(
+        "/rate-card/upload", files={"file": ("rates.csv", bad.encode(), "text/csv")}
+    )
+    location = r.headers["location"]
+    assert "Nothing+imported" in location or "Nothing%20imported" in location
+    assert "Row+4" in location or "Row%204" in location
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(RateCard)) == before
+
+
+def test_upload_needs_the_columns(client: Client) -> None:
+    r = client.as_user("kavya").post(
+        "/rate-card/upload", files={"file": ("r.csv", b"Grade,Cost\nC1,5\n", "text/csv")}
+    )
+    assert "Missing+columns" in r.headers["location"] or "Missing%20columns" in r.headers["location"]
+
+
+def test_export_is_the_upload_template(client: Client) -> None:
+    r = client.as_user("kavya").get("/rate-card/export.csv")
+    lines = r.text.splitlines()
+    assert lines[0] == ",".join(rate_card_service.UPLOAD_COLUMNS)
+    assert "Sogeti,US,C1,Any,60.00,2026-01-01," in lines

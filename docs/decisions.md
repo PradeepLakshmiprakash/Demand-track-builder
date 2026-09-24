@@ -94,13 +94,12 @@ so a changed mail time takes effect without a restart. It lists new submissions 
 the next run retries. "Send admin mail now" on the GTD queue sends one immediately. Locally mails are
 written as `.eml` files under `var/mail/`.
 
-**D18. Requisition IDs** are stored uppercase with spaces removed and must be 4 to 12 letters or digits
-(the 09-Sep sheet uses 6). Please confirm against real GTD IDs. Submitted demands can be linked
-before their mail goes out.
+**D18. Requisition IDs** are stored uppercase with spaces removed and must be 4 to 12 letters or digits.
+The 09-Sep sheet only has 6-character IDs, but the wider range stays so a future GTD format change
+doesn't need a code change (confirmed 24 Sep). Submitted demands can be linked before their mail goes out.
 
-**D19. Not built yet from techstack.md:** per-account custom fields on the demand form (the
-`custom_fields` column exists). Planned with the Phase 8 second-account work unless Discover needs one
-sooner.
+**D19. No per-account custom fields for now** (confirmed 24 Sep): the demand form's fields are enough.
+The `custom_fields` column stays for when a review comment asks for one.
 
 ## Phase 3 answers (24 Sep 2026): all recommendations accepted
 
@@ -190,7 +189,9 @@ sheet is expected and doesn't flag the demand as dropped.
 **D33. Rate card is dated history.** Cost per hour by grade, practice (blank = any, a practice-specific
 rate wins), region and supply channel. A rate is never edited: adding one for the same key closes the
 open-ended previous row the day before; an overlap with a bounded row is refused. The seed carries a
-made-up card (64 rows) so offers can be priced; replace it with Discover's real vendor rates.
+made-up card (64 rows) so offers can be priced; replace it with Discover's real vendor rates. Rates go
+in one at a time on the screen or in bulk from a .csv/.xlsx upload (all or nothing, every bad row
+listed); the CSV download uses the same columns, so it's the template (confirmed 24 Sep: both).
 
 **D34. Offers come from the DP sheet.** When a demand reaches Offer in process and its row names a
 candidate, reconciliation creates the candidate and an offer approval (once per candidate). The supply
@@ -217,3 +218,42 @@ of days late) and revenue lost to date; open escalations and offers waiting for 
 stage (single-hue bars, the two problem stages in a warning tone, counts labelled); revenue at risk
 list; breakdowns by practice and by BU. Leadership and the admin demand owner (confirmed 24 Sep); the
 admin demand owner still lands on All demands.
+
+## Answers before Phase 6 (24 Sep 2026)
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Requisition ID format | Keep 4 to 12 letters or digits, for future formats (D18). |
+| 2 | Per-account custom fields | Not needed; the fields are enough unless a review asks for more (D19). |
+| 3 | Real vendor rates | Both: entered on screen, and bulk upload (built, D33). |
+| 4 | Who schedules L1 | **Staffing**, outside the app, once they have coverage. There is still a gap between coverage and interviews being scheduled. For now the app needs a **placeholder to capture the panelist's recommendation on a candidate**; the open problem is **knowing which requisition ID a candidate being interviewed belongs to**. |
+| 5 | Who books L2 | Also **staffing**. Who takes the L2 interview is a placeholder: not clear yet. (Earlier answer still holds: the panelist asks for L2, the demand owner approves.) |
+| 6 | Karat | A **separate application** for conducting interviews; it needs to be **integrated**, not re-entered by hand. |
+| 7 | Candidate CVs | Sent by **staffing by email** today. |
+| 8 | Heads-up alerts: matching interviewer | **One matching technology** (at least one shared skill). Practice and grade don't have to match. |
+| 9 | Rejection limit and panel SLA | Yes: count panel rejections recorded in the app; feedback due 48 hours after the scheduled interview time. |
+
+### What this changes for Phase 6
+
+The plan assumed the app schedules interviews and so always knows the requisition. It doesn't:
+staffing schedules them, outside the app, and CVs arrive by email. So Phase 6 centres on
+**linking a candidate to the right requisition** and **capturing the panelist's recommendation**,
+rather than on scheduling:
+
+- **Candidates come from the DP sheet** (Candidate Name and the multi-line candidate details on the
+  requisition's row), so the app already knows which requisition each named candidate is on.
+- **The panelist records feedback against a candidate**, found by name. The app suggests the
+  requisition(s) that candidate is on; if a name appears on more than one, or on none, the panelist
+  picks or the admin team maps it. This is the "fallback" in flow-artifact §7, now the main path.
+- **Interview records are placeholders:** round (L1/L2), candidate, requisition, interviewer and time
+  can be filled in by whoever knows them (admin team, or the panelist when giving feedback). Staffing
+  scheduling stays outside the app.
+- **L2:** the panelist can ask for one in their feedback; the demand owner approves; the interviewer
+  stays open until someone is assigned.
+- **CVs:** attached to the candidate by the admin team from staffing's email (upload). Reading them
+  from a mailbox automatically is a later step.
+- **Karat:** a placeholder for the integration. We need Karat's details (API or export, what it
+  sends: candidate, requisition or job, result, report link) before building it.
+- **Heads-up alerts** go to interviewers sharing at least one technology with the requisition.
+- **Rejection limit** counts panel rejections recorded in the app; **panel SLA** is 48 hours from the
+  scheduled time when one is known.

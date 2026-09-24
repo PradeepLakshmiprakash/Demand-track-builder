@@ -4,8 +4,9 @@ from datetime import date
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
+from starlette.datastructures import UploadFile
 
 from app.core.db import get_db
 from app.core.security import Actor, require_screen
@@ -41,6 +42,7 @@ def rate_card_page(
         channels={c.key: c.label for c in cfg.supply_channels},
         today=today,
         history=history,
+        upload_columns=rate_card_service.UPLOAD_COLUMNS,
     )
 
 
@@ -95,3 +97,34 @@ async def end(
         return RedirectResponse(f"/rate-card?err={quote(str(e))}", status_code=303)
     margin_service.reprice_pending(db, actor.account_id)
     return RedirectResponse("/rate-card?msg=Rate+ended", status_code=303)
+
+
+@router.post("/rate-card/upload")
+async def upload(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    file = (await request.form()).get("file")
+    if not isinstance(file, UploadFile) or not file.filename:
+        return RedirectResponse("/rate-card?err=Choose+a+.csv+or+.xlsx+file", status_code=303)
+    try:
+        n = rate_card_service.import_rates(db, actor.account_id, actor.id, file.filename, await file.read())
+    except RateCardError as e:
+        db.rollback()
+        return RedirectResponse(f"/rate-card?err={quote(str(e))}", status_code=303)
+    changed = margin_service.reprice_pending(db, actor.account_id)
+    msg = f"{n} rate{'s' if n != 1 else ''} imported"
+    if changed:
+        msg += f"; {changed} waiting offer(s) re-priced"
+    return RedirectResponse(f"/rate-card?msg={quote(msg)}", status_code=303)
+
+
+@router.get("/rate-card/export.csv")
+def export(request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)) -> Response:
+    cfg = db.get_one(Account, actor.account_id).settings
+    history = request.query_params.get("history") == "1"
+    rows = rate_card_service.listing(
+        db, actor.account_id, on=account_today(db, actor.account_id), include_history=history
+    )
+    body = rate_card_service.export_csv(rows, {c.key: c.label for c in cfg.supply_channels})
+    headers = {"Content-Disposition": 'attachment; filename="rate-card.csv"'}
+    return Response(body, media_type="text/csv; charset=utf-8", headers=headers)
