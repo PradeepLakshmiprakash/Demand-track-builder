@@ -327,3 +327,14 @@ pending → back to Coverage required. The demand owner gets a mail when a candi
 Linked / Coverage required doesn't pull back a demand the panel has moved (the reconciliation page
 lists these as "sheet behind the panel"); a sheet stage that is further on always wins. Interview
 activity counts as movement for the aging escalation.
+
+**D51. The demand owner follows the offer without seeing the numbers.** The demand page has an
+*Offer approval* panel per candidate: waiting for approval (with the admin demand owner, or with
+leadership), being priced, approved or declined (by whom, when; a decline shows its reason). The
+demands list shows the same in one line. The owner is mailed when an offer is approved or declined.
+Rates and margin appear only for the admin demand owner and leadership.
+
+**D52. Date of joining and candidate stage come from the DP sheet.** The demand page shows the DOJ
+from the latest sheet and how many days it is after the requested start. Candidates named on the
+row take its stage (Profiles with client, Offer in market, Staffed); an offer's own stage (Offer
+approved / declined) is kept when the next sheet still says Offer in process.

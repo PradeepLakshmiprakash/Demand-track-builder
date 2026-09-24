@@ -14,7 +14,7 @@ from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
-from app.services import interview_service
+from app.services import interview_service, margin_service
 from app.services.demand_service import (
     FILTERS,
     can_change,
@@ -26,6 +26,7 @@ from app.services.demand_service import (
     stage_history,
     summary,
 )
+from app.services.escalation_service import current_doj
 
 router = APIRouter(tags=["demands"])
 guard = require_screen("demands")
@@ -132,6 +133,8 @@ def demand_page(
         submitters=names,
         statuses={s.value: s.label for s in DemandStatus},
         returned=_returned(db, demand),
+        doj=current_doj(db, actor.account_id).get(demand.id),
+        offers=margin_service.for_demand(db, demand.id),
     )
 
 

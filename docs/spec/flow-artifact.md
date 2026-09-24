@@ -2,7 +2,7 @@
 
 Version 1.3 · 24 Sep 2026 — updated to match what is built through Phase 6 plus the wiring fixes (see §14–§15 for what changed since 1.1).
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D50 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D52 in `docs/decisions.md`.
 
 ---
 
@@ -385,3 +385,4 @@ flowchart LR
 - §3.1: *client interview required* on the demand (does a panel select go to the client, or is the panel final).
 - §6.3, §7, §11: Interviewing and Selected by panel stages, set from interview records the day they're entered; a lagging sheet doesn't undo them.
 - §9.3: *send back to demand owner for correction* (Returned for correction); old or outgoing requisition IDs in the sheet are ignored.
+- §8: the demand owner sees each offer's approval progress (no rates or margin) and is mailed the decision; the date of joining and candidate stages follow the DP sheet (D51–D52).

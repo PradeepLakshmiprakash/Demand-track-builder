@@ -18,10 +18,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import mail
 from app.core.account_config import AccountConfig
+from app.core.config import get_settings
 from app.core.enums import ApprovalRoute, Decision, DemandStatus, Role
 from app.core.security import Actor
-from app.models import Account, Candidate, Demand, OfferApproval
+from app.models import Account, Candidate, Demand, OfferApproval, User
 from app.services import interview_service, rate_card_service
 
 OFFER_STAGES = (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)
@@ -91,10 +93,10 @@ def ensure_offer(
     if not names:
         return None
     cand = interview_service.ensure_candidate(db, account.id, demand, names[0], channel=channel)
-    cand.current_stage = DemandStatus.OFFER_IN_PROCESS.label
     already = db.scalar(select(OfferApproval.id).where(OfferApproval.candidate_id == cand.id))
     if already is not None:
-        return None
+        return None  # its stage already says where the approval is; a re-import mustn't reset it
+    cand.current_stage = DemandStatus.OFFER_IN_PROCESS.label
     approval = OfferApproval(demand_id=demand.id, candidate_id=cand.id, channel=channel or cand.channel,
                              created_at=datetime.now(UTC))  # fmt: skip
     db.add(approval)
@@ -182,8 +184,78 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
         )
     approval.decision, approval.comment = d.value, comment
     approval.approver_id, approval.decided_at = actor.id, datetime.now(UTC)
+    cand = db.get_one(Candidate, approval.candidate_id)
+    cand.current_stage = "Offer approved" if d is Decision.APPROVED else "Offer declined"
+    _mail_owner(db, demand, cand, approval, actor)
     db.commit()
     return approval
+
+
+def _mail_owner(db: Session, demand: Demand, cand: Candidate, approval: OfferApproval, actor: Actor) -> None:
+    """The demand owner hears the decision. No rates or margin: owners don't see them."""
+    owner = db.get_one(User, demand.owner_id)
+    if not owner.active or owner.id == actor.id:
+        return
+    approved = approval.decision == Decision.APPROVED.value
+    word = "approved" if approved else "declined"
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    by = actor.name.rstrip(".")
+    text = f"The offer for {cand.name} on {demand.app_ref} ({demand.name}) was {word} by {by}.\n"
+    text += (
+        "Staffing can now make the offer; the DP sheet will show it in market with a date of joining.\n"
+        if approved
+        else f"Reason: {approval.comment}\nStaffing goes back to the other candidates.\n"
+    )
+    text += f"\n{get_settings().app_base_url}/demands/{demand.app_ref}"
+    mail.send(mail.Mail(to=[owner.email], subject=f"[{ref}] Offer for {cand.name} {word}", text=text))
+
+
+@dataclass
+class OfferStatus:
+    candidate: str
+    state: str  # what the owner sees
+    chip: str
+    detail: str | None
+    approval: OfferApproval  # rates and margin: only for those who may see them
+
+
+def notes(db: Session, demands: list[Demand]) -> dict[int, str]:
+    """One line per demand at the offer stage for the demands list: where its latest offer stands."""
+    out = {}
+    for d in demands:
+        if d.status_enum in OFFER_STAGES and (offers := for_demand(db, d.id)):
+            o = offers[-1]
+            out[d.id] = f"Offer for {o.candidate}: {o.state.lower()}" + (
+                f", {o.detail}" if o.state == "Waiting for approval" else ""
+            )
+    return out
+
+
+def for_demand(db: Session, demand_id: int) -> list[OfferStatus]:
+    """Where each offer on the demand stands, in words a demand owner may read."""
+    out = []
+    rows = db.execute(
+        select(OfferApproval, Candidate)
+        .join(Candidate, Candidate.id == OfferApproval.candidate_id)
+        .where(OfferApproval.demand_id == demand_id)
+        .order_by(OfferApproval.created_at)
+    ).all()
+    for a, c in rows:
+        who = db.get(User, a.approver_id).name if a.approver_id else None  # type: ignore[union-attr]
+        when = a.decided_at.strftime("%d %b") if a.decided_at else ""
+        if a.decision == Decision.APPROVED.value:
+            out.append(OfferStatus(c.name, "Approved", "done", f"by {who}, {when}", a))
+        elif a.decision == Decision.DECLINED.value:
+            out.append(OfferStatus(c.name, "Declined", "esc", f"by {who}, {when}: {a.comment}", a))
+        elif a.route == ApprovalRoute.ADMIN.value:
+            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with the admin demand owner", a))
+        elif a.route == ApprovalRoute.LEADERSHIP.value:
+            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with leadership", a))
+        else:
+            out.append(
+                OfferStatus(c.name, "Being priced", "gray", "the admin team is completing the details", a)
+            )
+    return out
 
 
 @dataclass

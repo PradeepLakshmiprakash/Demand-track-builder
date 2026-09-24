@@ -154,7 +154,7 @@ def notes(db: Session, demands: list[Demand]) -> dict[int, str]:
     return {
         d.id: ev.note
         for d in demands
-        if d.status_enum in APP_PROGRESS | {DemandStatus.COVERAGE_REQUIRED, DemandStatus.OFFER_IN_PROCESS}
+        if d.status_enum in APP_PROGRESS | {DemandStatus.COVERAGE_REQUIRED}
         and (ev := evidence(db, d)) is not None
     }
 

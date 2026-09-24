@@ -128,9 +128,10 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
         ):
             escs.setdefault(e.demand_id, []).append(e)
 
+    from app.services.margin_service import notes as offer_notes  # margin_service imports this module too
     from app.services.pipeline_service import notes as panel_notes  # pipeline_service imports this module
 
-    progress = panel_notes(db, demands)
+    progress = panel_notes(db, demands) | offer_notes(db, demands)
     rows = []
     for d in demands:
         label, chip, note, attention = _describe(d, escs.get(d.id, []), today)

@@ -121,6 +121,12 @@ def candidates_from_sheet(
     return [ensure_candidate(db, account_id, demand, n, channel=channel) for n in split_names(cell)]
 
 
+def stage_from_sheet(db: Session, account_id: int, demand: Demand, cell: str | None, label: str) -> None:
+    """Candidates named on the row share its stage (Profiles with client, Offer in market, Staffed)."""
+    for c in candidates_from_sheet(db, account_id, demand, cell, None):
+        c.current_stage = label
+
+
 @dataclass
 class Match:
     candidate: Candidate

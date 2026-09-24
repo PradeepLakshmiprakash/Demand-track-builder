@@ -46,10 +46,22 @@
       <div class="facts">
         {% if actor.can_see_bill_rate %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
         {{ field('Requested start date', d.start_date | d) }}
+        {% if doj %}{{ field('Date of joining', (doj | d) ~ (' · %d days after the requested start' % (doj - d.start_date).days if d.start_date and doj > d.start_date else '')) }}{% endif %}
         {{ field('Region', d.region) }}{{ field('Location', d.location) }}{{ field('Work mode', d.work_mode) }}
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
     </section>
+    {% if offers %}
+    <section class="panel panel-body" id="offers">
+      <h2>Offer approval</h2>
+      {% for o in offers %}
+        <div class="cand-mini">
+          <div class="title">{{ o.candidate }} <span class="chip {{ o.chip }}">{{ o.state }}</span></div>
+          <div class="small muted">{{ o.detail }}{% if actor.can_see_bill_rate and o.approval.margin_pct is not none %} · margin {{ '%.1f' % o.approval.margin_pct }}%{% endif %}</div>
+        </div>
+      {% endfor %}
+    </section>
+    {% endif %}
     <section class="panel panel-body" id="interviews">
       <h2>Candidates and interviews</h2>
       {% for c, ivs in candidates %}

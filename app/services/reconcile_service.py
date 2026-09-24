@@ -48,6 +48,12 @@ log = logging.getLogger("demand_tracker.reconcile")
 PREFIX = re.compile(r"\[(DM-\d{6})\]")
 LINKABLE = (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)  # tier-2/3 targets without an ID
 EXPECTED = (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING)  # has an ID, not yet seen in a sheet
+# Stages the sheet sets for the people it names (an offer's own stage comes from its approval).
+SHEET_CANDIDATE_STAGES = (
+    DemandStatus.PROFILES_WITH_CLIENT,
+    DemandStatus.OFFER_IN_MARKET,
+    DemandStatus.STAFFED,
+)
 # Back with the owner or the admin team for a new GTD entry: the old ID's rows wait for the new one.
 RESUBMITTING = (DemandStatus.RETURNED, DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)
 SUGGEST_MIN = 60
@@ -306,6 +312,8 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             interview_service.candidates_from_sheet(
                 db, account.id, d, row.candidate_name, margin_service.channel_for_source(cfg, row.source)
             )
+        if row.candidate_name and d.status_enum in SHEET_CANDIDATE_STAGES:
+            interview_service.stage_from_sheet(db, account.id, d, row.candidate_name, d.status_enum.label)
         if stage is DemandStatus.OFFER_IN_PROCESS and row.candidate_name:
             # The offer needs a margin approval (§8); once per candidate.
             channel = margin_service.channel_for_source(cfg, row.source)
