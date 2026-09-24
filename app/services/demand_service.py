@@ -5,12 +5,14 @@ later the jobs), driven by the actor's visibility scope, account and BUs.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core import storage
+from app.core.account_config import AccountConfig
 from app.core.enums import (
     BEFORE_GTD,
     FINISHED,
@@ -19,9 +21,11 @@ from app.core.enums import (
     EscalationStatus,
     Role,
     Scope,
+    StageOrigin,
 )
 from app.core.security import Actor
-from app.models import Account, Demand, Escalation, Interview
+from app.models import Account, BusinessUnit, Demand, Escalation, Interview, StageEvent
+from app.schemas.raise_demand import DemandForm
 
 
 def visible_demands(actor: Actor) -> Select[tuple[Demand]]:
@@ -164,3 +168,161 @@ def summary(rows: list[DemandRow]) -> dict[str, int]:
         "in_coverage": sum(r.group == "linked" and not r.attention for r in open_rows),
         "attention": sum(r.attention for r in open_rows),
     }
+
+
+# --- Intake: raise, edit, submit (Phase 2) ---------------------------------------------------------
+
+EDITABLE = frozenset({DemandStatus.DRAFT, DemandStatus.SUBMITTED})  # locked once it's in the admin mail
+
+
+class DemandError(ValueError):
+    pass
+
+
+def get_visible(db: Session, actor: Actor, app_ref: str) -> Demand | None:
+    """A demand the actor may see, or None (callers answer 404, never 403, so refs don't leak)."""
+    return db.scalar(
+        visible_demands(actor)
+        .where(Demand.app_ref == app_ref)
+        .options(
+            selectinload(Demand.submissions), selectinload(Demand.business_unit), selectinload(Demand.owner)
+        )
+    )
+
+
+def can_change(actor: Actor, demand: Demand) -> bool:
+    return can_edit(actor, demand) and demand.status_enum in EDITABLE
+
+
+def record_stage(
+    db: Session, demand: Demand, to: DemandStatus, actor_id: int | None, origin: StageOrigin = StageOrigin.APP
+) -> None:
+    """Every status change goes through here so it is written as a stage event."""
+    before = demand.status
+    if before == to.value:
+        return
+    demand.status = to.value
+    db.add(
+        StageEvent(
+            demand_id=demand.id, from_stage=before, to_stage=to.value, origin=origin.value, actor_id=actor_id
+        )
+    )
+
+
+def _resolve_bu(db: Session, actor: Actor, form: DemandForm) -> int:
+    if actor.role is Role.DEMAND_OWNER:
+        if len(actor.bu_ids) != 1:
+            raise DemandError("Your user has no single business unit. Ask the admin to fix your access.")
+        return next(iter(actor.bu_ids))  # a demand owner raises for their own BU only
+    bu = db.get(BusinessUnit, form.bu_id) if form.bu_id else None
+    if bu is None or bu.account_id != actor.account_id or not bu.active:
+        raise DemandError("Choose a business unit.")
+    return bu.id
+
+
+def _check(cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date) -> None:
+    problems = []
+    for label, value, allowed in (
+        ("Practice", form.practice, cfg.practices),
+        ("Grade", form.grade, cfg.grades),
+        ("Category", form.category, cfg.categories),
+        ("Region", form.region, cfg.regions),
+        ("Work mode", form.work_mode, cfg.work_modes),
+    ):
+        if value is not None and value not in allowed:
+            problems.append(f"{label} '{value}' isn't in the account's list")
+    if submit:
+        missing = form.missing_for_submit()
+        if missing:
+            problems.append("Needed before submitting: " + ", ".join(missing))
+        if form.start_date and form.start_date < today:
+            problems.append("Requested start date is in the past")
+    if problems:
+        raise DemandError(". ".join(problems) + ".")
+
+
+def _apply(demand: Demand, form: DemandForm) -> None:
+    for field in (
+        "name", "practice", "grade", "category", "type", "replaced_resource", "position_type",
+        "primary_skills", "secondary_skills", "exp_min", "exp_max", "start_date", "region",
+        "location", "work_mode", "hiring_manager",
+    ):  # fmt: skip
+        setattr(demand, field, getattr(form, field))
+    if form.client_rate is not None:  # blank keeps the rate on file (demand owners can't see it)
+        demand.client_rate = form.client_rate
+
+
+Upload = tuple[str, bytes]  # (file name, content) of a job description
+
+
+def _check_jd(jd: Upload | None) -> None:
+    if jd is not None:
+        try:
+            storage.check(jd[0], jd[1], storage.JD_EXTENSIONS)
+        except storage.StorageError as e:
+            raise DemandError(f"Job description not saved: {e}.") from e
+
+
+def _store_jd(demand: Demand, jd: Upload | None) -> None:
+    if jd is not None:
+        demand.jd_path = storage.save(f"jd/{demand.app_ref}", jd[0], jd[1], storage.JD_EXTENSIONS)
+
+
+def create_demands(
+    db: Session, actor: Actor, form: DemandForm, *, submit: bool, jd: Upload | None = None
+) -> list[Demand]:
+    """Save (draft) or submit. One demand per position: N positions make N demands with their own refs."""
+    account = db.get_one(Account, actor.account_id)
+    today = account_today(db, actor.account_id)
+    bu_id = _resolve_bu(db, actor, form)
+    _check(account.settings, form, submit=submit, today=today)
+    _check_jd(jd)
+    created = []
+    for _ in range(form.positions):
+        d = Demand(
+            account_id=actor.account_id, bu_id=bu_id, owner_id=actor.id, status=DemandStatus.DRAFT.value
+        )
+        _apply(d, form)
+        db.add(d)
+        db.flush()  # Postgres assigns app_ref here
+        _store_jd(d, jd)
+        db.add(StageEvent(demand_id=d.id, from_stage=None, to_stage=DemandStatus.DRAFT.value,
+                          origin=StageOrigin.APP.value, actor_id=actor.id))  # fmt: skip
+        if submit:
+            _submit(db, actor, d)
+        created.append(d)
+    db.commit()
+    return created
+
+
+def update_demand(
+    db: Session, actor: Actor, demand: Demand, form: DemandForm, *, submit: bool, jd: Upload | None = None
+) -> Demand:
+    if not can_change(actor, demand):
+        raise DemandError("This demand can't be changed any more: it's already with the admin.")
+    _check_jd(jd)
+    account = db.get_one(Account, actor.account_id)
+    _check(account.settings, form, submit=submit or demand.status_enum is DemandStatus.SUBMITTED,
+           today=account_today(db, actor.account_id))  # fmt: skip
+    if actor.role is not Role.DEMAND_OWNER:
+        demand.bu_id = _resolve_bu(db, actor, form)
+    _apply(demand, form)
+    _store_jd(demand, jd)
+    if submit:
+        _submit(db, actor, demand)
+    db.commit()
+    return demand
+
+
+def _submit(db: Session, actor: Actor, demand: Demand) -> None:
+    if demand.status_enum is DemandStatus.DRAFT:
+        record_stage(db, demand, DemandStatus.SUBMITTED, actor.id)
+        demand.submitted_at = datetime.now(UTC)
+
+
+def stage_history(db: Session, demand: Demand) -> list[StageEvent]:
+    return list(
+        db.scalars(
+            select(StageEvent).where(StageEvent.demand_id == demand.id).order_by(StageEvent.at, StageEvent.id)
+        )
+    )

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' ~ demand.app_ref if demand else 'Raise demand' }}{% endblock %}
+{% macro opt(value, current) %}<option {{ 'selected' if value == current }}>{{ value }}</option>{% endmacro %}
+{% block main %}
+<div class="form-page">
+  <form method="post" enctype="multipart/form-data" class="stack demand-form" novalidate>
+    <div>
+      <a href="{{ '/demands/' ~ demand.app_ref if demand else '/demands' }}" class="small">← {{ demand.app_ref if demand else ('My demands' if actor.role.value == 'demand_owner' else 'All demands') }}</a>
+      <h1>{{ 'Edit demand' if demand else 'Raise demand' }}</h1>
+      <div class="lede">
+        {% if demand %}<span class="mono">{{ demand.app_ref }}</span> · {{ demand.status_enum.label }}. You can change it until it goes out in the admin mail.
+        {% else %}One demand per position. The app reference is created when you save.{% endif %}
+      </div>
+    </div>
+    {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
+
+    <fieldset class="panel panel-body">
+      <legend>Position</legend>
+      <div class="grid2">
+        <label class="f">Account<input type="text" value="{{ account.name }}" readonly></label>
+        {% if pick_bu %}
+          <label class="f">Business unit
+            <select name="bu_id" required>
+              <option value="">Choose…</option>
+              {% for b in bus %}<option value="{{ b.id }}" {{ 'selected' if (v.bu_id | string) == (b.id | string) }}>{{ b.name }}</option>{% endfor %}
+            </select>
+          </label>
+        {% else %}
+          <label class="f">Business unit<input type="text" value="{{ actor.bu_names | join(', ') }}" readonly><span class="hint">Your business unit</span></label>
+        {% endif %}
+        <label class="f">Practice
+          <select name="practice"><option value="">Choose…</option>{% for p in cfg.practices %}{{ opt(p, v.practice) }}{% endfor %}</select>
+        </label>
+        <label class="f">Grade
+          <select name="grade"><option value="">Choose…</option>{% for g in cfg.grades %}{{ opt(g, v.grade) }}{% endfor %}</select>
+        </label>
+      </div>
+      <label class="f">Demand request name
+        <input type="text" name="name" value="{{ v.name or '' }}" required minlength="3" maxlength="200" placeholder="e.g. Java AWS Developer Payments Chicago">
+        <span class="hint">Goes to GTD as <span class="mono">[{{ demand.app_ref if demand else 'DM-xxxxxx' }}] {{ v.name or 'name' }}</span></span>
+      </label>
+      <div class="grid3">
+        <fieldset class="f radios"><legend>Category</legend>
+          {% for c in cfg.categories %}<label><input type="radio" name="category" value="{{ c }}" {{ 'checked' if v.category == c }}> {{ c }}</label>{% endfor %}
+          <span class="hint">Proactive covers shadow, bench, NGT</span>
+        </fieldset>
+        <fieldset class="f radios"><legend>Type</legend>
+          {% for t in ['New', 'Replacement'] %}<label><input type="radio" name="type" value="{{ t }}" {{ 'checked' if (v.type or 'New') == t }}> {{ t }}</label>{% endfor %}
+        </fieldset>
+        <fieldset class="f radios"><legend>Position</legend>
+          {% for t in ['Billable', 'Non-billable'] %}<label><input type="radio" name="position_type" value="{{ t }}" {{ 'checked' if (v.position_type or 'Billable') == t }}> {{ t }}</label>{% endfor %}
+        </fieldset>
+      </div>
+      <label class="f" id="replaced">Who is being replaced<input type="text" name="replaced_resource" value="{{ v.replaced_resource or '' }}" maxlength="120"></label>
+      {% if not demand %}
+      <label class="f" style="max-width:220px">Number of positions<input type="number" name="positions" min="1" max="20" value="{{ v.positions or 1 }}"><span class="hint">Creates one demand per position</span></label>
+      {% endif %}
+    </fieldset>
+
+    <fieldset class="panel panel-body">
+      <legend>Requirements</legend>
+      <label class="f">Primary skills<input type="text" name="primary_skills" value="{{ v.primary_skills or '' }}" placeholder="Java, Spring Boot, AWS"><span class="hint">Comma-separated. Used to route interviewers.</span></label>
+      <label class="f">Secondary skills<input type="text" name="secondary_skills" value="{{ v.secondary_skills or '' }}" placeholder="e.g. Kafka, React"></label>
+      <div class="grid2" style="max-width:420px">
+        <label class="f">Exp. min (yrs)<input type="number" name="exp_min" min="0" max="50" value="{{ v.exp_min if v.exp_min is not none else '' }}"></label>
+        <label class="f">Exp. max (yrs)<input type="number" name="exp_max" min="0" max="50" value="{{ v.exp_max if v.exp_max is not none else '' }}"></label>
+      </div>
+      <label class="f">Job description
+        <input type="file" name="jd" accept=".pdf,.doc,.docx,.txt,.rtf">
+        <span class="hint">{% if demand and demand.jd_path %}On file: <a href="/demands/{{ demand.app_ref }}/jd">{{ demand.jd_path.split('/')[-1] }}</a>. Choose a file to replace it. {% endif %}PDF, Word or text, up to 5 MB.</span>
+      </label>
+    </fieldset>
+
+    <fieldset class="panel panel-body">
+      <legend>Commercial and timing</legend>
+      <div class="grid2">
+        <label class="f">Client bill rate (per hour)
+          <input type="number" name="client_rate" min="0" step="0.01" value="{{ v.client_rate if v.client_rate is not none else '' }}" placeholder="{{ 'On file. Leave blank to keep it.' if rate_on_file and not actor.can_see_bill_rate else '' }}">
+          <span class="hint">Only the admin demand owner and leadership see this after it's saved.</span>
+        </label>
+        <label class="f">Requested start date<input type="date" name="start_date" value="{{ v.start_date or '' }}"><span class="hint">Revenue loss is counted from this date</span></label>
+        <label class="f">Region
+          <select name="region">{% for r in cfg.regions %}{{ opt(r, v.region) }}{% endfor %}</select>
+        </label>
+        <label class="f">Location<input type="text" name="location" value="{{ v.location or '' }}" maxlength="80" placeholder="City"></label>
+        <label class="f">Work mode
+          <select name="work_mode"><option value="">Choose…</option>{% for w in cfg.work_modes %}{{ opt(w, v.work_mode) }}{% endfor %}</select>
+        </label>
+        <label class="f">Client hiring manager<input type="text" name="hiring_manager" value="{{ v.hiring_manager or '' }}" maxlength="120" placeholder="Name"></label>
+      </div>
+    </fieldset>
+
+    <div class="row">
+      {% if not demand or demand.status == 'draft' %}
+        <button class="btn" type="submit" name="action" value="draft">Save draft</button>
+        <button class="btn primary" type="submit" name="action" value="submit">Submit to admin</button>
+      {% else %}
+        <button class="btn primary" type="submit" name="action" value="save">Save changes</button>
+      {% endif %}
+      <a class="btn" href="{{ '/demands/' ~ demand.app_ref if demand else '/demands' }}">Cancel</a>
+    </div>
+  </form>
+
+  <aside class="panel panel-body next-steps">
+    <div class="title">What happens next</div>
+    <ol>
+      <li>Your demand goes into the admin mail, sent daily at {{ account.mail_time.strftime('%H:%M') }} ({{ cfg.timezone.split('/')[-1].replace('_', ' ') }} time).</li>
+      <li>The admin team enters it on GTD. The GTD requisition ID is linked to your demand.</li>
+      <li>Once GTD staffing approves it, it appears in the DP sheet and coverage begins.</li>
+    </ol>
+    <p class="note">If it isn't in the DP sheet within {{ account.grace_days }} working days, an escalation opens automatically and you're copied.</p>
+  </aside>
+</div>
+<script>
+(function () {
+  var box = document.getElementById('replaced');
+  function sync() { box.hidden = !document.querySelector('input[name=type][value=Replacement]').checked; }
+  document.querySelectorAll('input[name=type]').forEach(function (r) { r.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@ Scope: tracking client positions (demands) from the moment a demand owner raises
 |---|---|---|
 | Demand owner | Own demands (optionally read-only across own BU) | Belongs to exactly one BU (CARDS, BANKING, PAYMENTS, DATA) and raises demands for any grade or practice from it. Owns each demand until the person is onboarded. Approves L2 interview requests on their demands. |
 | Admin demand owner | All demands, all BUs | Submits demands on GTD and records the requisition ID. Uploads the DP sheet and resolves reconciliation. Approves offers with margin ≥ 30%. Maintains the vendor rate card. Liaises with demand owners, DPs and staffing. Handles L1 escalations with the LOB delivery head. |
-| Admin team | All demands, all BUs | The admin demand owner's team, separate from demand owners. Does the manual admin work: submits demands on GTD and records requisition IDs, uploads the DP sheet, works reconciliation. |
+| Admin team | All demands, all BUs | The admin demand owner's team, separate from demand owners. Does the manual admin work: submits demands on GTD and records requisition IDs, uploads the DP sheet, works reconciliation, handles escalations. |
 | Leadership | Whole account, read-only dashboards | Watches fill speed and revenue lost to missed start dates. Resolves L2 escalations. Approves or rejects offers below 30% margin at their discretion. |
 | Interviewer | Only interviews assigned to them | Receives alerts for requisitions in their skill area, conducts interviews, submits feedback and a select/reject decision. Asks for an L2 round when needed. |
 

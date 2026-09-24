@@ -40,9 +40,9 @@
 
     {% for item in menu %}
       {% if item.ready %}
-        <a class="nav-link {{ 'active' if path == item.path or (path.startswith(item.path ~ '/') ) }}" href="{{ item.path }}">{{ item.label_for(actor.role) }}</a>
+        <a class="nav-link {{ 'active' if item.key == active_nav }}" href="{{ item.path }}" {% if item.key == active_nav %}aria-current="page"{% endif %}>{{ item.label_for(actor.role) }}</a>
       {% else %}
-        <a class="nav-link soon {{ 'active' if path == '/soon/' ~ item.key }}" href="/soon/{{ item.key }}">{{ item.label_for(actor.role) }} <span class="tag">P{{ item.phase }}</span></a>
+        <a class="nav-link soon {{ 'active' if item.key == active_nav }}" href="/soon/{{ item.key }}">{{ item.label_for(actor.role) }} <span class="tag">P{{ item.phase }}</span></a>
       {% endif %}
     {% endfor %}
 

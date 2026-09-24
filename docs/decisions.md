@@ -1,6 +1,5 @@
 # Decisions
 
-
 ## Answers to the open questions (`spec/flow-artifact.md` §12), 24 Sep 2026
 
 | # | Question | Answer | Where it lives | Built |
@@ -64,12 +63,41 @@ request from their feedback; the demand's owner approves or declines it; only an
 becomes an interview record with its invite and feedback link. Pending requests count toward the panel
 SLA timer so a request waiting on the owner can still escalate.
 
-**D12. What the admin team can do (to confirm).** Full-account visibility, locked like the admin
-demand owner's. Menu: All demands, GTD queue, DP sheet import, Reconciliation. Kept with the admin
-demand owner only: User access, Account settings, Escalations, Offer approvals, Rate card,
-Interviewer profiles, Raise demand. The admin team doesn't see client bill rates. On the demands list
+**D12. What the admin team can do** (confirmed 24 Sep). Full-account visibility, locked like the admin
+demand owner's. Menu: All demands, GTD queue, DP sheet import, Reconciliation, Escalations (they handle
+escalations too). Kept with the admin demand owner only: User access, Account settings, Offer
+approvals, Rate card, Interviewer profiles, Raise demand. The admin team doesn't see client bill rates. On the demands list
 they're read-only; recording requisition IDs happens on the GTD queue (Phase 2), which they can use.
 
 **D13. BU rules by role.** Demand owner: exactly one BU (service rule; the form's BU chips act as a
 single choice). Interviewer: one or more (used for routing). Admin demand owner, admin team, leadership:
 every BU, set automatically.
+
+## Decisions made while building Phase 2
+
+**D14. Edit window.** A demand can be edited by its owner (or the admin demand owner) while it's a
+draft or submitted. Once it's in an admin mail (`notified`) it's locked; changes after that go through
+the admin.
+
+**D15. Drafts may be incomplete.** `practice` and `grade` are nullable so a draft can be saved early;
+a CHECK constraint (`submitted_is_complete`) requires both for anything past draft, and submitting
+checks every required field (`DemandForm.missing_for_submit`).
+
+**D16. Client bill rate is write-only for demand owners.** They can enter it on the form but never see
+it again; leaving it blank on edit keeps the rate on file. The admin demand owner and leadership see it.
+It's included in the GTD entry download for the admin roles.
+
+**D17. The daily admin mail** goes to active admin demand owners and admin team members. A job checks
+every minute and sends once the account's local mail time has passed and no mail went out that day,
+so a changed mail time takes effect without a restart. It lists new submissions (which become
+`notified`) and reminds about earlier ones still without an ID. If sending fails, nothing changes and
+the next run retries. "Send admin mail now" on the GTD queue sends one immediately. Locally mails are
+written as `.eml` files under `var/mail/`.
+
+**D18. Requisition IDs** are stored uppercase with spaces removed and must be 4 to 12 letters or digits
+(the 09-Sep sheet uses 6). Please confirm against real GTD IDs. Submitted demands can be linked
+before their mail goes out.
+
+**D19. Not built yet from techstack.md:** per-account custom fields on the demand form (the
+`custom_fields` column exists). Planned with the Phase 8 second-account work unless Discover needs one
+sooner.

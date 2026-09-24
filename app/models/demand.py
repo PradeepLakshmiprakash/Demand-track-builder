@@ -39,6 +39,9 @@ class Demand(Base):
         CheckConstraint(check_in("status", DemandStatus), name="status_valid"),
         CheckConstraint("exp_min IS NULL OR exp_max IS NULL OR exp_min <= exp_max", name="exp_range"),
         CheckConstraint("client_rate IS NULL OR client_rate >= 0", name="rate_positive"),
+        CheckConstraint(
+            "status = 'draft' OR (practice IS NOT NULL AND grade IS NOT NULL)", name="submitted_is_complete"
+        ),
         Index("ix_demands_account_status", "account_id", "status"),
         Index("ix_demands_owner", "owner_id"),
     )
@@ -49,8 +52,9 @@ class Demand(Base):
     bu_id: Mapped[int] = mapped_column(ForeignKey("business_units.id"))
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     name: Mapped[str] = mapped_column(String(200))
-    practice: Mapped[str] = mapped_column(String(40))
-    grade: Mapped[str] = mapped_column(String(10))
+    # Optional while a draft; required to submit (DemandForm.missing_for_submit).
+    practice: Mapped[str | None] = mapped_column(String(40))
+    grade: Mapped[str | None] = mapped_column(String(10))
     category: Mapped[str] = mapped_column(String(20), default="Open")
     type: Mapped[str] = mapped_column(String(20), default="New")
     position_type: Mapped[str] = mapped_column(String(20), default="Billable")

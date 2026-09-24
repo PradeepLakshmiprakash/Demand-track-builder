@@ -27,6 +27,10 @@ if not TEST_URL:
 os.environ["DATABASE_URL"] = TEST_URL
 os.environ["ENV"] = "test"
 os.environ["VIEW_SWITCHER_ENABLED"] = "true"
+os.environ["SCHEDULER_ENABLED"] = "false"
+os.environ["MAIL_BACKEND"] = "console"
+os.environ["MAIL_DIR"] = "var/test-mail"
+os.environ["STORAGE_DIR"] = "var/test-files"
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402

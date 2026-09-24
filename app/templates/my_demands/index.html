@@ -8,7 +8,7 @@
     <h1>{{ title }}</h1>
   </div>
   {% if actor.role.value in ('demand_owner', 'admin') %}
-    <a class="btn primary" href="/soon/raise" title="Arrives in Phase 2">Raise demand</a>
+    <a class="btn primary" href="/demands/new">Raise demand</a>
   {% endif %}
 </div>
 
@@ -45,7 +45,7 @@
     </div>
     {% for r in rows %}
     {% set d = r.demand %}
-    <div class="tr" role="row">
+    <a class="tr link" role="row" href="/demands/{{ d.app_ref }}">
       <div class="mono">{{ d.app_ref }}</div>
       <div class="mono">{{ r.req_id or '—' }}</div>
       <div>
@@ -59,7 +59,7 @@
       <div>{{ d.grade }}</div>
       <div>{{ d.start_date | d }}</div>
       <div><span class="chip {{ r.chip }}">{{ r.status_label }}</span></div>
-    </div>
+    </a>
     {% else %}
     <div class="empty">No demands here{% if active_filter != 'all' %} for this filter{% endif %}.</div>
     {% endfor %}

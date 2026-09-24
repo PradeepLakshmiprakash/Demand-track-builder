@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}GTD queue{% endblock %}
+{% macro demand_row(d, linkable) %}
+<div class="tr" id="d{{ d.id }}">
+  <div class="mono"><a href="/demands/{{ d.app_ref }}">{{ d.app_ref }}</a></div>
+  <div>
+    <div class="title">{{ d.gtd_name }}</div>
+    <div class="note">{{ d.owner.name }}{% if d.start_date %} · start {{ d.start_date | d }}{% endif %}</div>
+  </div>
+  <div>{{ d.business_unit.name }}</div>
+  <div>{{ d.practice }}</div>
+  <div>{{ d.grade }}</div>
+  {% if linkable %}
+  <form method="post" action="/gtd-queue/{{ d.id }}/link" class="link-form">
+    <label><span class="sr-only">GTD requisition ID for {{ d.app_ref }}</span>
+      <input type="text" name="gtd_req_id" placeholder="e.g. 2ZT7KP" autocomplete="off" spellcheck="false"
+             aria-label="GTD requisition ID for {{ d.app_ref }}"
+             value="{{ failed_value if failed_id == d.id | string else '' }}" class="mono {{ 'invalid' if failed_id == d.id | string }}"
+             {% if failed_id == d.id | string %}aria-invalid="true" autofocus{% endif %} required maxlength="20"></label>
+    <button class="btn small primary">Link</button>
+  </form>
+  {% else %}
+  <div class="row"><span class="mono">{{ d.gtd_req_id }}</span><span class="chip teal">Linked</span></div>
+  {% endif %}
+</div>
+{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · all BUs</div>
+    <h1>GTD queue</h1>
+    <div class="lede">Enter each demand on GTD with the name exactly as shown, then paste the requisition ID GTD gives you. An ID can be linked only once.</div>
+  </div>
+  <div class="row">
+    <a class="btn" href="/gtd-queue/export.csv">Download for GTD entry</a>
+    <form method="post" action="/gtd-queue/send-mail"><button class="btn">Send admin mail now</button></form>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Enter on GTD · from the admin mail</h2>
+      <div class="hint">
+        {% if q.last_batch %}Last mail sent {{ q.last_batch.sent_at | at(tz, '%d %b, %H:%M %Z') }}.{% else %}No admin mail sent yet.{% endif %}
+        Next one at {{ account.mail_time.strftime('%H:%M') }} {{ account.settings.timezone.split('/')[-1].replace('_', ' ') }} time.
+        Without an ID by the next mail, a demand is escalated as not submitted.
+      </div>
+    </div>
+    <span class="chip {{ 'risk' if q.in_mail else 'teal' }}">{{ q.in_mail | length }} pending</span>
+  </div>
+  <div class="tbl gtd">
+    <div class="tr th"><div>App ref</div><div>Demand request name</div><div>BU</div><div>Practice</div><div>Grade</div><div>GTD requisition ID</div></div>
+    {% for d in q.in_mail %}{{ demand_row(d, true) }}{% else %}<div class="empty">Nothing waiting from the admin mail.</div>{% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Submitted since the last mail</h2>
+      <div class="hint">These go out in the next admin mail. You can enter them on GTD early.</div>
+    </div>
+    <span class="chip gray">{{ q.next_mail | length }}</span>
+  </div>
+  <div class="tbl gtd">
+    {% for d in q.next_mail %}{{ demand_row(d, true) }}{% else %}<div class="empty">No new submissions.</div>{% endfor %}
+  </div>
+</section>
+
+{% if q.linked_today %}
+<section class="panel">
+  <div class="panel-head"><h2>Linked today</h2><span class="chip teal">{{ q.linked_today | length }}</span></div>
+  <div class="tbl gtd">
+    {% for d in q.linked_today %}{{ demand_row(d, false) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

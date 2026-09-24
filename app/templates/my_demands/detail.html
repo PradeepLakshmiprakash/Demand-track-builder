@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ d.app_ref }}{% endblock %}
+{% macro field(label, value) %}<div><div class="k">{{ label }}</div><div class="v">{{ value if value not in (none, '', []) else '—' }}</div></div>{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <a href="/demands" class="small">← {{ 'My demands' if actor.scope.value != 'full' else 'All demands' }}</a>
+    <div class="eyebrow" style="margin-top:8px"><span class="mono">{{ d.app_ref }}</span>{% if d.gtd_req_id %} · GTD <span class="mono">{{ d.gtd_req_id }}</span>{% endif %} · {{ d.business_unit.name }} · {{ d.owner.name }}</div>
+    <h1>{{ d.name }}</h1>
+    <div style="margin-top:10px"><span class="chip {{ d.status_enum.chip }}">{{ d.status_enum.label }}</span></div>
+  </div>
+  <div class="row">
+    {% if can_change %}<a class="btn" href="/demands/{{ d.app_ref }}/edit">Edit</a>{% endif %}
+    {% if can_submit %}
+      <form method="post" action="/demands/{{ d.app_ref }}/submit"><button class="btn primary">Submit to admin</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <section class="panel panel-body">
+      <h2>Position</h2>
+      <div class="facts">
+        {{ field('Practice', d.practice) }}{{ field('Grade', d.grade) }}{{ field('Category', d.category) }}
+        {{ field('Type', d.type ~ (' · replacing ' ~ d.replaced_resource if d.replaced_resource else '')) }}
+        {{ field('Position', d.position_type) }}{{ field('Name on GTD', d.gtd_name) }}
+      </div>
+    </section>
+    <section class="panel panel-body">
+      <h2>Requirements</h2>
+      <div class="facts">
+        {{ field('Primary skills', d.primary_skills | join(', ')) }}
+        {{ field('Secondary skills', d.secondary_skills | join(', ')) }}
+        {{ field('Experience', (d.exp_min | string if d.exp_min is not none else '?') ~ '–' ~ (d.exp_max | string if d.exp_max is not none else '?') ~ ' yrs' if d.exp_min is not none or d.exp_max is not none else none) }}
+        <div><div class="k">Job description</div><div class="v">{% if d.jd_path %}<a href="/demands/{{ d.app_ref }}/jd">{{ d.jd_path.split('/')[-1] }}</a>{% else %}—{% endif %}</div></div>
+      </div>
+    </section>
+    <section class="panel panel-body">
+      <h2>Commercial and timing</h2>
+      <div class="facts">
+        {% if actor.can_see_bill_rate %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
+        {{ field('Requested start date', d.start_date | d) }}
+        {{ field('Region', d.region) }}{{ field('Location', d.location) }}{{ field('Work mode', d.work_mode) }}
+        {{ field('Client hiring manager', d.hiring_manager) }}
+      </div>
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="panel panel-body">
+      <h2>GTD</h2>
+      {% if d.submissions %}
+        {% for s in d.submissions %}
+          <div class="row small" style="margin-top:10px"><span class="mono" style="font-size:15px">{{ s.gtd_req_id }}</span>
+            <span class="muted">linked {{ s.submitted_at | at(tz, '%d %b %Y') }} by {{ submitters.get(s.submitted_by, '—') }}</span></div>
+        {% endfor %}
+      {% else %}
+        <p class="muted small" style="margin:10px 0 0">No requisition ID yet. {% if d.status == 'draft' %}Submit the demand to send it to the admin.{% else %}The admin team links it after entering the demand on GTD.{% endif %}</p>
+      {% endif %}
+    </section>
+    <section class="panel panel-body">
+      <h2>History</h2>
+      <ol class="timeline">
+        {% for e in history %}
+          <li><span class="title">{{ statuses.get(e.to_stage, e.to_stage) }}</span>
+            <span class="muted small">{{ e.at | at(tz) }}{% if e.origin == 'import' %} · from DP sheet{% endif %}</span></li>
+        {% endfor %}
+      </ol>
+    </section>
+  </aside>
+</div>
+{% endblock %}

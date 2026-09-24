@@ -1,3 +1,6 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -10,14 +13,35 @@ from app.core.db import get_db, new_session
 from app.core.nav import BY_KEY, home_for
 from app.core.security import VIEW_AS_COOKIE, Actor, current_user
 from app.core.templating import render
-from app.routers import account_settings, my_demands, user_access, view_switcher
+from app.routers import account_settings, gtd_queue, my_demands, raise_demand, user_access, view_switcher
 
-ROUTERS = [my_demands.router, user_access.router, account_settings.router]
+# raise_demand before my_demands so /demands/new isn't read as a demand ref.
+ROUTERS = [
+    raise_demand.router,
+    my_demands.router,
+    gtd_queue.router,
+    user_access.router,
+    account_settings.router,
+]
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    scheduler = None
+    if get_settings().scheduler_enabled:
+        from app.jobs.scheduler import start
+
+        scheduler = start()
+    yield
+    if scheduler:
+        scheduler.shutdown(wait=False)
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Demand Tracker", version="0.1.0")
+    app = FastAPI(title="Demand Tracker", version="0.2.0", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     if settings.view_switcher_enabled:

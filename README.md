@@ -15,7 +15,8 @@ Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 |---|---|---|
 | 0 | Decisions and setup | Repo, CI; open questions answered 24 Sep (`docs/decisions.md`) |
 | 1 | Foundation | **Done**: all tables + first migration, View-as switcher, User access, Account settings, demands list with scope filtering, seed |
-| 2 | Intake and GTD submission | Next |
+| 2 | Intake and GTD submission | **Done**: Raise demand (draft/submit, N positions, JD upload), demand page with history, GTD queue (link IDs, CSV for GTD entry), daily admin mail + scheduler |
+| 3 | DP sheet import and reconciliation | Next |
 
 ## Run locally (this machine)
 
@@ -50,8 +51,10 @@ services so scheduled jobs can reuse it.
 app/core/        config, db, enums (the vocabulary), account_config (per-client rules),
                  security (Actor, current_user, role guards), nav (menu per role)
 app/models/      SQLAlchemy models, one class per table
-app/services/    demand_service (scope filter), user_service, account_service
-app/routers/     view_switcher, my_demands, user_access, account_settings
+app/services/    demand_service (scope filter, intake), gtd_service, notify_service (admin mail),
+                 user_service, account_service
+app/jobs/        scheduler (daily admin mail)
+app/routers/     view_switcher, my_demands, raise_demand, gtd_queue, user_access, account_settings
 app/templates/   base.html + one folder per screen
 migrations/      Alembic
 seed/            Discover NA dummy data (python -m seed)
@@ -66,7 +69,7 @@ tests/
 | Demand owner | Rahul K. (CARDS) | Own + CARDS read-only |
 | Demand owner | Neha T., Meera S., Arjun D. | Own demands |
 | Admin demand owner | Kavya R. | Full account |
-| Admin team | Farah Q., Deepak L. | Full account; GTD queue, DP sheet import, reconciliation |
+| Admin team | Farah Q., Deepak L. | Full account; GTD queue, DP sheet import, reconciliation, escalations |
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
 

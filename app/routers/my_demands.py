@@ -2,17 +2,28 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import storage
 from app.core.db import get_db
-from app.core.enums import Scope
-from app.core.security import Actor, require_screen
+from app.core.enums import DemandStatus, Role, Scope
+from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
-from app.models import BusinessUnit
-from app.services.demand_service import FILTERS, demand_rows, filter_counts, filter_rows, summary
+from app.models import BusinessUnit, User
+from app.services.demand_service import (
+    FILTERS,
+    can_change,
+    can_edit,
+    demand_rows,
+    filter_counts,
+    filter_rows,
+    get_visible,
+    stage_history,
+    summary,
+)
 
 router = APIRouter(tags=["demands"])
 guard = require_screen("demands")
@@ -80,3 +91,45 @@ def demands_json(
             item["client_rate"] = d.client_rate
         out.append(item)
     return out
+
+
+@router.get("/demands/{ref}", response_class=HTMLResponse)
+def demand_page(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """One demand. Anyone who can see it may open it (interviewers included); actions follow edit rights."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    submitted_by = {s.submitted_by for s in demand.submissions}
+    names: dict[int, str] = {
+        uid: name for uid, name in db.execute(select(User.id, User.name).where(User.id.in_(submitted_by)))
+    }
+    return render(
+        request,
+        "my_demands/detail.html",
+        actor,
+        db,
+        d=demand,
+        can_change=can_change(actor, demand) and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
+        can_submit=can_edit(actor, demand)
+        and demand.status_enum is DemandStatus.DRAFT
+        and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
+        history=stage_history(db, demand),
+        submitters=names,
+        statuses={s.value: s.label for s in DemandStatus},
+    )
+
+
+@router.get("/demands/{ref}/jd")
+def job_description(
+    ref: str, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> FileResponse:
+    demand = get_visible(db, actor, ref)
+    if demand is None or not demand.jd_path:
+        raise HTTPException(404, "No job description.")
+    try:
+        path = storage.open_path(demand.jd_path)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "The job description file is missing.") from e
+    return FileResponse(path, filename=path.name)

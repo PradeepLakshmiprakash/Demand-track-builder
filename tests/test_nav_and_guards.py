@@ -43,7 +43,13 @@ def test_leadership_menu(client: Client) -> None:
 
 
 def test_admin_team_menu(client: Client) -> None:
-    assert menu(client.as_user("farah")) == ["All demands", "GTD queue", "DP sheet import", "Reconciliation"]
+    assert menu(client.as_user("farah")) == [
+        "All demands",
+        "GTD queue",
+        "DP sheet import",
+        "Reconciliation",
+        "Escalations",
+    ]
 
 
 def test_interviewer_menu_and_home(client: Client) -> None:
