@@ -22,7 +22,7 @@
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
     <h1>User access</h1>
-    <div class="lede">Decide who sees what. Admin demand owners and leadership always see the whole account.</div>
+    <div class="lede">Decide who sees what. Admin demand owners, their admin team and leadership always see the whole account.</div>
   </div>
   <a class="btn primary" href="/users?new=1">Add user</a>
 </div>
@@ -53,9 +53,10 @@
     <section class="panel panel-body stack">
       <h2>Default access by role</h2>
       <div class="defaults">
-        <div class="title">Demand owner</div><div>Own demands. Admin can widen to read-only view of their BU.</div>
+        <div class="title">Demand owner</div><div>Own demands, one BU. Admin can widen to read-only view of their BU.</div>
         <div class="title">Interviewer</div><div>Only interviews assigned to them, plus alerts for new requisitions in their skills.</div>
         <div class="title">Admin demand owner</div><div>Full account, all BUs. Fixed.</div>
+        <div class="title">Admin team</div><div>Full account, all BUs. Fixed. Does the manual admin work: GTD entry, DP sheet upload, reconciliation.</div>
         <div class="title">Leadership</div><div>Full account, all BUs. Fixed.</div>
       </div>
     </section>
@@ -90,6 +91,7 @@
           {% endfor %}
         </div>
         <div class="hint" id="bu-locked" hidden>Every BU. Fixed for this role.</div>
+        <div class="hint" id="bu-single" hidden>Exactly one for a demand owner.</div>
       </fieldset>
 
       <fieldset class="f" style="border:0;padding:0;margin:0">
@@ -140,7 +142,7 @@
 </div>
 
 <script>
-// Show only the visibility options the chosen role allows. The server enforces the same rule.
+// Show only the visibility options and BU choices the chosen role allows. The server enforces the same rules.
 (function () {
   var allowed = {{ allowed_scopes | tojson }};
   var role = document.getElementById('role');
@@ -159,9 +161,22 @@
     var full = ok.length === 1 && ok[0] === 'full';
     document.querySelectorAll('#bu-chips input').forEach(function (i) { if (full) i.checked = true; i.disabled = full; });
     document.getElementById('bu-locked').hidden = !full;
+    var single = role.value === 'demand_owner';
+    document.getElementById('bu-single').hidden = !single;
+    if (single) {
+      var on = document.querySelectorAll('#bu-chips input:checked');
+      for (var k = 1; k < on.length; k++) on[k].checked = false;
+    }
     document.getElementById('iv-fields').hidden = role.value !== 'interviewer';
   }
   role.addEventListener('change', sync);
+  // A demand owner has exactly one BU: ticking one clears the others.
+  document.querySelectorAll('#bu-chips input').forEach(function (i) {
+    i.addEventListener('change', function () {
+      if (role.value !== 'demand_owner' || !i.checked) return;
+      document.querySelectorAll('#bu-chips input').forEach(function (o) { if (o !== i) o.checked = false; });
+    });
+  });
   sync();
 })();
 </script>

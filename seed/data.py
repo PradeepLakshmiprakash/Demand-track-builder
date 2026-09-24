@@ -71,6 +71,8 @@ USERS = [
     ("meera", "Meera S.", "meera.s@example.com", "demand_owner", "C2", "own", ["BANKING"], [], None),
     ("arjun", "Arjun D.", "arjun.d@example.com", "demand_owner", "C1", "own", ["DATA"], [], None),
     ("kavya", "Kavya R.", "kavya.r@example.com", "admin", "D2", "full", BUSINESS_UNITS, [], None),
+    ("farah", "Farah Q.", "farah.q@example.com", "admin_team", "B2", "full", BUSINESS_UNITS, [], None),
+    ("deepak", "Deepak L.", "deepak.l@example.com", "admin_team", "C1", "full", BUSINESS_UNITS, [], None),
     ("sanjay", "Sanjay M.", "sanjay.m@example.com", "leadership", "E1", "full", BUSINESS_UNITS, [], None),
     (
         "vikram",

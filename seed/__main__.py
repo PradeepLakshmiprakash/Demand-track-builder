@@ -12,7 +12,7 @@ def main() -> None:
         sys.exit("Refusing to seed a production database.")
     with new_session() as db:
         load(db)
-    print("Seeded Discover NA: 4 BUs, 9 users, 18 demands, 6 open escalations, 2 interviews.")
+    print("Seeded Discover NA: 4 BUs, 11 users, 18 demands, 6 open escalations, 2 interviews.")
 
 
 if __name__ == "__main__":

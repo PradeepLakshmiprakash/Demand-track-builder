@@ -1,18 +1,17 @@
 # Decisions
 
-Phase 0 asks for the open questions in `spec/flow-artifact.md` §12 to be answered before the build.
-They weren't answered yet, so the build proceeds on the working assumptions below. Each is isolated
-in account settings or a single service, so changing it later is cheap. **Status: to confirm.**
 
-| # | Question | Working assumption | Where it lives | Needed by |
+## Answers to the open questions (`spec/flow-artifact.md` §12), 24 Sep 2026
+
+| # | Question | Answer | Where it lives | Built |
 |---|---|---|---|---|
-| 1 | Who schedules L2 interviews today? | The admin demand owner creates interview records | `interview_service` (Phase 6) | Phase 6 |
-| 2 | Offers below 30% margin: leadership exception or blocked? | Routed to leadership as an exception | `accounts.margin_threshold`, `margin_service` | Phase 5 |
-| 3 | Is the admin demand owner the person who submits on GTD? | Yes: the same role records requisition IDs | Role `admin` | Phase 2 |
-| 4 | How does the DP sheet arrive? | Manual upload in v1 | `excel_import` | Phase 3 |
-| 5 | "Not submitted" escalation trigger and cutoff | In the daily mail, no requisition ID by the next day's mail time → escalation | `accounts.mail_time`, `escalation_service` | Phase 4 |
-| 6 | Grace period before a demand is flagged missing | 3 working days | `accounts.grace_days` (Account settings) | Phase 3 |
-| 7 | Can a demand owner belong to more than one BU? | Yes, one or more (`user_business_units`) | User access page | Phase 1 ✔ |
+| 1 | Is the admin demand owner the person who submits on GTD? | The admin demand owner **and their admin team**. The team is separate from ordinary demand owners; its job is all the manual admin work. | Role `admin_team` (migration 0002) | Role: Phase 1. GTD queue: Phase 2 |
+| 2 | "Not submitted" escalation trigger and cutoff | As assumed: in the daily mail, no requisition ID by the next day's mail time, so 1 working day | `accounts.mail_time`, `escalation_service` | Phase 4 |
+| 3 | How does the DP sheet arrive? | Manual upload, by the admin demand owner or their admin team | `excel_import` guarded for `admin`, `admin_team` | Phase 3 |
+| 4 | Grace period before a demand is flagged missing | Set per account on the Account settings page (default 3 working days) | `accounts.grace_days` | Phase 1 ✔ |
+| 5 | Offers below 30% margin | Leadership decides: approve or reject at their discretion. At or above 30%: admin demand owner. | `accounts.margin_threshold`, `margin_service` | Phase 5 |
+| 6 | Who schedules the L2 interview? | The **panelist asks** for an L2 round and the **demand owner approves** it | `interview_service`, see D11 | Phase 6 |
+| 7 | Can a demand owner belong to more than one BU? | **No.** A demand owner has exactly one BU. Only the admin demand owner spans BUs (with the admin team and leadership, who see the full account). | `user_service`, User access form | Phase 1 ✔ |
 
 ## Decisions made while building Phase 1
 
@@ -57,3 +56,20 @@ cluster (5433) and the system PG17 service (5432). CI and docker-compose use Pos
 
 **D10. No CSRF protection yet.** Forms are plain POSTs behind the dev-only switcher. CSRF tokens
 arrive with login in Phase 7.
+
+## Decisions from the answers
+
+**D11. L2 rounds are requested, then approved (Phase 6).** An interviewer (panelist) raises an L2
+request from their feedback; the demand's owner approves or declines it; only an approved request
+becomes an interview record with its invite and feedback link. Pending requests count toward the panel
+SLA timer so a request waiting on the owner can still escalate.
+
+**D12. What the admin team can do (to confirm).** Full-account visibility, locked like the admin
+demand owner's. Menu: All demands, GTD queue, DP sheet import, Reconciliation. Kept with the admin
+demand owner only: User access, Account settings, Escalations, Offer approvals, Rate card,
+Interviewer profiles, Raise demand. The admin team doesn't see client bill rates. On the demands list
+they're read-only; recording requisition IDs happens on the GTD queue (Phase 2), which they can use.
+
+**D13. BU rules by role.** Demand owner: exactly one BU (service rule; the form's BU chips act as a
+single choice). Interviewer: one or more (used for routing). Admin demand owner, admin team, leadership:
+every BU, set automatically.

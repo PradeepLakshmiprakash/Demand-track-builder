@@ -10,6 +10,7 @@ from enum import StrEnum
 class Role(StrEnum):
     DEMAND_OWNER = "demand_owner"
     ADMIN = "admin"  # "Admin demand owner" in the UI
+    ADMIN_TEAM = "admin_team"  # the admin demand owner's team: the manual admin work
     LEADERSHIP = "leadership"
     INTERVIEWER = "interviewer"
 
@@ -21,6 +22,7 @@ class Role(StrEnum):
 ROLE_LABELS = {
     Role.DEMAND_OWNER: "Demand owner",
     Role.ADMIN: "Admin demand owner",
+    Role.ADMIN_TEAM: "Admin team",
     Role.LEADERSHIP: "Leadership",
     Role.INTERVIEWER: "Interviewer",
 }
@@ -55,6 +57,7 @@ SCOPE_LABELS = {
 ALLOWED_SCOPES: dict[Role, tuple[Scope, ...]] = {
     Role.DEMAND_OWNER: (Scope.OWN, Scope.OWN_BU_READ),
     Role.ADMIN: (Scope.FULL,),
+    Role.ADMIN_TEAM: (Scope.FULL,),
     Role.LEADERSHIP: (Scope.FULL,),
     Role.INTERVIEWER: (Scope.ASSIGNED_INTERVIEWS,),
 }

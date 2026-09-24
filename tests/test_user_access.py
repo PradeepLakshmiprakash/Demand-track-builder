@@ -68,10 +68,23 @@ def test_add_interviewer_with_profile(admin: Client, db: Session) -> None:
     assert u.practices == ["CCA-FS"]
 
 
-def test_demand_owner_needs_a_bu(admin: Client) -> None:
-    r = admin.post("/users", data=_form(bu_ids=[]))
+@pytest.mark.parametrize("bus", [[], ["DATA", "CARDS"]])
+def test_demand_owner_has_exactly_one_bu(admin: Client, bus: list[str]) -> None:
+    r = admin.post("/users", data=_form(bu_ids=[str(bu_id(b)) for b in bus]))
     assert r.status_code == 400
-    assert "at least one business unit" in r.text
+    assert "exactly one business unit" in r.text
+
+
+def test_interviewer_may_cover_several_bus(admin: Client, db: Session) -> None:
+    admin.post("/users", data=_form(role="interviewer", bu_ids=[str(bu_id("DATA")), str(bu_id("CARDS"))]))
+    assert {b.name for b in _get(db, "test.user@example.com").business_units} == {"DATA", "CARDS"}
+
+
+def test_admin_team_is_forced_to_full_account(admin: Client, db: Session) -> None:
+    admin.post("/users", data=_form(role="admin_team", scope="own"))
+    u = _get(db, "test.user@example.com")
+    assert u.visibility_scope == "full"
+    assert {b.name for b in u.business_units} == {"CARDS", "BANKING", "PAYMENTS", "DATA"}
 
 
 def test_email_is_unique_ignoring_case(admin: Client) -> None:
@@ -126,6 +139,6 @@ def test_database_enforces_scope_rule(db: Session) -> None:
 
 def test_users_api(admin: Client) -> None:
     users = admin.get("/api/users").json()
-    assert len(users) == 9
+    assert len(users) == 11
     vikram = next(u for u in users if u["email"] == "vikram.p@example.com")
     assert vikram["scope"] == "assigned_interviews" and vikram["practices"] == ["CCA-FS"]

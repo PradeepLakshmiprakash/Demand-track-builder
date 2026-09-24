@@ -42,6 +42,10 @@ def test_leadership_menu(client: Client) -> None:
     assert items == ["Account overview", "All demands", "Escalations", "Offer approvals"]
 
 
+def test_admin_team_menu(client: Client) -> None:
+    assert menu(client.as_user("farah")) == ["All demands", "GTD queue", "DP sheet import", "Reconciliation"]
+
+
 def test_interviewer_menu_and_home(client: Client) -> None:
     client.as_user("vikram")
     assert menu(client) == ["My interviews"]
@@ -56,6 +60,8 @@ def test_interviewer_menu_and_home(client: Client) -> None:
         ("priya", "/settings"),
         ("sanjay", "/users"),
         ("sanjay", "/settings"),
+        ("farah", "/users"),
+        ("farah", "/settings"),
         ("vikram", "/demands"),
         ("rahul", "/api/users"),
     ],

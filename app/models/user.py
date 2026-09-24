@@ -18,7 +18,7 @@ class User(Base):
         CheckConstraint(check_in("visibility_scope", Scope), name="scope_valid"),
         # The access rule itself, enforced by the database (mirrors enums.ALLOWED_SCOPES).
         CheckConstraint(
-            "(role IN ('admin', 'leadership') AND visibility_scope = 'full')"
+            "(role IN ('admin', 'admin_team', 'leadership') AND visibility_scope = 'full')"
             " OR (role = 'interviewer' AND visibility_scope = 'assigned_interviews')"
             " OR (role = 'demand_owner' AND visibility_scope IN ('own', 'own_bu_read'))",
             name="scope_matches_role",

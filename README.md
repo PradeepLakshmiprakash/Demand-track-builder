@@ -6,14 +6,14 @@ interviews. Built for Discover NA first; every client-specific rule is account c
 
 Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 [`docs/spec/techstack.md`](docs/spec/techstack.md) (stack, data model),
-[`docs/spec/plan.md`](docs/spec/plan.md) (phases). Working assumptions and design decisions:
+[`docs/spec/plan.md`](docs/spec/plan.md) (phases). Answers to the open questions and design decisions:
 [`docs/decisions.md`](docs/decisions.md).
 
 ## Status
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Decisions and setup | Repo, CI; open questions recorded as working assumptions (to confirm) |
+| 0 | Decisions and setup | Repo, CI; open questions answered 24 Sep (`docs/decisions.md`) |
 | 1 | Foundation | **Done**: all tables + first migration, View-as switcher, User access, Account settings, demands list with scope filtering, seed |
 | 2 | Intake and GTD submission | Next |
 
@@ -66,6 +66,7 @@ tests/
 | Demand owner | Rahul K. (CARDS) | Own + CARDS read-only |
 | Demand owner | Neha T., Meera S., Arjun D. | Own demands |
 | Admin demand owner | Kavya R. | Full account |
+| Admin team | Farah Q., Deepak L. | Full account; GTD queue, DP sheet import, reconciliation |
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
 

@@ -1,8 +1,9 @@
 """User access: who exists, their role, BUs, practices and what they see.
 
 Rules (flow-artifact §1.1):
-- Admin demand owners and leadership always see the full account, all BUs. Fixed.
-- Demand owners see their own demands; the admin may widen that to own + BU read-only.
+- Admin demand owners, their admin team and leadership always see the full account, all BUs. Fixed.
+- A demand owner belongs to exactly one BU and sees their own demands; the admin may widen that to
+  own + BU read-only.
 - Interviewers see assigned interviews; their skills, practices and max grade live on their profile.
 - Deactivating removes access immediately; demands and history stay.
 """
@@ -69,8 +70,8 @@ def _apply(db: Session, actor: Actor, user: User, form: UserForm) -> None:
         user.business_units = account_bus  # locked: full account, every BU
     else:
         chosen = [b for b in account_bus if b.id in set(form.bu_ids)]
-        if form.role is Role.DEMAND_OWNER and not chosen:
-            raise UserAccessError("A demand owner needs at least one business unit.")
+        if form.role is Role.DEMAND_OWNER and len(chosen) != 1:
+            raise UserAccessError("A demand owner belongs to exactly one business unit.")
         # Keep BUs from other accounts untouched.
         others = [b for b in user.business_units if b.account_id != actor.account_id]
         user.business_units = others + chosen

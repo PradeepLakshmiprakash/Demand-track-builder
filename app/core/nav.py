@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from app.core.enums import Role
 
-DO, AD, LD, IV = Role.DEMAND_OWNER, Role.ADMIN, Role.LEADERSHIP, Role.INTERVIEWER
+DO, AD, AT, LD, IV = Role.DEMAND_OWNER, Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP, Role.INTERVIEWER
 
 
 @dataclass(frozen=True)
@@ -25,11 +25,16 @@ def _same(label: str, *roles: Role) -> dict[Role, str]:
 
 NAV: tuple[NavItem, ...] = (
     NavItem("overview", "/overview", _same("Account overview", LD), phase=5),
-    NavItem("demands", "/demands", {DO: "My demands", AD: "All demands", LD: "All demands"}, ready=True),
+    NavItem(
+        "demands",
+        "/demands",
+        {DO: "My demands", AD: "All demands", AT: "All demands", LD: "All demands"},
+        ready=True,
+    ),
     NavItem("raise", "/demands/new", _same("Raise demand", DO, AD), phase=2),
-    NavItem("gtd_queue", "/gtd-queue", _same("GTD queue", AD), phase=2),
-    NavItem("import", "/imports", _same("DP sheet import", AD), phase=3),
-    NavItem("reconciliation", "/reconciliation", _same("Reconciliation", AD), phase=3),
+    NavItem("gtd_queue", "/gtd-queue", _same("GTD queue", AD, AT), phase=2),
+    NavItem("import", "/imports", _same("DP sheet import", AD, AT), phase=3),
+    NavItem("reconciliation", "/reconciliation", _same("Reconciliation", AD, AT), phase=3),
     NavItem("escalations", "/escalations", _same("Escalations", AD, LD), phase=4),
     NavItem("approvals", "/approvals", _same("Offer approvals", AD, LD), phase=5),
     NavItem("rate_card", "/rate-card", _same("Rate card", AD), phase=5),

@@ -41,7 +41,7 @@ def test_bu_read_only_sees_colleagues_but_cannot_edit(client: Client) -> None:
 
 
 def test_full_account_roles_see_everything(client: Client) -> None:
-    for who in ("kavya", "sanjay"):
+    for who in ("kavya", "farah", "sanjay"):
         seen = refs(client.as_user(who))
         assert len(seen) == 18, who
         assert {d["business_unit"] for d in seen.values()} == {"CARDS", "BANKING", "PAYMENTS", "DATA"}
