@@ -1,4 +1,5 @@
-"""Leadership: account overview. Fill speed, pipeline, and revenue lost to missed start dates."""
+"""Leadership and the admin demand owner: account overview. Fill speed, pipeline, and revenue lost
+to missed start dates."""
 
 from typing import Any
 
@@ -8,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.enums import EscalationStatus
+from app.core.enums import EscalationStatus, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import Demand, Escalation, OfferApproval
@@ -35,13 +36,18 @@ def overview_page(
 ) -> HTMLResponse:
     today = account_today(db, actor.account_id)
     o = loss_service.overview(db, actor.account_id, today)
+    # Offers this viewer decides: below the cut-off for leadership, at or above for the admin demand owner.
+    route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(
         select(func.count())
         .select_from(OfferApproval)
         .join(Demand)
-        .where(Demand.account_id == actor.account_id, OfferApproval.decision.is_(None),
-               OfferApproval.route == "leadership")
-    )  # fmt: skip
+        .where(
+            Demand.account_id == actor.account_id,
+            OfferApproval.decision.is_(None),
+            OfferApproval.route == route,
+        )
+    )
     return render(
         request,
         "leadership_dashboard/index.html",

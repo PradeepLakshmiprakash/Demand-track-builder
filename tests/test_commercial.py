@@ -326,13 +326,16 @@ def test_missing_bill_rate_is_reported_not_guessed(client: Client, db: Session) 
     assert next(x for x in o.at_risk if x.demand.app_ref == "DM-000126").lost is None
 
 
-def test_overview_screen_for_leadership_only(client: Client) -> None:
+def test_overview_screen_for_leadership_and_admin_owner(client: Client) -> None:
     import_sample(client)
     page = client.as_user("sanjay").get("/overview")
     assert page.status_code == 200
     assert "Revenue lost to date" in page.text and "Pipeline by stage" in page.text and "DIT7AF" in page.text
     assert client.as_user("sanjay").get("/").headers["location"] == "/overview"
-    for who in ("kavya", "priya"):
+    admin = client.as_user("kavya")
+    assert admin.get("/").headers["location"] == "/demands"  # admin still lands on the demands
+    assert "Revenue lost to date" in admin.get("/overview").text
+    for who in ("farah", "priya"):
         assert client.as_user(who).get("/overview").status_code == 403
 
 

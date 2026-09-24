@@ -19,7 +19,7 @@
 {% block main %}
 <div class="head">
   <div>
-    <div class="eyebrow">Leadership · {{ actor.account_name }} · all BUs</div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }} · all BUs</div>
     <h1>Account overview</h1>
   </div>
   <div class="small muted">{% if latest %}DP sheet of {{ latest.sheet_date | d }} · {% endif %}as of {{ o.today | d }}</div>
@@ -37,7 +37,7 @@
 {% if escalations or offers_waiting %}
 <div class="row small">
   {% if escalations %}<a class="pill" href="/escalations?level=2">{{ escalations.get(2, 0) }} escalation{{ 's' if escalations.get(2, 0) != 1 }} at L2 · {{ escalations.get(1, 0) }} at L1</a>{% endif %}
-  {% if offers_waiting %}<a class="pill" href="/approvals">{{ offers_waiting }} offer{{ 's' if offers_waiting != 1 }} below the margin cut-off waiting for you</a>{% endif %}
+  {% if offers_waiting %}<a class="pill" href="/approvals">{{ offers_waiting }} offer{{ 's' if offers_waiting != 1 }} waiting for your approval</a>{% endif %}
 </div>
 {% endif %}
 

@@ -24,7 +24,7 @@ def _same(label: str, *roles: Role) -> dict[Role, str]:
 
 
 NAV: tuple[NavItem, ...] = (
-    NavItem("overview", "/overview", _same("Account overview", LD), phase=5, ready=True),
+    NavItem("overview", "/overview", _same("Account overview", LD, AD), phase=5, ready=True),
     NavItem(
         "demands",
         "/demands",
@@ -51,9 +51,16 @@ def menu_for(role: Role) -> list[NavItem]:
     return [n for n in NAV if role in n.labels]
 
 
+# Where each role lands. The admin demand owner's day starts on the demands, not the overview.
+HOME = {AD: "demands"}
+
+
 def home_for(role: Role) -> str:
-    """First ready screen in the role's menu; an unbuilt landing page shows its 'coming in phase N' view."""
+    """The role's home screen, else the first ready one; an unbuilt one shows its 'coming in phase N' view."""
     items = menu_for(role)
+    preferred = BY_KEY.get(HOME.get(role, ""))
+    if preferred is not None and preferred.ready and role in preferred.labels:
+        return preferred.path
     for n in items:
         if n.ready:
             return n.path

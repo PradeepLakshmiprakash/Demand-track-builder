@@ -23,7 +23,7 @@ def test_demand_owner_menu(client: Client) -> None:
 
 def test_admin_menu(client: Client) -> None:
     items = menu(client.as_user("kavya"))
-    assert items[0] == "All demands"
+    assert items[:2] == ["Account overview", "All demands"]
     for expected in (
         "GTD queue",
         "DP sheet import",

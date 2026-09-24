@@ -205,7 +205,7 @@ re-priced when the screen loads or the rate card changes. A decline needs a comm
 below-cut-off approval (the exception's reason). Decisions record approver, margin and time. The
 approval doesn't move the demand's stage; the DP sheet still does.
 
-**D36. Revenue loss** (please confirm): days late = (DOJ or today) − start date, counted to today at
+**D36. Revenue loss** (confirmed 24 Sep: keep the account setting): days late = (DOJ or today) − start date, counted to today at
 most; revenue lost to date = hourly bill rate × billable hours per day (Account settings, default 8) ×
 **working** days late. The spec says "daily bill rate × days late"; working days avoid charging
 weekends. A future DOJ adds a separate "more by the DOJs set" projection. Staffed demands that joined
@@ -215,5 +215,5 @@ is counted but its loss is shown as unknown, never guessed.
 **D37. Leadership overview.** Open demands, still-need-coverage, past start unfilled (with the range
 of days late) and revenue lost to date; open escalations and offers waiting for leadership; pipeline by
 stage (single-hue bars, the two problem stages in a warning tone, counts labelled); revenue at risk
-list; breakdowns by practice and by BU. Leadership only for now; say if the admin demand owner should
-see it too.
+list; breakdowns by practice and by BU. Leadership and the admin demand owner (confirmed 24 Sep); the
+admin demand owner still lands on All demands.
