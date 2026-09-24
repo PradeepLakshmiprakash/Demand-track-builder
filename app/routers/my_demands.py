@@ -1,9 +1,10 @@
 """Demands list: "My demands" for demand owners, "All demands" for full-account roles."""
 
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,7 @@ from app.core.enums import DemandStatus, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Escalation, User
+from app.services import interview_service
 from app.services.demand_service import (
     FILTERS,
     can_change,
@@ -124,6 +126,9 @@ def demand_page(
             )
         ),
         sees_escalations=actor.role in (Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP),
+        candidates=interview_service.for_demand(db, demand.id),
+        decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,
+        people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
         submitters=names,
         statuses={s.value: s.label for s in DemandStatus},
     )
@@ -141,3 +146,24 @@ def job_description(
     except FileNotFoundError as e:
         raise HTTPException(404, "The job description file is missing.") from e
     return FileResponse(path, filename=path.name)
+
+
+@router.post("/demands/{ref}/rounds/{interview_id}")
+async def decide_round(
+    ref: str,
+    interview_id: int,
+    request: Request,
+    actor: Actor = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """The demand owner approves or declines a round the panelist asked for."""
+    form = await request.form()
+    try:
+        iv = interview_service.decide_next_round(
+            db, actor, interview_id, form.get("decision") == "approve", str(form.get("note") or "")
+        )
+    except interview_service.InterviewError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#interviews", status_code=303)
+    msg = f"{iv.round} approved: staffing schedules it" if iv.status == "open" else f"{iv.round} declined"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#interviews", status_code=303)

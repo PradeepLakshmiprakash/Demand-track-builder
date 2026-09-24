@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Interviewer profiles{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>Interviewer profiles</h1>
+    <div class="lede">An interviewer hears about a new requisition when they share at least one technology with it. Keep the skills as the same words used on demands (e.g. Java, Spring Boot, AWS). New interviewers are added on User access.</div>
+  </div>
+  <a class="btn" href="/users">User access</a>
+</div>
+
+<section class="panel">
+  {% for u, p, matching, load in rows %}
+  <form method="post" action="/interviewers/{{ u.id }}" class="prof" id="u{{ u.id }}">
+    <div>
+      <div class="title">{{ u.name }}{% if not u.active %} <span class="chip gray">Inactive user</span>{% endif %}</div>
+      <div class="note">{{ u.email }} · {{ load }} scheduled · matches {{ matching | length }} open requisition{{ 's' if matching | length != 1 }}</div>
+      {% if matching %}<div class="note">{% for d in matching[:4] %}<span class="mono">{{ d.gtd_req_id or d.app_ref }}</span>{{ ', ' if not loop.last }}{% endfor %}{% if matching | length > 4 %} …{% endif %}</div>{% endif %}
+    </div>
+    <label class="f">Skills<input type="text" name="skills" value="{{ (p.skills if p else []) | join(', ') }}" placeholder="Java, Spring Boot, AWS"></label>
+    <fieldset class="f" style="border:0;padding:0;margin:0"><legend class="small">Practices</legend>
+      <div class="toggle-chips">{% for pr in cfg.practices %}<label><input type="checkbox" name="practices" value="{{ pr }}" {{ 'checked' if p and pr in p.practices }}><span>{{ pr }}</span></label>{% endfor %}</div>
+    </fieldset>
+    <label class="f">Up to grade<select name="max_grade"><option value="">Any</option>{% for g in cfg.grades %}<option {{ 'selected' if p and p.max_grade == g }}>{{ g }}</option>{% endfor %}</select></label>
+    <label class="f">Status<select name="active"><option value="1" {{ 'selected' if not p or p.active }}>Takes interviews</option><option value="0" {{ 'selected' if p and not p.active }}>Paused</option></select></label>
+    <button class="btn small">Save</button>
+  </form>
+  {% else %}
+  <div class="empty">No interviewers yet. Add them on User access with the Interviewer role.</div>
+  {% endfor %}
+</section>
+{% endblock %}

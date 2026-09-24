@@ -7,7 +7,8 @@ Triggers (§9.1):
   incorrect       the DP sheet marks it "In Correct Demnad"                 }
   aging           no stage change for the account's aging days (linked demands)
   past start      requested start date has passed and there's no DOJ on or before it
-  rejection limit, panel SLA: need interview records (Phase 6)
+  rejection limit panel rejections recorded in the app reach the account's limit (confirmed 24 Sep)
+  panel SLA       no feedback within the account's panel hours of a scheduled interview's time
 
 Ladder (§9.2): every escalation opens at L1 (the BU's LOB delivery head; demand owner and admins
 copied), due after the account's L1 working days. Past due, the sweep promotes it to L2 (account
@@ -20,7 +21,7 @@ reconciliation are mailed by the next sweep and a failed mail is retried.
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from html import escape
 from zoneinfo import ZoneInfo
 
@@ -35,6 +36,8 @@ from app.core.enums import (
     EscalationEventKind,
     EscalationStatus,
     EscalationType,
+    InterviewOutcome,
+    InterviewStatus,
     ResolutionAction,
     Role,
     StageOrigin,
@@ -44,12 +47,14 @@ from app.core.workdays import add_working_days
 from app.models import (
     Account,
     BusinessUnit,
+    Candidate,
     Demand,
     Escalation,
     EscalationEvent,
     ExcelImport,
     ExcelRow,
     GtdSubmission,
+    Interview,
     StageEvent,
     User,
 )
@@ -194,6 +199,40 @@ def notified_at(db: Session, demand_ids: list[int]) -> dict[int, datetime]:
     return {demand_id: at for demand_id, at in rows}
 
 
+def panel_rejections(db: Session, demand_ids: list[int]) -> dict[int, int]:
+    if not demand_ids:
+        return {}
+    rows = db.execute(
+        select(Interview.demand_id, func.count())
+        .where(Interview.demand_id.in_(demand_ids), Interview.outcome == InterviewOutcome.REJECT.value)
+        .group_by(Interview.demand_id)
+    ).all()
+    return {demand_id: n for demand_id, n in rows}
+
+
+def overdue_panels(
+    db: Session, account: Account, now: datetime
+) -> dict[int, list[tuple[Interview, Candidate]]]:
+    """Scheduled interviews with a known time whose feedback is past the panel SLA, by requisition."""
+    cutoff = now - timedelta(hours=account.panel_timer_hours)
+    rows = db.execute(
+        select(Interview, Candidate)
+        .join(Candidate, Candidate.id == Interview.candidate_id)
+        .where(
+            Candidate.account_id == account.id,
+            Interview.demand_id.is_not(None),
+            Interview.status == InterviewStatus.SCHEDULED.value,
+            Interview.scheduled_at.is_not(None),
+            Interview.scheduled_at < cutoff,
+        )
+        .order_by(Interview.scheduled_at)
+    ).all()
+    out: dict[int, list[tuple[Interview, Candidate]]] = {}
+    for iv, c in rows:
+        out.setdefault(iv.demand_id, []).append((iv, c))
+    return out
+
+
 def _past_start(d: Demand, doj: date | None, today: date) -> bool:
     return bool(
         d.start_date
@@ -222,7 +261,9 @@ def is_cleared(db: Session, account: Account, esc: Escalation, demand: Demand, n
     if t is EscalationType.PAST_START:
         today = now.astimezone(_tz(account)).date()
         return not _past_start(demand, current_doj(db, account.id).get(demand.id), today)
-    return False  # rejection limit, panel SLA: Phase 6
+    if t is EscalationType.PANEL_SLA:
+        return not overdue_panels(db, account, now).get(demand.id)
+    return False  # rejection limit: a person decides what happens next
 
 
 # --- The sweep --------------------------------------------------------------------------------------
@@ -253,6 +294,8 @@ def open_triggered(db: Session, account: Account, now: datetime, result: SweepRe
     mailed = notified_at(db, ids)
     changed = last_stage_change(db, ids)
     doj = current_doj(db, account.id)
+    rejected = panel_rejections(db, ids)
+    overdue = overdue_panels(db, account, now)
 
     def raise_(d: Demand, t: EscalationType, detail: str) -> None:
         if open_escalation(db, account, d, t, detail, now) is not None:
@@ -275,6 +318,24 @@ def open_triggered(db: Session, account: Account, now: datetime, result: SweepRe
                 raise_(
                     d, EscalationType.AGING, f"{s.label}, no stage change since {since:%d %b} ({quiet} days)"
                 )
+        # Rejection limit: too many panel rejections on one requisition.
+        n = rejected.get(d.id, 0)
+        if n >= account.rejection_limit:
+            raise_(
+                d,
+                EscalationType.REJECTION_LIMIT,
+                f"{n} candidates rejected by the panel (limit {account.rejection_limit})",
+            )
+        # Panel SLA: a scheduled interview with no feedback in time.
+        panels = overdue.get(d.id)
+        if panels:
+            iv, c = panels[0]
+            raise_(
+                d,
+                EscalationType.PANEL_SLA,
+                f"{iv.round} for {c.name} on {iv.scheduled_at:%d %b}: no feedback after "
+                f"{account.panel_timer_hours} h" + (f" (+{len(panels) - 1} more)" if len(panels) > 1 else ""),
+            )
         # Past start date: no DOJ, or DOJ after the requested start.
         if _past_start(d, doj.get(d.id), today):
             late = (today - d.start_date).days  # type: ignore[operator]
@@ -350,8 +411,11 @@ def audience(db: Session, account: Account, esc: Escalation, demand: Demand) -> 
         return Audience(to, sorted(set(owner_mail + admins) - set(to)), [head, "demand owner", "admin"])
     leaders = [u.email for u in _users(db, account.id, Role.LEADERSHIP)]
     to = leaders or [u.email for u in _users(db, account.id, Role.ADMIN)]
-    return Audience(to, sorted(set(head_mail + owner_mail) - set(to)),
-                    [owners_cfg.get("L2", "Account leadership"), head, "demand owner"])  # fmt: skip
+    return Audience(
+        to,
+        sorted(set(head_mail + owner_mail) - set(to)),
+        [owners_cfg.get("L2", "Account leadership"), head, "demand owner"],
+    )
 
 
 def notify_pending(db: Session, account: Account, now: datetime) -> int:

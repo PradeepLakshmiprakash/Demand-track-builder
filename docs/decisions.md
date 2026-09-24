@@ -257,3 +257,50 @@ rather than on scheduling:
 - **Heads-up alerts** go to interviewers sharing at least one technology with the requisition.
 - **Rejection limit** counts panel rejections recorded in the app; **panel SLA** is 48 hours from the
   scheduled time when one is known.
+
+## Decisions made while building Phase 6
+
+**D38. Candidates are mapped, not assumed.** A candidate belongs to at most one requisition
+(`candidates.demand_id`, empty until known; the same name can be a separate record on another
+requisition). They come from the DP sheet's Candidate Name cell (one per line) on the requisition's
+row, from a panelist or the admin team adding them, or from Karat. Unmapped candidates wait on
+Candidates → "No requisition yet"; mapping moves their interviews too, and mapping onto a requisition
+that already has that person merges the two records.
+
+**D39. Interviews are records that can start incomplete.** Round (L1/L2), requisition, interviewer and
+time can each be unknown. Statuses: waiting for demand owner (an asked-for L2), extra round declined,
+to be scheduled (approved or recorded, nobody assigned yet), scheduled (interviewer assigned; invite
+and feedback link sent), feedback in. Staffing's scheduling stays outside the app; the admin team
+records what's known on Candidates. Who takes an L2 stays a placeholder until that's decided.
+
+**D40. The panelist's recommendation** is ratings 1 to 5 on the account's dimensions (Account config
+`interview_ratings`, default Technical depth, Problem solving, Communication), select / reject / hold,
+comments (required to reject or hold), and optionally "needs another round" with a reason. It can be
+given on an assigned interview, from the mail link, or for any candidate found by name on My
+interviews (the panelist can confirm the requisition while doing it).
+
+**D41. Extra rounds.** "Needs another round" creates an L2 request and mails the demand owner. The
+demand owner (or the admin demand owner) approves or declines it on the demand page; declining needs a
+note. Rejected candidates can't be sent on; L2 is the last round.
+
+**D42. Feedback link.** Issued when an interviewer is assigned; in the invite with subject
+`[GTD ID | DM ref] L2 – Candidate`, the JD link (sign-in) and the CV link. Works without signing in,
+single use (cleared on submit; a reassignment issues a new one). The CV link works while the feedback
+link is live.
+
+**D43. CVs** are uploaded on Candidates by the admin roles from staffing's email. Reading them from a
+mailbox automatically is a later step.
+
+**D44. Heads-up alerts** go once per requisition, when it's first seen in a DP sheet at an interview
+stage, to active interviewers sharing at least one technology (primary or secondary skills vs
+interviewer skills, case-insensitive). Interviewer profiles shows each interviewer's matching
+requisitions. A mail failure never fails an import.
+
+**D45. Escalations switched on:** rejection limit = panel rejections recorded on the requisition reach
+the account's limit; panel SLA = a scheduled interview with a known time has no feedback after the
+account's panel hours (clears when feedback is in).
+
+**D46. Karat is an integration point, not built out.** `POST /api/integrations/karat/results`
+(X-Api-Key, off unless `KARAT_API_KEY` is set) accepts {external_ref, candidate_name, gtd_req_id?,
+round, outcome, report_url?, comments?}, maps by GTD ID when given, otherwise leaves the candidate
+unmapped, and is idempotent on `external_ref`. We need Karat's real API/export details to finish it.

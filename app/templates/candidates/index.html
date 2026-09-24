@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Candidates{% endblock %}
+{% macro schedule_form(c, iv=none) %}
+<form method="post" action="/candidates/{{ c.id }}/schedule" class="sched">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  {% if iv %}<input type="hidden" name="interview_id" value="{{ iv.id }}"><input type="hidden" name="round" value="{{ iv.round }}">
+  {% else %}<select name="round" aria-label="Round for {{ c.name }}"><option>L1</option><option>L2</option></select>{% endif %}
+  <select name="interviewer_id" aria-label="Interviewer for {{ c.name }}">
+    <option value="">Interviewer not known yet</option>
+    {% for u in interviewers %}<option value="{{ u.id }}" {{ 'selected' if iv and iv.interviewer_id == u.id }}>{{ u.name }}</option>{% endfor %}
+  </select>
+  <input type="datetime-local" name="when" aria-label="When" value="{{ iv.scheduled_at | at(tz, '%Y-%m-%dT%H:%M') if iv and iv.scheduled_at else '' }}">
+  <button class="btn small">{{ 'Update' if iv else 'Add round' }}</button>
+</form>
+{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · all BUs</div>
+    <h1>Candidates</h1>
+    <div class="lede">Who is on which requisition. Candidates come from the DP sheet's candidate names, from panelists, or from Karat. Staffing schedules interviews; record here what's known, and attach the CVs staffing sends by email.</div>
+  </div>
+</div>
+
+<div class="row filters">
+  <div class="pills" role="group" aria-label="Show">
+    {% for key, label in tabs.items() %}
+      <a class="pill {{ 'on' if tab == key }}" href="?tab={{ key }}{% if q %}&q={{ q | urlencode }}{% endif %}">{{ label }} ({{ counts[key] }})</a>
+    {% endfor %}
+  </div>
+  <form method="get" class="row">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name" aria-label="Search candidates" style="width:220px;min-height:40px">
+    <button class="btn small">Search</button>
+  </form>
+</div>
+
+<section class="panel">
+  {% for c, d in rows %}
+  {% set ivs = interviews.get(c.id, []) %}
+  <div class="cand" id="c{{ c.id }}">
+    <div class="cand-head">
+      <div>
+        <div class="title">{{ c.name }} <span class="chip gray">{{ c.source }}</span></div>
+        <div class="note">
+          {% if d %}<a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a> {{ d.name }} · {{ d.grade }} · {{ d.status_enum.label }}{% else %}<span class="chip risk">No requisition yet</span>{% endif %}
+          {% if c.current_stage %} · {{ c.current_stage }}{% endif %}
+        </div>
+      </div>
+      <div class="row small">
+        {% if c.cv_path %}<a href="/candidates/{{ c.id }}/cv">CV</a>{% endif %}
+        <form method="post" action="/candidates/{{ c.id }}/cv" enctype="multipart/form-data" class="row">
+          <input type="file" name="cv" accept=".pdf,.doc,.docx,.rtf,.txt" aria-label="CV for {{ c.name }}" required style="max-width:200px">
+          <button class="btn small">{{ 'Replace CV' if c.cv_path else 'Attach CV' }}</button>
+        </form>
+      </div>
+    </div>
+
+    {% if not d %}
+    <form method="post" action="/candidates/{{ c.id }}/map" class="row">
+      <select name="demand_id" aria-label="Requisition for {{ c.name }}" required style="max-width:520px">
+        <option value="">Which requisition is this candidate on?</option>
+        {% for r in requisitions %}<option value="{{ r.id }}">{{ r.gtd_req_id or r.app_ref }} · {{ r.name[:60] }} · {{ r.grade }}</option>{% endfor %}
+      </select>
+      <button class="btn small primary">Map</button>
+    </form>
+    {% endif %}
+
+    <div class="rounds">
+      {% for iv in ivs %}
+      <div class="round">
+        <span class="chip {{ 'blue' if iv.status == 'scheduled' else 'risk' if iv.status in ('requested', 'open') else 'done' if iv.outcome == 'select' else 'esc' if iv.outcome == 'reject' else 'gray' }}">{{ iv.round }} · {{ iv.status_enum.label }}{% if iv.outcome %} · {{ iv.outcome }}{% endif %}</span>
+        <span class="small muted">
+          {% if iv.interviewer_id %}{{ names.get(iv.interviewer_id, '') }}{% elif iv.status in ('open', 'scheduled') %}interviewer not known{% endif %}
+          {% if iv.scheduled_at %} · {{ iv.scheduled_at | at(tz, '%d %b %H:%M %Z') }}{% endif %}
+          {% if iv.source == 'karat' %} · Karat{% if iv.report_url %} · <a href="{{ iv.report_url }}" rel="noopener" target="_blank">report</a>{% endif %}{% endif %}
+          {% if iv.status == 'requested' %} · asked by {{ names.get(iv.requested_by, 'the panelist') }}{% if iv.request_note %}: {{ iv.request_note }}{% endif %} · the demand owner decides{% if d %} on <a href="/demands/{{ d.app_ref }}#interviews">the demand page</a>{% endif %}{% endif %}
+          {% if iv.comments %} · “{{ iv.comments }}”{% endif %}
+        </span>
+        {% if iv.status in ('open', 'scheduled') %}{{ schedule_form(c, iv) }}{% endif %}
+      </div>
+      {% endfor %}
+      {% if d %}<details class="small"><summary>Record another round staffing arranged</summary>{{ schedule_form(c) }}</details>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">{{ 'Every candidate is on a requisition.' if tab == 'unmapped' else 'Nobody here.' }}</div>
+  {% endfor %}
+</section>
+
+<section class="panel panel-body stack" style="max-width:760px">
+  <h2>Add a candidate</h2>
+  <form method="post" action="/candidates/add" class="row">
+    <input type="text" name="name" placeholder="Name" aria-label="Candidate name" required maxlength="160" style="max-width:260px">
+    <select name="demand_id" aria-label="Requisition" style="max-width:380px">
+      <option value="">Requisition not known yet</option>
+      {% for r in requisitions %}<option value="{{ r.id }}">{{ r.gtd_req_id or r.app_ref }} · {{ r.name[:50] }}</option>{% endfor %}
+    </select>
+    <button class="btn small">Add</button>
+  </form>
+</section>
+{% endblock %}

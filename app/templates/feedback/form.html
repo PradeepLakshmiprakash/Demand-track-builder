@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Feedback · {{ c.name }} · Demand tracker</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main class="public">
+  <div class="brand-mini">Demand tracker</div>
+  <section class="panel panel-body stack">
+    <div>
+      <div class="eyebrow">Feedback · {{ iv.round }} ·
+        {% if d %}<span class="mono">{{ d.gtd_req_id or 'no GTD ID' }}</span> / <span class="mono">{{ d.app_ref }}</span>{% else %}requisition to confirm{% endif %}</div>
+      <h1 style="font-size:28px">{{ c.name }}</h1>
+      {% if d %}<div class="small muted">{{ d.name }} · {{ d.grade }}{% if d.primary_skills %} · required: {{ d.primary_skills | join(', ') }}{% endif %}</div>{% endif %}
+      {% if who %}<div class="small muted">Panelist: {{ who.name }}</div>{% endif %}
+    </div>
+    <div class="row small">
+      {% if d and d.jd_path %}<span class="muted">Job description: sign in to open it</span>{% endif %}
+      {% if c.cv_path %}<a href="/cv/{{ token }}">Candidate CV</a>{% endif %}
+    </div>
+    {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="stack">
+      {% with dims=dims, fixed_round=iv.round, v={} %}{% include "_feedback_fields.html" %}{% endwith %}
+      <div><button class="btn primary">Submit feedback</button></div>
+      <div class="small muted">This link works once. After you submit, it closes.</div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

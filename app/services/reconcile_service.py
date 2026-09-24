@@ -18,6 +18,7 @@ Only the latest import is reconciled or acted on; older imports are history. Re-
 stage changes and escalations are no-ops when nothing changed, and people's confirmations are kept.
 """
 
+import logging
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
@@ -39,10 +40,11 @@ from app.core.enums import (
 )
 from app.core.workdays import add_working_days
 from app.models import Account, BusinessUnit, Demand, ExcelImport, ExcelRow, GtdSubmission, StageEvent, User
-from app.services import margin_service
+from app.services import interview_service, margin_service
 from app.services.demand_service import record_stage
 from app.services.escalation_service import open_escalation
 
+log = logging.getLogger("demand_tracker.reconcile")
 PREFIX = re.compile(r"\[(DM-\d{6})\]")
 LINKABLE = (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)  # tier-2/3 targets without an ID
 EXPECTED = (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING)  # has an ID, not yet seen in a sheet
@@ -257,6 +259,11 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             summary.incorrect.append(d.app_ref)
             detail = f"DP sheet of {as_of:%d %b} marks {row.gtd_req_id} as '{row.status}'"
             _escalate(db, account, d, EscalationType.INCORRECT, detail, now, summary)
+        if row.candidate_name and d.status_enum in interview_service.INTERVIEW_STAGES:
+            # The sheet says who is on this requisition: that's how candidates get mapped (§7).
+            interview_service.candidates_from_sheet(
+                db, account.id, d, row.candidate_name, margin_service.channel_for_source(cfg, row.source)
+            )
         if stage is DemandStatus.OFFER_IN_PROCESS and row.candidate_name:
             # The offer needs a margin approval (§8); once per candidate.
             channel = margin_service.channel_for_source(cfg, row.source)
@@ -313,6 +320,12 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
         )  # fmt: skip
     imp.summary = asdict(summary) | {"parse_warnings": summary_parse_warnings}
     db.commit()
+    try:  # heads-up to interviewers; a mail problem must not undo the import
+        interview_service.alert_interviewers(db, account, list(in_sheet))
+        db.commit()
+    except Exception:
+        db.rollback()
+        log.exception("Interviewer alerts failed for import %s", imp.id)
     return summary
 
 

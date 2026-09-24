@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_starttls: bool = True
 
+    # Karat integration (interview results). Off unless a key is set.
+    karat_api_key: str | None = None
+    karat_account_id: int = 1
+
     storage_backend: Literal["local", "s3"] = "local"
     storage_dir: str = "var/files"
     max_upload_mb: int = 5

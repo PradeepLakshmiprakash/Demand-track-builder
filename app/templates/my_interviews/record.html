@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Recommendation · {{ c.name }}{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <a href="/interviews" class="small">← My interviews</a>
+    <div class="eyebrow" style="margin-top:8px">Record a recommendation</div>
+    <h1>{{ c.name }}</h1>
+  </div>
+</div>
+
+<div class="iv-split">
+  <section class="panel panel-body stack">
+    {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="stack">
+      <div class="f">Requisition
+        {% if d %}
+          <div style="font-weight:400"><span class="mono">{{ d.gtd_req_id or 'no GTD ID' }}</span> <span class="mono">{{ d.app_ref }}</span> · {{ d.name }} · {{ d.grade }}</div>
+        {% else %}
+          <select name="demand_id">
+            <option value="">Not sure: the admin team will map it</option>
+            {% for r in requisitions %}<option value="{{ r.id }}">{{ r.gtd_req_id or r.app_ref }} · {{ r.name[:60] }} · {{ r.grade }}</option>{% endfor %}
+          </select>
+          <span class="hint">This candidate isn't on a requisition yet. Pick it if you know which one you interviewed them for.</span>
+        {% endif %}
+      </div>
+      {% if same_name | length > 1 %}
+        <div class="flash ok small">This name is on more than one requisition. Recording against:
+          {% for m in same_name %}{% if m.candidate.id != c.id %} <a href="/interviews/record/{{ m.candidate.id }}">{{ m.demand.gtd_req_id or m.demand.app_ref if m.demand else 'unmapped record' }} instead</a>{% endif %}{% endfor %}</div>
+      {% endif %}
+      {% with dims=dims, fixed_round=none, v=v %}{% include "_feedback_fields.html" %}{% endwith %}
+      <div><button class="btn primary">Save recommendation</button></div>
+    </form>
+  </section>
+
+  <aside class="panel panel-body stack">
+    <h2>Earlier rounds</h2>
+    {% for iv in history %}
+      <div class="small"><strong>{{ iv.round }}</strong> · {{ iv.status_enum.label }}{% if iv.outcome %} · <span class="chip {{ 'done' if iv.outcome == 'select' else 'esc' if iv.outcome == 'reject' else 'gray' }}">{{ iv.outcome | capitalize }}</span>{% endif %}
+        {% if iv.comments %}<div class="muted">{{ iv.comments }}</div>{% endif %}</div>
+    {% else %}
+      <div class="small muted">None recorded yet.</div>
+    {% endfor %}
+  </aside>
+</div>
+{% endblock %}

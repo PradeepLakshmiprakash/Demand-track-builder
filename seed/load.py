@@ -137,7 +137,9 @@ def load(db: Session, now: datetime | None = None) -> None:
 
     for ref, cand, rnd, iv_key, when in data.INTERVIEWS:
         d = demands[ref]
-        c = Candidate(demand_id=d.id, name=cand, channel="fte", current_stage="internal_panel")
+        c = Candidate(
+            account_id=account.id, demand_id=d.id, name=cand, channel="fte", current_stage="Internal panel"
+        )
         db.add(c)
         db.flush()
         db.add(
@@ -148,8 +150,12 @@ def load(db: Session, now: datetime | None = None) -> None:
                 interviewer_id=users[iv_key].id,
                 scheduled_at=datetime(*when, tzinfo=UTC),
                 feedback_token=secrets.token_urlsafe(32),
+                status="scheduled",
             )
         )
+
+    # A candidate staffing mentioned whose requisition nobody has confirmed yet.
+    db.add(Candidate(account_id=account.id, demand_id=None, name="Candidate F", source="manual"))
 
     # Postgres owns app refs: continue the sequence after the seeded ones.
     db.execute(

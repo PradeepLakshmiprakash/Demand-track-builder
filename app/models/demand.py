@@ -73,6 +73,8 @@ class Demand(Base):
     custom_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(24), default=DemandStatus.DRAFT.value)
     submitted_at: Mapped[datetime | None]
+    # When interviewers sharing a technology were told about this requisition (once).
+    interviewers_alerted_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

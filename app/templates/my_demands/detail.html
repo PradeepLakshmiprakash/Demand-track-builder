@@ -45,6 +45,33 @@
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
     </section>
+    <section class="panel panel-body" id="interviews">
+      <h2>Candidates and interviews</h2>
+      {% for c, ivs in candidates %}
+        <div class="cand-mini">
+          <div class="title">{{ c.name }}{% if c.current_stage %} <span class="small muted">· {{ c.current_stage }}</span>{% endif %}</div>
+          {% for iv in ivs %}
+            <div class="small round">
+              <span class="chip {{ 'blue' if iv.status == 'scheduled' else 'risk' if iv.status in ('requested', 'open') else 'done' if iv.outcome == 'select' else 'esc' if iv.outcome == 'reject' else 'gray' }}">{{ iv.round }} · {{ iv.status_enum.label }}{% if iv.outcome %} · {{ iv.outcome }}{% endif %}</span>
+              {% if iv.interviewer_id %}<span class="muted">{{ people.get(iv.interviewer_id, '') }}</span>{% endif %}
+              {% if iv.comments and actor.role.value != 'interviewer' %}<span class="muted">“{{ iv.comments }}”</span>{% endif %}
+              {% if iv.status == 'requested' %}
+                <span class="muted">Asked by {{ people.get(iv.requested_by, 'the panelist') }}{% if iv.request_note %}: {{ iv.request_note }}{% endif %}</span>
+                {% if decides_rounds %}
+                <form method="post" action="/demands/{{ d.app_ref }}/rounds/{{ iv.id }}" class="row" style="width:100%">
+                  <input type="text" name="note" placeholder="Note (required to decline)" aria-label="Note on the {{ iv.round }} request for {{ c.name }}" style="max-width:320px;min-height:36px">
+                  <button class="btn small primary" name="decision" value="approve">Approve {{ iv.round }}</button>
+                  <button class="btn small danger" name="decision" value="decline">Decline</button>
+                </form>
+                {% endif %}
+              {% elif iv.status == 'declined' and iv.decision_note %}<span class="muted">{{ iv.decision_note }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted small" style="margin:10px 0 0">No candidates yet. They come from the DP sheet's candidate names or from the panel.</p>
+      {% endfor %}
+    </section>
   </div>
 
   <aside class="stack">

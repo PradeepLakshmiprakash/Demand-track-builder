@@ -49,6 +49,7 @@ def test_admin_team_menu(client: Client) -> None:
         "DP sheet import",
         "Reconciliation",
         "Escalations",
+        "Candidates",
     ]
 
 
@@ -56,7 +57,7 @@ def test_interviewer_menu_and_home(client: Client) -> None:
     client.as_user("vikram")
     assert menu(client) == ["My interviews"]
     r = client.get("/", follow_redirects=False)
-    assert r.headers["location"] == "/soon/interviews"
+    assert r.headers["location"] == "/interviews"
 
 
 @pytest.mark.parametrize(

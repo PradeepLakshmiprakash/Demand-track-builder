@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}My interviews{% endblock %}
+{% macro ids(d) %}{% if d %}<span class="mono">{{ d.gtd_req_id or 'no GTD ID' }}</span> <span class="mono">{{ d.app_ref }}</span>{% else %}<span class="chip risk">Requisition to confirm</span>{% endif %}{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }}{% if actor.practices %} · {{ actor.practices | join(', ') }}{% endif %}</div>
+    <h1>My interviews</h1>
+    <div class="lede">Staffing schedules interviews. Give your recommendation here: on an interview assigned to you, or for any candidate you interviewed, found by name.</div>
+  </div>
+</div>
+
+<div class="iv-split">
+  <div class="stack">
+    {% for iv, c, d in open_ %}
+      <a class="iv-card {{ 'on' if selected and selected[0].id == iv.id }}" href="?id={{ iv.id }}">
+        <div class="row small">{{ ids(d) }} <span class="chip blue">{{ iv.round }}</span></div>
+        <div class="title" style="font-size:17px">{{ c.name }}</div>
+        {% if d %}<div class="note">{{ d.name }} · {{ d.grade }}</div>{% endif %}
+        <div class="note">{{ iv.scheduled_at | at(tz, '%a %d %b · %H:%M %Z') if iv.scheduled_at else 'Time to be confirmed by staffing' }}</div>
+      </a>
+    {% else %}
+      <div class="panel panel-body muted">No interviews assigned to you right now.</div>
+    {% endfor %}
+
+    <section class="panel panel-body stack" id="find" style="gap:12px">
+      <h2>Record a recommendation</h2>
+      <form method="get" class="row">
+        <label class="f" style="flex:1">Candidate you interviewed<input type="search" name="q" value="{{ q }}" placeholder="Candidate name" autocomplete="off"></label>
+        <button class="btn" style="align-self:flex-end">Find</button>
+      </form>
+      {% if q %}
+        {% for m in results %}
+          <a class="find-row" href="/interviews/record/{{ m.candidate.id }}">
+            <div><div class="title">{{ m.candidate.name }}</div>
+              <div class="note">{% if m.demand %}{{ ids(m.demand) }} · {{ m.demand.name }}{% else %}No requisition yet{% endif %}</div></div>
+            <span class="small muted">{{ m.score }}%</span>
+          </a>
+        {% else %}
+          <div class="small muted">No candidate matches "{{ q }}".</div>
+        {% endfor %}
+        <form method="post" action="/interviews/add-candidate" class="stack" style="gap:8px;border-top:1px solid var(--line);padding-top:12px">
+          <div class="small">Not listed? Add them, and pick the requisition if you know it.</div>
+          <input type="text" name="name" value="{{ q }}" aria-label="Candidate name" required maxlength="160">
+          <select name="demand_id" aria-label="Requisition">
+            <option value="">Requisition not known</option>
+            {% for d in requisitions %}<option value="{{ d.id }}">{{ d.gtd_req_id or d.app_ref }} · {{ d.name[:60] }} · {{ d.grade }}</option>{% endfor %}
+          </select>
+          <div><button class="btn small">Add and record</button></div>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="panel panel-body stack" style="gap:8px">
+      <h2>New in your skill area</h2>
+      {% for d in new_reqs[:8] %}
+        <div class="small">{{ ids(d) }} {{ d.name }} · {{ d.grade }} <span class="muted">· {{ d.primary_skills | join(', ') }}</span></div>
+      {% else %}
+        <div class="small muted">Nothing open matches your skills. The admin sets them under Interviewer profiles.</div>
+      {% endfor %}
+      <div class="small muted">Profiles expected soon. You'll get an invite when you're assigned an interview.</div>
+    </section>
+
+    {% if done %}
+    <section class="panel panel-body stack" style="gap:8px">
+      <h2>Given</h2>
+      {% for iv, c, d in done[:10] %}
+        <div class="small"><strong>{{ c.name }}</strong> · {{ iv.round }} · <span class="chip {{ 'done' if iv.outcome == 'select' else 'esc' if iv.outcome == 'reject' else 'gray' }}">{{ iv.outcome | capitalize }}</span> {{ ids(d) }}</div>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </div>
+
+  {% if selected %}
+  {% set iv, c, d = selected %}
+  <section class="panel panel-body stack">
+    <div>
+      <div class="eyebrow">Feedback · {{ iv.round }} · {{ ids(d) }}</div>
+      <h2 style="font-size:24px;margin-top:4px">{{ c.name }}</h2>
+      {% if d %}<div class="small muted">{{ d.name }} · {{ d.grade }}{% if iv.scheduled_at %} · {{ iv.scheduled_at | at(tz, '%a %d %b · %H:%M %Z') }}{% endif %}</div>{% endif %}
+    </div>
+    <div class="row small">
+      {% if d and d.jd_path %}<a href="/demands/{{ d.app_ref }}/jd">Job description</a>{% endif %}
+      {% if c.cv_path and iv.feedback_token %}<a href="/cv/{{ iv.feedback_token }}">Candidate CV</a>{% else %}<span class="muted">CV not attached yet</span>{% endif %}
+      {% if d and d.primary_skills %}<span class="muted">Required: {{ d.primary_skills | join(', ') }}{% if d.exp_min %} · {{ d.exp_min }}+ years{% endif %}</span>{% endif %}
+    </div>
+    <form method="post" action="/interviews/{{ iv.id }}/feedback" class="stack">
+      {% with dims=dims, fixed_round=iv.round, v={} %}{% include "_feedback_fields.html" %}{% endwith %}
+      <div><button class="btn primary">Submit feedback</button></div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{# Shared by My interviews and the no-sign-in feedback link. Needs: dims, fixed_round (or none), v (previous values). #}
+{% set v = v or {} %}
+{% if not fixed_round %}
+<div class="grid2">
+  <label class="f">Round
+    <select name="round" required>
+      {% for r in ['L1', 'L2'] %}<option {{ 'selected' if v.get('round', 'L1') == r }}>{{ r }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="f">Interviewed on <span class="hint">(optional)</span><input type="date" name="interviewed_on" value="{{ v.get('interviewed_on', '') }}"></label>
+</div>
+{% endif %}
+<fieldset class="f ratings">
+  <legend>Ratings (1 to 5)</legend>
+  {% for d in dims %}
+  {% set i = loop.index0 %}
+  <div class="rating-row" role="radiogroup" aria-label="{{ d }}">
+    <div class="rating-label">{{ d }}</div>
+    {% for n in range(1, 6) %}
+      <label class="rating"><input type="radio" name="r{{ i }}" value="{{ n }}" required {{ 'checked' if (v.get('ratings') or {}).get(d) == n }}><span>{{ n }}</span></label>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</fieldset>
+<fieldset class="f outcome">
+  <legend>Decision</legend>
+  <div class="row">
+    {% for key, label in [('select', 'Select'), ('reject', 'Reject'), ('hold', 'On hold')] %}
+      <label class="choice {{ key }}"><input type="radio" name="outcome" value="{{ key }}" required {{ 'checked' if v.get('outcome') == key }}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+</fieldset>
+<label class="f">Comments<textarea name="comments" rows="4" placeholder="Strengths, gaps, and anything the client panel should probe. Required to reject or hold.">{{ v.get('comments', '') }}</textarea></label>
+{% if fixed_round != 'L2' %}
+<label class="row" style="font-weight:500"><input type="checkbox" name="needs_next_round" value="1" style="width:18px;height:18px;accent-color:var(--brand)" {{ 'checked' if v.get('needs_next_round') }}> Needs another round (the demand owner approves it)</label>
+<label class="f">Why another round <span class="hint">(optional)</span><input type="text" name="next_round_note" value="{{ v.get('next_round_note', '') }}" maxlength="400"></label>
+{% endif %}

@@ -22,7 +22,7 @@ from app.core.account_config import AccountConfig
 from app.core.enums import ApprovalRoute, Decision, DemandStatus, Role
 from app.core.security import Actor
 from app.models import Account, Candidate, Demand, OfferApproval
-from app.services import rate_card_service
+from app.services import interview_service, rate_card_service
 
 OFFER_STAGES = (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)
 DECIDERS = {ApprovalRoute.ADMIN.value: (Role.ADMIN,), ApprovalRoute.LEADERSHIP.value: (Role.LEADERSHIP,)}
@@ -87,20 +87,11 @@ def ensure_offer(
     db: Session, account: Account, demand: Demand, candidate_name: str, channel: str | None
 ) -> OfferApproval | None:
     """Create the candidate (if new) and a pending approval for their offer, once per candidate."""
-    name = candidate_name.strip().splitlines()[0].strip()[:160] if candidate_name.strip() else ""
-    if not name:
+    names = interview_service.split_names(candidate_name)
+    if not names:
         return None
-    cand = next(
-        (c for c in db.scalars(select(Candidate).where(Candidate.demand_id == demand.id))
-         if c.name.casefold() == name.casefold()),
-        None,
-    )  # fmt: skip
-    if cand is None:
-        cand = Candidate(
-            demand_id=demand.id, name=name, channel=channel, current_stage=DemandStatus.OFFER_IN_PROCESS
-        )
-        db.add(cand)
-        db.flush()
+    cand = interview_service.ensure_candidate(db, account.id, demand, names[0], channel=channel)
+    cand.current_stage = DemandStatus.OFFER_IN_PROCESS.label
     already = db.scalar(select(OfferApproval.id).where(OfferApproval.candidate_id == cand.id))
     if already is not None:
         return None

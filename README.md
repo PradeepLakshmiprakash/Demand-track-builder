@@ -19,7 +19,8 @@ Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 | 3 | DP sheet import and reconciliation | **Done**: upload with column mapping in settings, snapshot rows, exact / name-prefix / fuzzy matching, missing and dropped detection with escalations, match or create from row |
 | 4 | Escalation engine | **Done**: not submitted / aging / past start triggers, two-hourly sweep, L1 → L2 promotion, mails to the BU delivery head and leadership, Escalations screen with resolve (resubmit, extend, close, no further action) and audit trail |
 | 5 | Rate card, approvals, leadership view | **Done**: dated rate card, offers priced from the DP sheet and routed by the margin cut-off, revenue loss, leadership overview |
-| 6 | Interviews | Next |
+| 6 | Interviews | **Done**: candidates mapped to requisitions (from the DP sheet, panelists, Karat stub), panelist recommendations, L2 requests approved by the demand owner, scheduling placeholders, invite + no-sign-in feedback link, CVs, interviewer alerts, rejection-limit and panel-SLA escalations |
+| 7 | Production readiness | Next |
 
 ## Run locally (this machine)
 

@@ -231,6 +231,35 @@ class InterviewOutcome(StrEnum):
     HOLD = "hold"
 
 
+class InterviewStatus(StrEnum):
+    REQUESTED = "requested"  # L2 asked for by the panelist; waiting for the demand owner
+    DECLINED = "declined"  # the demand owner said no to the extra round
+    OPEN = "open"  # needed, but staffing hasn't scheduled it or no interviewer is known yet
+    SCHEDULED = "scheduled"  # interviewer assigned (time may still be unknown); feedback link issued
+    COMPLETED = "completed"  # recommendation recorded
+
+    @property
+    def label(self) -> str:
+        return {
+            "requested": "Waiting for demand owner",
+            "declined": "Extra round declined",
+            "open": "To be scheduled",
+            "scheduled": "Scheduled",
+            "completed": "Feedback in",
+        }[self.value]
+
+
+class InterviewSource(StrEnum):
+    APP = "app"
+    KARAT = "karat"
+
+
+class CandidateSource(StrEnum):
+    SHEET = "sheet"  # the DP sheet's candidate name on the requisition's row
+    MANUAL = "manual"  # added by the admin team or a panelist
+    KARAT = "karat"
+
+
 def check_in(column: str, values: type[StrEnum] | tuple[StrEnum, ...]) -> str:
     """SQL for a CHECK constraint limiting a text column to an enum's values."""
     items = ", ".join(f"'{v.value}'" for v in values)

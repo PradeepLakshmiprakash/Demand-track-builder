@@ -38,8 +38,9 @@ NAV: tuple[NavItem, ...] = (
     NavItem("escalations", "/escalations", _same("Escalations", AD, AT, LD), phase=4, ready=True),
     NavItem("approvals", "/approvals", _same("Offer approvals", AD, LD), phase=5, ready=True),
     NavItem("rate_card", "/rate-card", _same("Rate card", AD), phase=5, ready=True),
-    NavItem("interviews", "/interviews", _same("My interviews", IV), phase=6),
-    NavItem("interviewer_profiles", "/interviewers", _same("Interviewer profiles", AD), phase=6),
+    NavItem("candidates", "/candidates", _same("Candidates", AD, AT), phase=6, ready=True),
+    NavItem("interviews", "/interviews", _same("My interviews", IV), phase=6, ready=True),
+    NavItem("interviewer_profiles", "/interviewers", _same("Interviewer profiles", AD), phase=6, ready=True),
     NavItem("users", "/users", _same("User access", AD), ready=True),
     NavItem("settings", "/settings", _same("Account settings", AD), ready=True),
 )
