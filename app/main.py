@@ -1,5 +1,7 @@
+import base64
 import logging
-from collections.abc import AsyncIterator
+import secrets
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -19,6 +21,7 @@ from app.routers import (
     accounts,
     approvals,
     candidates,
+    cron,
     escalations,
     excel_import,
     feedback_link,
@@ -54,6 +57,7 @@ ROUTERS = [
     user_access.router,
     account_settings.router,
     accounts.router,
+    cron.router,
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -71,10 +75,38 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         scheduler.shutdown(wait=False)
 
 
+OPEN_PATHS = ("/health", "/api/cron/")
+
+
+def _demo_gate(app: FastAPI, password: str) -> None:
+    """Hosted demo: one shared password (HTTP Basic, any user name) in front of every page."""
+
+    @app.middleware("http")
+    async def gate(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        if request.url.path.startswith(OPEN_PATHS):
+            return await call_next(request)
+        scheme, _, value = request.headers.get("authorization", "").partition(" ")
+        given = ""
+        if scheme.lower() == "basic":
+            try:
+                given = base64.b64decode(value).decode("utf-8").partition(":")[2]
+            except (ValueError, UnicodeDecodeError):
+                given = ""
+        if not secrets.compare_digest(given.encode(), password.encode()):
+            return Response(
+                "Demand Tracker demo: enter the demo password (any user name).",
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="Demand Tracker demo", charset="UTF-8"'},
+            )
+        return await call_next(request)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Demand Tracker", version="0.2.0", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    if settings.demo_password:
+        _demo_gate(app, settings.demo_password)
 
     if settings.view_switcher_enabled:
         app.include_router(view_switcher.router)

@@ -13,7 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    env: Literal["local", "test", "production"] = "local"
+    # demo: a hosted demo with dummy data (Vercel): the View-as switcher stays, behind demo_password.
+    env: Literal["local", "test", "demo", "production"] = "local"
     database_url: str = "postgresql+psycopg://dt_admin@127.0.0.1:5434/demand_tracker"
     secret_key: str = "dev-only-change-me"
     app_base_url: str = "http://localhost:8010"
@@ -38,6 +39,13 @@ class Settings(BaseSettings):
     karat_api_key: str | None = None
     karat_account_id: int = 1
 
+    # Hosted demo: one shared password in front of the whole app (HTTP Basic). Unset = no gate.
+    demo_password: str | None = None
+    # Serverless hosting (Vercel): no connection pool kept between requests.
+    serverless: bool = False
+    # Vercel Cron calls /api/cron/daily with "Authorization: Bearer <cron_secret>".
+    cron_secret: str | None = None
+
     storage_backend: Literal["local", "s3"] = "local"
     storage_dir: str = "var/files"
     max_upload_mb: int = 5
@@ -46,6 +54,12 @@ class Settings(BaseSettings):
     def _no_switcher_in_production(self) -> "Settings":
         if self.env == "production" and self.view_switcher_enabled:
             raise ValueError("VIEW_SWITCHER_ENABLED must be false in production")
+        if self.env == "demo" and not self.demo_password:
+            raise ValueError("DEMO_PASSWORD must be set for a hosted demo")
+        # Hosted Postgres (Neon, Heroku-style) hands out postgres:// URLs; SQLAlchemy needs the driver.
+        for prefix in ("postgres://", "postgresql://"):
+            if self.database_url.startswith(prefix):
+                self.database_url = "postgresql+psycopg://" + self.database_url[len(prefix) :]
         return self
 
     def local_path(self, value: str) -> Path:

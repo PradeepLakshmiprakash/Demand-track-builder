@@ -1,0 +1,14 @@
+# Runtime dependencies for hosting (Vercel reads this file). Same as pyproject.toml's, minus dev tools.
+fastapi>=0.115
+jinja2>=3.1
+python-multipart>=0.0.9
+pydantic>=2.7
+email-validator>=2.1
+pydantic-settings>=2.3
+sqlalchemy>=2.0.30
+alembic>=1.13
+psycopg[binary]>=3.2
+openpyxl>=3.1
+rapidfuzz>=3.9
+apscheduler>=3.10,<4
+tzdata>=2024.1

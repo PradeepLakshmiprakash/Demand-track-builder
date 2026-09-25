@@ -10,3 +10,5 @@ var/
 # DP sheets carry candidate personal data: never commit real ones.
 *.xlsx
 !seed/sample_dp_sheet.xlsx
+.vercel
+.env.local
