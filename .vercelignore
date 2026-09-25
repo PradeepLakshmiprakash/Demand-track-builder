@@ -12,3 +12,7 @@ scripts
 __pycache__
 *.egg-info
 *.xlsx
+.claude
+.agents
+skills-lock.json
+.vercel

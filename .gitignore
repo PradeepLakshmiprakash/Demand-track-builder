@@ -12,3 +12,9 @@ var/
 !seed/sample_dp_sheet.xlsx
 .vercel
 .env.local
+
+.vercel
+.env*
+.agents/
+.claude/
+skills-lock.json
