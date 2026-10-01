@@ -109,7 +109,8 @@ def load(db: Session, now: datetime | None = None) -> None:
             )
 
     for ref, etype, esc_level, due_in, detail in data.ESCALATIONS:
-        due = now + timedelta(days=due_in)
+        # L2 means the due date has passed with no response.
+        due = now + timedelta(days=-abs(due_in) if esc_level == 2 else due_in)
         opened = due - timedelta(days=account.l1_sla_days + (account.l2_sla_days if esc_level == 2 else 0))
         esc = Escalation(
             demand_id=demands[ref].id, type=etype, level=esc_level, status="open", detail=detail,
