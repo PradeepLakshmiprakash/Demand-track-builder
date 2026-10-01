@@ -20,11 +20,20 @@ def demand(db: Session, ref: str) -> Demand:
 
 def _form(**kw: str) -> dict[str, str]:
     base = {
-        "name": "Java Developer", "practice": "Cloud-Java", "grade": "C1", "category": "Open",
-        "type": "Replacement", "replaced_resource": "A. Leaver", "position_type": "Billable",
-        "primary_skills": "Java", "start_date": (date.today() + timedelta(days=30)).isoformat(),
-        "region": "US", "location": "Chicago", "work_mode": "Hybrid", "action": "submit",
-    }  # fmt: skip
+        "name": "Java Developer",
+        "practice": "Cloud-Java",
+        "grade": "C1",
+        "category": "Open",
+        "type": "Replacement",
+        "replaced_resource": "A. Leaver",
+        "position_type": "Billable",
+        "primary_skills": "Java",
+        "start_date": (date.today() + timedelta(days=30)).isoformat(),
+        "region": "US",
+        "location": "Chicago",
+        "work_mode": "Hybrid",
+        "action": "submit",
+    }
     return {**base, **kw}
 
 

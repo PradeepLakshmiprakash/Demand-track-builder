@@ -5,6 +5,7 @@ the last mail (status → notified) plus a reminder of earlier ones still withou
 Each mail is recorded as a notification batch. It goes out once per account per day unless forced.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
@@ -100,7 +101,10 @@ def send_daily_admin_mail(
     db.flush()
 
     try:
-        mail.send(compose(account, new, waiting, [u.email for u in to], local))
+        msg = compose(account, new, waiting, [u.email for u in to], local)
+        # Demand owners are copied on the reminder for their own demands.
+        msg.cc = sorted({d.owner.email for d in (*new, *waiting)} - set(msg.to))
+        mail.send(msg)
     except Exception:
         db.rollback()  # demands stay "submitted" and go in the next attempt
         raise
@@ -162,3 +166,67 @@ def compose(
         f"({cutoff}) are escalated as not submitted.</p>"
     ]
     return mail.Mail(to=to, subject=subject, text="\n".join(text), html="".join(html))
+
+
+# --- Per-demand mails: landed, and created on GTD ----------------------------------------------------
+
+log = logging.getLogger("demand_tracker.notify")
+
+
+def _facts(d: Demand) -> str:
+    start = d.start_date.strftime("%d %b %Y") if d.start_date else "no start date"
+    return (
+        f"{d.app_ref}  {d.gtd_name}\n"
+        f"{d.business_unit.name} · {d.practice or '—'} · {d.grade or '—'} · {d.type} · {d.position_type}"
+        f" · start {start}\nDemand owner: {d.owner.name}"
+    )
+
+
+def send_landed(db: Session, demand: Demand) -> None:
+    """The moment a demand is submitted: tell the GTD admin team it needs creating on GTD, with the
+    demand owner copied. The morning mail then reminds them every day until it is created."""
+    account = db.get_one(Account, demand.account_id)
+    to = [u.email for u in recipients(db, account.id)]
+    again = f"\nThis is a resubmission; it was {demand.gtd_req_id}." if demand.submissions else ""
+    link = f"{get_settings().app_base_url}/gtd-queue"
+    mail.send(
+        mail.Mail(
+            to=to,
+            cc=[demand.owner.email] if demand.owner.email not in to else [],
+            subject=f"[{account.name}] New demand to create on GTD: {demand.app_ref} {demand.name}",
+            text=(
+                f"A demand has just been submitted and needs creating on GTD.\n\n{_facts(demand)}{again}\n\n"
+                "Steps for the GTD admin team:\n"
+                "1. Create it on GTD with the name exactly as shown.\n"
+                f"2. Paste the requisition ID GTD gives back on the GTD queue: {link}\n\n"
+                "You'll be reminded every morning until it is created. The demand owner is copied."
+            ),
+        )
+    )
+
+
+def send_created(db: Session, demand: Demand, req_id: str, by: str) -> None:
+    """Completion: the demand now exists on GTD. To the demand owner, GTD admin team copied."""
+    account = db.get_one(Account, demand.account_id)
+    team = [u.email for u in recipients(db, account.id) if u.email != demand.owner.email]
+    link = f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+    mail.send(
+        mail.Mail(
+            to=[demand.owner.email],
+            cc=team,
+            subject=f"[{account.name}] Created on GTD: {demand.app_ref} is {req_id}",
+            text=(
+                f"Done: {by} created this demand on GTD. Its requisition ID is {req_id}.\n\n"
+                f"{_facts(demand)}\n\nNext: once GTD staffing approves it, it appears in the DP sheet and "
+                f"coverage begins.\n{link}"
+            ),
+        )
+    )
+
+
+def safely(send: object, *args: object) -> None:
+    """A mail that fails must never undo the action that triggered it."""
+    try:
+        send(*args)  # type: ignore[operator]
+    except Exception:
+        log.exception("Mail failed: %s", getattr(send, "__name__", send))

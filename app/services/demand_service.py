@@ -342,6 +342,10 @@ def _submit(db: Session, actor: Actor, demand: Demand) -> None:
     if demand.status_enum in (DemandStatus.DRAFT, DemandStatus.RETURNED):
         record_stage(db, demand, DemandStatus.SUBMITTED, actor.id)
         demand.submitted_at = datetime.now(UTC)
+        db.flush()
+        from app.services import notify_service  # it imports this module
+
+        notify_service.safely(notify_service.send_landed, db, demand)
 
 
 def stage_history(db: Session, demand: Demand) -> list[StageEvent]:

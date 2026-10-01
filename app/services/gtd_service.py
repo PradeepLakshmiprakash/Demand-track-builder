@@ -18,7 +18,7 @@ from app.core.enums import DemandStatus
 from app.core.security import Actor
 from app.models import Account, Demand, GtdSubmission, NotificationBatch
 from app.services.demand_service import record_stage
-from app.services.notify_service import local_now
+from app.services.notify_service import local_now, safely, send_created
 
 REQ_ID = re.compile(r"^[A-Z0-9]{4,12}$")
 PENDING = (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)
@@ -109,6 +109,7 @@ def link_requisition(db: Session, actor: Actor, demand_id: int, raw_req_id: str)
     except IntegrityError as e:  # two people linking the same ID at once
         db.rollback()
         raise GtdError(f"{req_id} was just linked to another demand.") from e
+    safely(send_created, db, demand, req_id, actor.name)
     return sub
 
 
