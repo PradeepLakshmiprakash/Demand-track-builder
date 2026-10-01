@@ -64,7 +64,8 @@ class UserAccount(Base):
         CheckConstraint(
             "(role IN ('admin', 'admin_team', 'leadership') AND visibility_scope = 'full')"
             " OR (role = 'interviewer' AND visibility_scope = 'assigned_interviews')"
-            " OR (role = 'demand_owner' AND visibility_scope IN ('own', 'own_bu_read'))",
+            " OR (role = 'demand_owner' AND visibility_scope IN ('own', 'own_bu_read'))"
+            " OR (role = 'administrator' AND visibility_scope = 'app_controls')",
             name="scope_matches_role",
         ),
     )

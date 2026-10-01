@@ -285,9 +285,9 @@ def test_who_may_resolve_each_level(db: Session) -> None:
     l1 = open_esc(db, "DM-000139", "missing")
     l2 = open_esc(db, "DM-000121", "past_start")
     assert l1 is not None and l2 is not None
-    with pytest.raises(EscalationError, match="resolved by leadership or the admin demand owner"):
+    with pytest.raises(EscalationError, match="resolved by leadership or the GTD team admin"):
         svc.resolve(db, actor(db, "farah"), l2.id, reason="Unknown", action="close", comment=None)
-    with pytest.raises(EscalationError, match="admin demand owner or admin team"):
+    with pytest.raises(EscalationError, match="GTD team admin or GTD admin team"):
         svc.resolve(db, actor(db, "sanjay"), l1.id, reason="Unknown", action="close", comment=None)
     with pytest.raises(EscalationError, match="Choose a reason"):
         svc.resolve(db, actor(db, "farah"), l1.id, reason="Because", action="close", comment=None)

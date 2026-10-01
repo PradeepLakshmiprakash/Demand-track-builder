@@ -1,4 +1,4 @@
-"""Admin demand owner and admin team: what the latest DP sheet says, and rows that need a person."""
+"""GTD team admin and GTD admin team: what the latest DP sheet says, and rows that need a person."""
 
 from typing import Any
 from urllib.parse import quote

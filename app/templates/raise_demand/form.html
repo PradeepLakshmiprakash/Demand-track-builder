@@ -80,7 +80,7 @@
       <div class="grid2">
         <label class="f">Client bill rate (per hour)
           <input type="number" name="client_rate" min="0" step="0.01" value="{{ v.client_rate if v.client_rate is not none else '' }}" placeholder="{{ 'On file. Leave blank to keep it.' if rate_on_file and not actor.can_see_bill_rate else '' }}">
-          <span class="hint">Only the admin demand owner and leadership see this after it's saved.</span>
+          <span class="hint">Only the GTD team admin and leadership see this after it's saved.</span>
         </label>
         <label class="f">Requested start date<input type="date" name="start_date" value="{{ v.start_date or '' }}"><span class="hint">Revenue loss is counted from this date</span></label>
         <label class="f">Region
@@ -109,7 +109,7 @@
     <div class="title">What happens next</div>
     <ol>
       <li>Your demand goes into the admin mail, sent daily at {{ account.mail_time.strftime('%H:%M') }} ({{ cfg.timezone.split('/')[-1].replace('_', ' ') }} time).</li>
-      <li>The admin team enters it on GTD. The GTD requisition ID is linked to your demand.</li>
+      <li>The GTD admin team enters it on GTD. The GTD requisition ID is linked to your demand.</li>
       <li>Once GTD staffing approves it, it appears in the DP sheet and coverage begins.</li>
     </ol>
     <p class="note">If it isn't in the DP sheet within {{ account.grace_days }} working days, an escalation opens automatically and you're copied.</p>

@@ -19,7 +19,7 @@
 
 {% if d.status == 'returned' and returned %}
 <div class="flash bad" role="alert"><strong>Sent back for correction</strong> by {{ returned.by }} on {{ returned.at | at(tz, '%d %b') }}: {{ returned.reason }}{% if returned.comment %}. {{ returned.comment }}{% endif %}.
-  {% if can_change %}Correct it with Edit, then resubmit; it goes back to the admin team for GTD.{% endif %}</div>
+  {% if can_change %}Correct it with Edit, then resubmit; it goes back to the GTD admin team for GTD.{% endif %}</div>
 {% endif %}
 <div class="split">
   <div class="stack">
@@ -100,7 +100,7 @@
             <span class="muted">linked {{ s.submitted_at | at(tz, '%d %b %Y') }} by {{ submitters.get(s.submitted_by, '—') }}</span></div>
         {% endfor %}
       {% else %}
-        <p class="muted small" style="margin:10px 0 0">No requisition ID yet. {% if d.status == 'draft' %}Submit the demand to send it to the admin.{% else %}The admin team links it after entering the demand on GTD.{% endif %}</p>
+        <p class="muted small" style="margin:10px 0 0">No requisition ID yet. {% if d.status == 'draft' %}Submit the demand to send it to the admin.{% else %}The GTD admin team links it after entering the demand on GTD.{% endif %}</p>
       {% endif %}
     </section>
     {% if escalations %}

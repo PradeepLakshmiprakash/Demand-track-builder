@@ -1,7 +1,7 @@
 """User access: who exists, their role, BUs, practices and what they see.
 
 Rules (flow-artifact §1.1):
-- Admin demand owners, their admin team and leadership always see the full account, all BUs. Fixed.
+- GTD team admins, their GTD admin team and leadership always see the full account, all BUs. Fixed.
 - A demand owner belongs to exactly one BU and sees their own demands; the admin may widen that to
   own + BU read-only.
 - Interviewers see assigned interviews; their skills, practices and max grade live on their profile.
@@ -181,8 +181,13 @@ def _apply(db: Session, actor: Actor, user: User, m: UserAccount, form: UserForm
         user.interviewer_profile.active = False
 
 
-def _guard_last_admin(db: Session, actor: Actor, user_id: int, *, losing_admin: bool) -> None:
-    if not losing_admin:
+# An account must always keep one of each: someone to run the app's controls, someone to run the work.
+MUST_KEEP_ONE = (Role.ADMINISTRATOR, Role.ADMIN)
+
+
+def _guard_last(db: Session, actor: Actor, user_id: int, leaving: Role | None) -> None:
+    """Refuse when this person is the account's last active holder of a must-keep role."""
+    if leaving not in MUST_KEEP_ONE:
         return
     others = db.scalar(
         select(func.count())
@@ -190,14 +195,14 @@ def _guard_last_admin(db: Session, actor: Actor, user_id: int, *, losing_admin: 
         .join(User, User.id == UserAccount.user_id)
         .where(
             UserAccount.account_id == actor.account_id,
-            UserAccount.role == Role.ADMIN.value,
+            UserAccount.role == leaving.value,
             UserAccount.active,
             User.active,
             UserAccount.user_id != user_id,
         )
     )
     if not others:
-        raise UserAccessError("The account needs at least one active admin demand owner.")
+        raise UserAccessError(f"The account needs at least one active {leaving.label}.")
 
 
 def create_user(db: Session, actor: Actor, form: UserForm) -> Member:
@@ -221,8 +226,8 @@ def create_user(db: Session, actor: Actor, form: UserForm) -> Member:
 
 def update_user(db: Session, actor: Actor, user_id: int, form: UserForm) -> Member:
     member = get_user(db, actor.account_id, user_id)
-    was_admin = member.role == Role.ADMIN.value and member.active
-    _guard_last_admin(db, actor, user_id, losing_admin=was_admin and form.role is not Role.ADMIN)
+    if member.active and form.role is not member.role_enum:
+        _guard_last(db, actor, user_id, member.role_enum)
     _apply(db, actor, member.user, member.m, form)
     db.commit()
     return member
@@ -234,7 +239,7 @@ def set_active(db: Session, actor: Actor, user_id: int, active: bool) -> Member:
     if not active:
         if user_id == actor.id:
             raise UserAccessError("You can't deactivate yourself.")
-        _guard_last_admin(db, actor, user_id, losing_admin=member.role == Role.ADMIN.value)
+        _guard_last(db, actor, user_id, member.role_enum)
     member.m.active = active
     if active:
         member.user.active = True

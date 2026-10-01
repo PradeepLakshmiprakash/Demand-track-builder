@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Requests{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>{{ 'Requests to the Administrator' if can_raise else 'Requests' }}</h1>
+    <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Ask for a change here: they get an email, make the change and mark it done.{% else %}Changes the GTD team admin has asked for. Make the change on the matching screen, then mark the request done; they are emailed.{% endif %}</div>
+  </div>
+</div>
+
+{% if can_raise %}
+<section class="panel">
+  <div class="panel-head"><div><h2>New request</h2></div></div>
+  <form method="post" action="/requests" class="panel-body stack">
+    <label class="f" style="max-width:520px">What is it about
+      <select name="kind" required>{% for k, label in kinds.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+    </label>
+    <label class="f">What needs to change<textarea name="details" rows="4" required minlength="5" placeholder="e.g. Add Asha P. (asha.p@example.com) as a demand owner in CARDS"></textarea></label>
+    <div><button class="btn primary">Send to the Administrator</button></div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="panel-head"><div><h2>Open and past requests</h2></div><span class="chip {{ 'risk' if open_count else 'gray' }}">{{ open_count }} open</span></div>
+  {% for r in rows %}
+  <div class="match-row">
+    <div class="match-head">
+      <div>
+        <div class="title">#{{ r.id }} · {{ kinds[r.kind] }}</div>
+        <div class="note">Asked by {{ people.get(r.requested_by, '—') }} on {{ r.created_at | at(tz, '%d %b %Y, %H:%M') }}</div>
+        <div style="margin-top:6px;white-space:pre-wrap">{{ r.details }}</div>
+        {% if r.status != 'open' %}<div class="note" style="margin-top:6px">{{ r.status | capitalize }} by {{ people.get(r.handled_by, '—') }} on {{ r.handled_at | at(tz, '%d %b %Y') }}{% if r.note %}: {{ r.note }}{% endif %}</div>{% endif %}
+      </div>
+      <span class="chip {{ 'risk' if r.status == 'open' else 'done' if r.status == 'done' else 'gray' }}">{{ r.status | capitalize }}</span>
+    </div>
+    {% if can_handle and r.status == 'open' %}
+    <form method="post" action="/requests/{{ r.id }}" class="row" style="margin-top:10px">
+      <input type="text" name="note" placeholder="Note (required to decline)" aria-label="Note for request {{ r.id }}" style="max-width:360px">
+      <button class="btn small primary" name="status" value="done">Mark done</button>
+      <button class="btn small danger" name="status" value="declined">Decline</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty">No requests yet.</div>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -1,4 +1,4 @@
-"""Leadership and the admin demand owner: account overview. Fill speed, pipeline, and revenue lost
+"""Leadership and the GTD team admin: account overview. Fill speed, pipeline, and revenue lost
 to missed start dates."""
 
 from typing import Any
@@ -36,7 +36,7 @@ def overview_page(
 ) -> HTMLResponse:
     today = account_today(db, actor.account_id)
     o = loss_service.overview(db, actor.account_id, today)
-    # Offers this viewer decides: below the cut-off for leadership, at or above for the admin demand owner.
+    # Offers this viewer decides: below the cut-off for leadership, at or above for the GTD team admin.
     route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(
         select(func.count())

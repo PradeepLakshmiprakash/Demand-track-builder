@@ -18,7 +18,7 @@
           <div style="font-weight:400"><span class="mono">{{ d.gtd_req_id or 'no GTD ID' }}</span> <span class="mono">{{ d.app_ref }}</span> · {{ d.name }} · {{ d.grade }}</div>
         {% else %}
           <select name="demand_id">
-            <option value="">Not sure: the admin team will map it</option>
+            <option value="">Not sure: the GTD admin team will map it</option>
             {% for r in requisitions %}<option value="{{ r.id }}">{{ r.gtd_req_id or r.app_ref }} · {{ r.name[:60] }} · {{ r.grade }}</option>{% endfor %}
           </select>
           <span class="hint">This candidate isn't on a requisition yet. Pick it if you know which one you interviewed them for.</span>

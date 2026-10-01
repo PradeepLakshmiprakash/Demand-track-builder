@@ -66,7 +66,7 @@ def test_interviewer_sees_only_demands_with_their_interviews(db: Session) -> Non
 
 def test_widening_scope_takes_effect_immediately(client: Client) -> None:
     neha = user_id("neha")
-    client.as_user("kavya")
+    client.as_user("anil")
     form = {
         "name": "Neha T.",
         "email": "neha.t@example.com",

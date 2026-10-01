@@ -4,13 +4,13 @@ Staffing schedules interviews outside the app and CVs arrive by email, so the ap
 
 1. Know which requisition each candidate belongs to. Candidates come from the DP sheet (the
    Candidate Name cell on the requisition's row) or are added by hand; one without a requisition
-   waits for the admin team or the panelist to map it.
+   waits for the GTD admin team or the panelist to map it.
 2. Capture the panelist's recommendation: ratings, select / reject / hold, comments, and optionally
    "needs another round". The panelist finds the candidate by name; the app shows the requisitions
    that name is on. A recommendation can be recorded before scheduling is known.
 3. An L2 asked for by the panelist waits for the demand owner's approval, then for staffing to
    schedule it and for someone to be assigned (who interviews at L2 is still open, so it's a
-   placeholder the admin team fills).
+   placeholder the GTD admin team fills).
 4. When an interviewer is assigned, they get an invite with both IDs, the JD and CV links and a
    single-use feedback link that works without signing in.
 5. Interviewers sharing at least one technology with a newly linked requisition get a heads-up.
@@ -320,7 +320,7 @@ def request_next_round(
 def decide_next_round(
     db: Session, actor: Actor, interview_id: int, approve: bool, note: str | None
 ) -> Interview:
-    """The demand owner (or the admin demand owner) approves or declines an asked-for round."""
+    """The demand owner (or the GTD team admin) approves or declines an asked-for round."""
     iv = _interview(db, actor, interview_id)
     if iv.status_enum is not InterviewStatus.REQUESTED:
         raise InterviewError("That round isn't waiting for a decision.")
@@ -538,7 +538,7 @@ def record_external(
     comments: str | None = None,
 ) -> Interview:
     """A result from Karat. The candidate is matched to a requisition by GTD ID when one is sent,
-    otherwise it waits unmapped for the admin team. Re-sending the same result is a no-op."""
+    otherwise it waits unmapped for the GTD admin team. Re-sending the same result is a no-op."""
     same = db.scalar(
         select(Interview).where(
             Interview.external_ref == external_ref, Interview.source == InterviewSource.KARAT.value

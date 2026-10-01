@@ -29,12 +29,25 @@ def test_admin_menu(client: Client) -> None:
         "DP sheet import",
         "Reconciliation",
         "Escalations",
-        "Rate card",
-        "User access",
-        "Account settings",
+        "Requests to administrator",
     ):
         assert expected in items
-    assert "My interviews" not in items
+    # The app's controls belong to the Administrator, who in turn has no demand screens.
+    for gone in ("My interviews", "Rate card", "User access", "Account settings"):
+        assert gone not in items
+
+
+def test_administrator_menu_has_only_app_controls(client: Client) -> None:
+    c = client.as_user("anil")
+    assert [m.split("  ")[0] for m in menu(c)] == [
+        "Requests",
+        "User access",
+        "Account settings",
+        "Rate card",
+        "Accounts",
+    ]
+    assert c.get("/demands").status_code == 403 and c.get("/api/demands").status_code == 403
+    assert c.get("/gtd-queue").status_code == 403 and c.get("/overview").status_code == 403
 
 
 def test_leadership_menu(client: Client) -> None:

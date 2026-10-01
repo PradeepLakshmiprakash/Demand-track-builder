@@ -1,7 +1,7 @@
-"""Admin demand owner, admin team and leadership: open escalations, and resolving them.
+"""GTD team admin, GTD admin team and leadership: open escalations, and resolving them.
 
 Opened automatically; closed only with a reason and an action. L1 is resolved by the admin demand
-owner or admin team, L2 by leadership.
+owner or GTD admin team, L2 by leadership.
 """
 
 from datetime import UTC, date, datetime

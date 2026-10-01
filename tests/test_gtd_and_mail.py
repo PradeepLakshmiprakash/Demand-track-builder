@@ -55,7 +55,7 @@ def test_mail_lists_submitted_and_marks_them_notified(db: Session) -> None:
 def test_mail_skips_leadership_owners_and_inactive_admin_team(client: Client, db: Session) -> None:
     from tests.conftest import user_id
 
-    client.as_user("kavya").post(f"/users/{user_id('deepak')}/active", data={"active": "0"})
+    client.as_user("anil").post(f"/users/{user_id('deepak')}/active", data={"active": "0"})
     notify_service.send_daily_admin_mail(db, account(db).id, force=True)
     assert set(mail.sent[0].to) == {"kavya.r@example.com", "farah.q@example.com"}
 
@@ -122,7 +122,7 @@ def test_console_backend_writes_eml(db: Session) -> None:
 
 @pytest.fixture
 def team(client: Client) -> Client:
-    return client.as_user("farah")  # admin team does the manual GTD work
+    return client.as_user("farah")  # GTD admin team does the manual GTD work
 
 
 def test_queue_shows_mail_and_new_submissions(team: Client) -> None:

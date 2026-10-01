@@ -9,10 +9,12 @@ from enum import StrEnum
 
 class Role(StrEnum):
     DEMAND_OWNER = "demand_owner"
-    ADMIN = "admin"  # "Admin demand owner" in the UI
-    ADMIN_TEAM = "admin_team"  # the admin demand owner's team: the manual admin work
+    ADMIN = "admin"  # "GTD team admin" in the UI: heads the GTD admin team
+    ADMIN_TEAM = "admin_team"  # "GTD admin team": the manual GTD and DP sheet work
     LEADERSHIP = "leadership"
     INTERVIEWER = "interviewer"
+    # Runs the app's controls (settings, access, rate card) on request. Sees no demands.
+    ADMINISTRATOR = "administrator"
 
     @property
     def label(self) -> str:
@@ -21,10 +23,11 @@ class Role(StrEnum):
 
 ROLE_LABELS = {
     Role.DEMAND_OWNER: "Demand owner",
-    Role.ADMIN: "Admin demand owner",
-    Role.ADMIN_TEAM: "Admin team",
+    Role.ADMIN: "GTD team admin",
+    Role.ADMIN_TEAM: "GTD admin team",
     Role.LEADERSHIP: "Leadership",
     Role.INTERVIEWER: "Interviewer",
+    Role.ADMINISTRATOR: "Administrator",
 }
 
 
@@ -35,6 +38,7 @@ class Scope(StrEnum):
     OWN_BU_READ = "own_bu_read"
     FULL = "full"
     ASSIGNED_INTERVIEWS = "assigned_interviews"
+    APP_CONTROLS = "app_controls"
 
     @property
     def label(self) -> str:
@@ -50,6 +54,7 @@ SCOPE_LABELS = {
     Scope.OWN_BU_READ: ("Own + BU read-only", "Can view other demands in their BU(s)"),
     Scope.FULL: ("Full account", "All BUs, all demands"),
     Scope.ASSIGNED_INTERVIEWS: ("Assigned interviews", "Plus alerts for new requisitions in their skills"),
+    Scope.APP_CONTROLS: ("App controls", "Settings, access and rate card; no demands"),
 }
 
 # Which scopes each role may hold. A single allowed scope means the role is locked to it.
@@ -60,6 +65,7 @@ ALLOWED_SCOPES: dict[Role, tuple[Scope, ...]] = {
     Role.ADMIN_TEAM: (Scope.FULL,),
     Role.LEADERSHIP: (Scope.FULL,),
     Role.INTERVIEWER: (Scope.ASSIGNED_INTERVIEWS,),
+    Role.ADMINISTRATOR: (Scope.APP_CONTROLS,),
 }
 
 
@@ -280,7 +286,7 @@ class InterviewSource(StrEnum):
 
 class CandidateSource(StrEnum):
     SHEET = "sheet"  # the DP sheet's candidate name on the requisition's row
-    MANUAL = "manual"  # added by the admin team or a panelist
+    MANUAL = "manual"  # added by the GTD admin team or a panelist
     KARAT = "karat"
 
 

@@ -1,4 +1,4 @@
-"""Admin demand owner and admin team: upload the DP sheet, see past imports."""
+"""GTD team admin and GTD admin team: upload the DP sheet, see past imports."""
 
 from datetime import date
 from urllib.parse import quote

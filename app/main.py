@@ -34,6 +34,7 @@ from app.routers import (
     raise_demand,
     rate_card,
     reconciliation,
+    requests,
     user_access,
     view_switcher,
 )
@@ -57,6 +58,7 @@ ROUTERS = [
     user_access.router,
     account_settings.router,
     accounts.router,
+    requests.router,
     cron.router,
 ]
 

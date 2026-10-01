@@ -309,7 +309,7 @@ def test_renamed_column_via_settings(client: Client, db: Session) -> None:
         "col_req_id": "GTD Req Code",
         "blank_values": "0, -",
     }
-    client.as_user("kavya").post("/settings/dp-columns", data=form)
+    client.as_user("anil").post("/settings/dp-columns", data=form)
     db.expire_all()
     assert db.get_one(Account, 1).settings.dp_columns["req_id"] == "GTD Req Code"
     assert upload(client.as_user("farah"), data).status_code == 303  # type: ignore[attr-defined]
@@ -317,7 +317,7 @@ def test_renamed_column_via_settings(client: Client, db: Session) -> None:
 
 def test_dp_columns_setting_validation(client: Client) -> None:
     form = {f"col_{f}": v for f, v in CFG.dp_columns.items()} | {"col_status": "", "blank_values": ""}
-    r = client.as_user("kavya").post("/settings/dp-columns", data=form)
+    r = client.as_user("anil").post("/settings/dp-columns", data=form)
     assert "err=" in r.headers["location"]
     form = {f"col_{f}": v for f, v in CFG.dp_columns.items()} | {"col_status": "Status Group"}
     r = client.post("/settings/dp-columns", data=form)

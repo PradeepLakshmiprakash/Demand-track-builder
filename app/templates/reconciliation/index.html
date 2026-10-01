@@ -28,7 +28,7 @@
   <section class="panel panel-body"><p style="margin:0">No DP sheet imported yet. <a href="/imports">Upload the first one.</a></p></section>
 {% else %}
 {% if not is_latest %}<div class="flash bad" role="status">This is an older sheet, shown as it was. Only the latest sheet can be matched or changed.</div>{% endif %}
-{% for w in s.get('warnings', []) %}<div class="flash bad" role="status">{{ w }}{% if 'mapping' in w %} <a href="/settings#status-mapping">Open settings</a>{% endif %}</div>{% endfor %}
+{% for w in s.get('warnings', []) %}<div class="flash bad" role="status">{{ w }}{% if 'mapping' in w %} <a href="/requests">Ask the Administrator to map it</a>{% endif %}</div>{% endfor %}
 
 <div class="cards six">
   <div class="card"><div class="k">Sent to GTD</div><div class="v">{{ s.get('sent', 0) }}</div><div class="s">Expected in the sheet</div></div>
@@ -101,7 +101,7 @@
               </select>
               {% if guess %}<span class="hint">Matches the sheet's originator.</span>{% elif r.originator %}<span class="hint">No user matches "{{ r.originator }}".</span>{% endif %}
             </label>
-            <label class="f">Business unit <span class="hint">(only when the owner is the admin demand owner)</span>
+            <label class="f">Business unit <span class="hint">(only when the owner is the GTD team admin)</span>
               <select name="bu_id"><option value="">Owner's BU</option>{% for b in bus %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select>
             </label>
             <div><button class="btn small">Create demand from row</button></div>

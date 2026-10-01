@@ -1,4 +1,4 @@
-"""Admin demand owner and leadership: offer margin approvals."""
+"""GTD team admin and leadership: offer margin approvals."""
 
 from urllib.parse import quote
 
@@ -61,7 +61,7 @@ async def set_channel(
     approval_id: int, request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     if actor.role is not Role.ADMIN:
-        return _back(err="Only the admin demand owner changes an offer's details.")
+        return _back(err="Only the GTD team admin changes an offer's details.")
     try:
         margin_service.set_channel(db, actor, approval_id, str((await request.form()).get("channel") or ""))
     except ApprovalError as e:
@@ -75,7 +75,7 @@ async def request_approval(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     if actor.role is not Role.ADMIN:
-        return _back(err="Only the admin demand owner raises an offer approval.")
+        return _back(err="Only the GTD team admin raises an offer approval.")
     f = await request.form()
     try:
         margin_service.request(

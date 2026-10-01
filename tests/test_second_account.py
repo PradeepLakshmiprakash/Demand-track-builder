@@ -50,7 +50,7 @@ def test_accounts_do_not_see_each_other(client: Client) -> None:
     acme = client.as_user("grace").get("/api/demands").json()
     assert {d["app_ref"] for d in acme} == {f"DM-00010{i}" for i in range(1, 7)}
     assert client.get("/demands/DM-000142").status_code == 404
-    page = client.get("/settings").text
+    page = client.as_user("rosa").get("/settings").text  # Acme's Administrator
     assert "Req #" in page and "Offer Pending" in page and "Code Requisition" not in page
     rates = client.get("/rate-card").text
     assert "Partner network" in rates and "Sogeti" not in rates
@@ -94,7 +94,7 @@ def _person(email: str, role: str, bu: str = "CLAIMS") -> dict[str, object]:
 
 
 def test_an_interviewer_cannot_join_a_second_account(client: Client, db: Session) -> None:
-    grace = client.as_user("grace")
+    grace = client.as_user("rosa")
     for role in ("interviewer", "demand_owner", "leadership"):
         r = grace.post("/users", data=_person("vikram.p@example.com", role))
         assert r.status_code == 400 and "is an interviewer in Discover NA" in r.text, role
@@ -103,7 +103,7 @@ def test_an_interviewer_cannot_join_a_second_account(client: Client, db: Session
 
 
 def test_someone_in_another_account_cannot_become_an_interviewer(client: Client) -> None:
-    r = client.as_user("grace").post("/users", data=_person("priya.n@example.com", "interviewer"))
+    r = client.as_user("rosa").post("/users", data=_person("priya.n@example.com", "interviewer"))
     assert r.status_code == 400 and "already works in Discover NA" in r.text
     # and a shared person can't be switched to interviewer in either account
     form = {
@@ -127,7 +127,7 @@ def test_an_interviewer_cannot_be_a_new_accounts_admin(client: Client) -> None:
         "admin_name": "Vikram P.",
         "admin_email": "vikram.p@example.com",
     }
-    r = client.as_user("kavya").post("/platform/accounts", data=form)
+    r = client.as_user("anil").post("/platform/accounts", data=form)
     assert "err=" in r.headers["location"] and "interviewer" in r.headers["location"]
     assert "Nova Co" not in client.get("/platform/accounts").text
 
@@ -141,7 +141,7 @@ def test_adding_an_existing_person_gives_them_a_second_account(client: Client, d
         "scope": "own",
         "bu_ids": [str(bu_id("CLAIMS"))],
     }
-    r = client.as_user("grace").post("/users", data=form)
+    r = client.as_user("rosa").post("/users", data=form)
     assert r.status_code == 303, r.text
     priya = db.scalars(select(User).where(User.email == "priya.n@example.com")).one()
     assert priya.name == "Priya N."  # the existing person, not renamed
@@ -152,7 +152,7 @@ def test_adding_an_existing_person_gives_them_a_second_account(client: Client, d
 
 def test_deactivating_in_one_account_leaves_the_other(client: Client) -> None:
     sanjay = user_id("sanjay")
-    assert client.as_user("grace").post(f"/users/{sanjay}/active", data={"active": "0"}).status_code == 303
+    assert client.as_user("rosa").post(f"/users/{sanjay}/active", data={"active": "0"}).status_code == 303
     c = client.as_user("sanjay")
     assert c.get("/overview").status_code == 200  # Discover
     assert c.get(f"/switch-account/{account_id(ACME)}").status_code == 404
@@ -162,7 +162,7 @@ def test_deactivating_in_one_account_leaves_the_other(client: Client) -> None:
 
 
 def test_acme_reads_its_own_sheet_format_and_rate_card(client: Client, db: Session) -> None:
-    client.as_user("tomas")  # Acme admin team
+    client.as_user("tomas")  # Acme GTD admin team
     upload(client, sample_sheet_acme.build())
     assert demand(db, "DM-000102").status == "coverage_required"  # "Sourcing" → coverage required
     assert demand(db, "DM-000101").status == "interviewing"  # Candidate P's panel is scheduled
@@ -210,11 +210,12 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
         "admin_name": "Pat Q.",
         "admin_email": "pat.q@example.com",
     }
-    _post(client.as_user("kavya"), "/platform/accounts", admin_form)
+    _post(client.as_user("anil"), "/platform/accounts", admin_form)
     assert "Globex Retail" in client.get("/platform/accounts").text
 
-    # 2. Its admin demand owner sets it up in Account settings.
-    pat = client.as_user("pat")
+    # 2. The Administrator (whoever created the account) sets it up in Account settings.
+    assert client.as_user("pat").get("/settings").status_code == 403  # the GTD team admin asks, never edits
+    pat = client.as_user("anil", "Globex Retail")
     assert pat.get("/settings").status_code == 200
     _post(pat, "/settings/business-units", {"name": "Stores"})
     _post(
@@ -290,7 +291,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
         },
     )
 
-    # 3. People: a new demand owner, and someone from Discover's admin team who helps here too.
+    # 3. People: a new demand owner, and someone from Discover's GTD admin team who helps here too.
     _post(
         pat,
         "/users",
@@ -337,7 +338,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
     d = demand(db, ref)
     assert d.account_id == account_id("Globex Retail") and d.status == "submitted"
 
-    farah = client.as_user("farah", "Globex Retail")  # works here as admin team too
+    farah = client.as_user("farah", "Globex Retail")  # works here as GTD admin team too
     _post(farah, "/gtd-queue/send-mail", {})
     assert any("Globex Retail" in m.subject for m in mail.sent)
     _post(farah, f"/gtd-queue/{d.id}/link", {"gtd_req_id": "GX0001"})
@@ -373,7 +374,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
     assert "Globex Retail" in client.get("/overview").text
     escalation_service.sweep(db, account_id("Globex Retail"))
 
-    # 5. Still isolated, and Farah is still admin team in Discover.
+    # 5. Still isolated, and Farah is still GTD admin team in Discover.
     assert client.as_user("kavya").get(f"/demands/{ref}").status_code == 404
     assert client.as_user("pat").get("/demands/DM-000142").status_code == 404
     farah_roles = {
@@ -385,7 +386,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
 
 def test_deactivated_account_blocks_its_people(client: Client) -> None:
     acme = account_id(ACME)
-    kavya = client.as_user("kavya")
+    kavya = client.as_user("anil")
     _post(kavya, f"/platform/accounts/{acme}/active", {"active": "0"})
     assert client.as_user("grace").get("/demands").status_code == 403  # Acme only
     c = client.as_user("sanjay")

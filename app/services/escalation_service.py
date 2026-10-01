@@ -77,7 +77,7 @@ AGING_STAGES = frozenset(
         DemandStatus.OFFER_IN_MARKET,
     }
 )
-# L1: admin demand owner and admin team. L2: leadership, and the admin demand owner (confirmed 24 Sep).
+# L1: GTD team admin and GTD admin team. L2: leadership, and the GTD team admin (confirmed 24 Sep).
 RESOLVERS = {1: (Role.ADMIN, Role.ADMIN_TEAM), 2: (Role.LEADERSHIP, Role.ADMIN)}
 
 
@@ -489,7 +489,7 @@ def _compose(
 
 
 def can_resolve(actor: Actor, esc: Escalation) -> bool:
-    """L1: admin demand owner and admin team. L2: leadership and the admin demand owner."""
+    """L1: GTD team admin and GTD admin team. L2: leadership and the GTD team admin."""
     return esc.status == EscalationStatus.OPEN.value and actor.role in RESOLVERS[esc.level]
 
 
@@ -522,11 +522,7 @@ def resolve(
     if esc.status != EscalationStatus.OPEN.value:
         raise EscalationError("This escalation is already resolved.")
     if not can_resolve(actor, esc):
-        who = (
-            "the admin demand owner or admin team"
-            if esc.level == 1
-            else "leadership or the admin demand owner"
-        )
+        who = "the GTD team admin or GTD admin team" if esc.level == 1 else "leadership or the GTD team admin"
         raise EscalationError(f"An L{esc.level} escalation is resolved by {who}.")
     account = db.get_one(Account, actor.account_id)
     if reason not in account.settings.resolution_reasons:
@@ -587,7 +583,7 @@ def _mail_owner_returned(db: Session, demand: Demand, reason: str, comment: str 
         f"{demand.app_ref} ({demand.name}) was sent back to you for correction.\n"
         f"Reason: {reason}"
         + (f"\nWhat to fix: {comment}" if comment else "")
-        + f"\n\nCorrect it and resubmit; it then goes back to the admin team for GTD:\n{link}"
+        + f"\n\nCorrect it and resubmit; it then goes back to the GTD admin team for GTD:\n{link}"
     )
     mail.send(
         mail.Mail(to=[owner.email], subject=f"[{demand.app_ref}] Please correct and resubmit", text=text)

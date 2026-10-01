@@ -1,4 +1,4 @@
-"""Accounts: the platform admin creates a client account, names its first admin demand owner, and can
+"""Accounts: the platform admin creates a client account, names its first GTD team admin, and can
 deactivate it. Everything else about the client is set by that admin in the account's own settings.
 
 A new account starts either blank (defaults only) or with a copy of another account's settings: lists,
@@ -83,7 +83,7 @@ def create_account(
     except (ZoneInfoNotFoundError, ValueError) as e:
         raise PlatformError(f"Unknown time zone: {timezone}") from e
     if len(admin_name) < 2 or "@" not in admin_email:
-        raise PlatformError("Name the account's first admin demand owner, with their email.")
+        raise PlatformError("Name the account's first GTD team admin, with their email.")
 
     account = Account(name=name, active=True)
     if copy_from:
@@ -111,6 +111,17 @@ def create_account(
             account_id=account.id, role=Role.ADMIN.value, visibility_scope=Scope.FULL.value, active=True
         )
     )
+    # Whoever creates the account runs its controls: they become its Administrator.
+    creator = db.get_one(User, actor.id)
+    if creator.id != admin.id and creator.membership(account.id) is None:
+        creator.memberships.append(
+            UserAccount(
+                account_id=account.id,
+                role=Role.ADMINISTRATOR.value,
+                visibility_scope=Scope.APP_CONTROLS.value,
+                active=True,
+            )
+        )
     db.commit()
     return account
 

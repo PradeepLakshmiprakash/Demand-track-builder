@@ -198,7 +198,7 @@ def test_l2_request_approval_and_scheduling(client: Client, db: Session) -> None
         Interview, req.id
     ).decided_by == user_id("priya")
 
-    # Staffing arranged it; the admin team records it with no interviewer yet, then assigns one.
+    # Staffing arranged it; the GTD admin team records it with no interviewer yet, then assigns one.
     team = client.as_user("farah")
     assert "Candidate Z" in team.get("/candidates?tab=to_schedule").text
     team.post(

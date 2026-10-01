@@ -1,6 +1,7 @@
 """All tables. Import from here so Alembic and the app see the full metadata."""
 
 from app.models.account import Account, BusinessUnit
+from app.models.admin_request import AdminRequest
 from app.models.commercial import OfferApproval, RateCard
 from app.models.demand import Demand
 from app.models.escalation import Escalation, EscalationEvent
@@ -10,6 +11,7 @@ from app.models.sheet import ExcelImport, ExcelRow, StageEvent
 from app.models.user import InterviewerProfile, User, UserAccount, UserBusinessUnit, UserPractice, member_of
 
 __all__ = [
+    "AdminRequest",
     "Account",
     "BusinessUnit",
     "Candidate",

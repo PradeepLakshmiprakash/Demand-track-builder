@@ -1,4 +1,4 @@
-"""Admin demand owner: the vendor rate card (dated cost rates per hour)."""
+"""GTD team admin: the vendor rate card (dated cost rates per hour)."""
 
 from datetime import date
 from urllib.parse import quote

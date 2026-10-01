@@ -1,6 +1,6 @@
 """GTD queue: demands waiting to be entered on GTD, and linking the requisition ID GTD generates.
 
-The app has no view into GTD. The admin demand owner or the admin team enters each demand there by
+The app has no view into GTD. The GTD team admin or the GTD admin team enters each demand there by
 hand (name prefixed `[DM-000142] …`) and pastes the requisition ID back. That link is the key the
 DP sheet reconciles on, so an ID can be linked only once, ever.
 """

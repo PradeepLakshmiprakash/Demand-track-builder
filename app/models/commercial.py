@@ -34,7 +34,7 @@ class RateCard(Base):
 
 class OfferApproval(Base):
     """Margin check for an offer (flow-artifact §8). Priced from the client bill rate and the dated rate
-    card; routed to the admin demand owner at or above the account's margin cut-off, else leadership.
+    card; routed to the GTD team admin at or above the account's margin cut-off, else leadership.
     Until both rates are known it waits unpriced (no route) with the reason in `blocked_reason`."""
 
     __tablename__ = "offer_approvals"

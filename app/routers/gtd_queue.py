@@ -1,4 +1,4 @@
-"""Admin demand owner and admin team: demands to enter on GTD, and linking the requisition IDs."""
+"""GTD team admin and GTD admin team: demands to enter on GTD, and linking the requisition IDs."""
 
 from typing import Any
 from urllib.parse import quote

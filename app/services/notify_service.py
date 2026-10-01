@@ -1,6 +1,6 @@
 """The daily admin mail (flow-artifact §4).
 
-At each account's mail time, the admin demand owner and the admin team get the demands submitted since
+At each account's mail time, the GTD team admin and the GTD admin team get the demands submitted since
 the last mail (status → notified) plus a reminder of earlier ones still without a requisition ID.
 Each mail is recorded as a notification batch. It goes out once per account per day unless forced.
 """
@@ -90,7 +90,7 @@ def send_daily_admin_mail(
         return MailResult(None, "Nothing to send: no demands are waiting for GTD entry.")
     to = recipients(db, account.id)
     if not to:
-        return MailResult(None, "No active admin demand owner or admin team member to send to.")
+        return MailResult(None, "No active GTD team admin or GTD admin team member to send to.")
 
     local = local_now(account, now)
     batch = NotificationBatch(account_id=account.id, sent_at=local, demand_ids=[d.id for d in new])

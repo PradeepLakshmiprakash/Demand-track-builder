@@ -25,7 +25,7 @@ THRESHOLDS = {
 
 @pytest.fixture
 def admin(client: Client) -> Client:
-    return client.as_user("kavya")
+    return client.as_user("anil")
 
 
 def account(db: Session) -> Account:

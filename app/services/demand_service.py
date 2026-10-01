@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, false, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core import storage
@@ -40,6 +40,8 @@ def visible_demands(actor: Actor) -> Select[tuple[Demand]]:
         case Scope.ASSIGNED_INTERVIEWS:
             assigned = select(Interview.demand_id).where(Interview.interviewer_id == actor.id)
             return stmt.where(Demand.id.in_(assigned))
+        case Scope.APP_CONTROLS:
+            return stmt.where(false())  # the Administrator runs the app's controls and sees no demands
     raise AssertionError(actor.scope)
 
 

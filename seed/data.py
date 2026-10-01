@@ -104,6 +104,8 @@ USERS = [
         ["DMN-FS"],
         (["Mainframe", "COBOL"], "C1"),
     ),
+    # Runs the app's controls on request; sees no demands. Also the platform admin (Accounts screen).
+    ("anil", "Anil V.", "anil.v@example.com", "administrator", "E1", "app_controls", [], [], None),
 ]
 
 J, S, A = "Java", "Spring Boot", "AWS"

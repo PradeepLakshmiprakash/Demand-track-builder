@@ -31,12 +31,10 @@ def owner_of(db: Session, ref: str) -> User:
 
 def test_owner_sees_where_the_offer_is_without_the_numbers(client: Client, db: Session) -> None:
     import_sample(client)
-    owner = owner_of(db, "DM-000131")  # B1 Sogeti, 43.75%: with the admin demand owner
+    owner = owner_of(db, "DM-000131")  # B1 Sogeti, 43.75%: with the GTD team admin
     assert owner.id == user_id("rahul")
     text = client.as_user("rahul").get("/demands/DM-000131").text
-    assert (
-        "Offer approval" in text and "Waiting for approval" in text and "with the admin demand owner" in text
-    )
+    assert "Offer approval" in text and "Waiting for approval" in text and "with the GTD team admin" in text
     assert "margin 4" not in text and "43.8" not in text and "$45" not in text
 
     admin_view = client.as_user("kavya").get("/demands/DM-000131").text

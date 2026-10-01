@@ -118,12 +118,12 @@ def test_end_a_rate(db: Session) -> None:
 
 
 def test_rate_card_screen(client: Client) -> None:
-    client.as_user("kavya")
+    client.as_user("anil")
     assert "Sogeti" in client.get("/rate-card").text
     r = client.post("/rate-card", data={"channel": "fte", "region": "CA", "grade": "E1", "practice": "",
                                         "cost_rate": "120", "effective_from": "2027-01-01"})  # fmt: skip
     assert "msg=Rate+added" in r.headers["location"] or "msg=Rate%20added" in r.headers["location"]
-    assert client.as_user("farah").get("/rate-card").status_code == 403  # admin demand owner only
+    assert client.as_user("farah").get("/rate-card").status_code == 403  # GTD team admin only
 
 
 # --- Offer approvals ------------------------------------------------------------------------------
@@ -170,7 +170,7 @@ def test_leadership_exception_needs_a_comment(client: Client, db: Session) -> No
     below = offer_for(db, "DM-000121")
     with pytest.raises(ApprovalError, match="why the exception"):
         margin_service.decide(db, lead, below.id, "approved", "")
-    with pytest.raises(ApprovalError, match="decided by the admin demand owner"):
+    with pytest.raises(ApprovalError, match="decided by the GTD team admin"):
         margin_service.decide(db, lead, offer_for(db, "DM-000131").id, "approved", "fine")
     a = margin_service.decide(db, lead, below.id, "approved", "Strategic account, client pays in Q4")
     assert a.decision == "approved" and a.margin_pct == Decimal("24.84")
@@ -205,7 +205,7 @@ def test_missing_rate_card_entry_blocks_until_added(client: Client, db: Session)
     import_sample(client)
     a = offer_for(db, "DM-000131")
     assert "No rate card entry for B1" in (a.blocked_reason or "")
-    client.as_user("kavya").post(
+    client.as_user("anil").post(
         "/rate-card",
         data={
             "channel": "sogeti",
@@ -362,7 +362,7 @@ UPLOAD = (
 
 
 def test_upload_rates_csv(client: Client, db: Session) -> None:
-    client.as_user("kavya")
+    client.as_user("anil")
     r = client.post("/rate-card/upload", files={"file": ("rates.csv", UPLOAD.encode(), "text/csv")})
     assert "2+rates+imported" in r.headers["location"] or "2%20rates%20imported" in r.headers["location"]
     kw = {"region": "US", "on": date(2027, 2, 1)}
@@ -387,7 +387,7 @@ def test_upload_rates_xlsx(client: Client, db: Session) -> None:
     ws.append(["FTE external hire", "CA", "E1", "Any", 101, date(2027, 3, 1), None])
     buf = io.BytesIO()
     wb.save(buf)
-    client.as_user("kavya").post(
+    client.as_user("anil").post(
         "/rate-card/upload", files={"file": ("rates.xlsx", buf.getvalue(), "application/octet-stream")}
     )
     r = rate_card_service.lookup(
@@ -399,7 +399,7 @@ def test_upload_rates_xlsx(client: Client, db: Session) -> None:
 def test_upload_is_all_or_nothing(client: Client, db: Session) -> None:
     bad = UPLOAD + "Carrier pigeon,US,C1,Any,10,2027-01-01,\nSogeti,US,Z9,Any,10,2027-01-01,\n"
     before = db.scalar(select(func.count()).select_from(RateCard))
-    r = client.as_user("kavya").post(
+    r = client.as_user("anil").post(
         "/rate-card/upload", files={"file": ("rates.csv", bad.encode(), "text/csv")}
     )
     location = r.headers["location"]
@@ -410,14 +410,14 @@ def test_upload_is_all_or_nothing(client: Client, db: Session) -> None:
 
 
 def test_upload_needs_the_columns(client: Client) -> None:
-    r = client.as_user("kavya").post(
+    r = client.as_user("anil").post(
         "/rate-card/upload", files={"file": ("r.csv", b"Grade,Cost\nC1,5\n", "text/csv")}
     )
     assert "Missing+columns" in r.headers["location"] or "Missing%20columns" in r.headers["location"]
 
 
 def test_export_is_the_upload_template(client: Client) -> None:
-    r = client.as_user("kavya").get("/rate-card/export.csv")
+    r = client.as_user("anil").get("/rate-card/export.csv")
     lines = r.text.splitlines()
     assert lines[0] == ",".join(rate_card_service.UPLOAD_COLUMNS)
     assert "Sogeti,US,C1,Any,60.00,2026-01-01," in lines

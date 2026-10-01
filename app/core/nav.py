@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.core.enums import Role
 
 DO, AD, AT, LD, IV = Role.DEMAND_OWNER, Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP, Role.INTERVIEWER
+ADM = Role.ADMINISTRATOR  # app controls only: no demand screens
 
 
 @dataclass(frozen=True)
@@ -37,12 +38,13 @@ NAV: tuple[NavItem, ...] = (
     NavItem("reconciliation", "/reconciliation", _same("Reconciliation", AD, AT), phase=3, ready=True),
     NavItem("escalations", "/escalations", _same("Escalations", AD, AT, LD), phase=4, ready=True),
     NavItem("approvals", "/approvals", _same("Offer approvals", AD, LD), phase=5, ready=True),
-    NavItem("rate_card", "/rate-card", _same("Rate card", AD), phase=5, ready=True),
+    NavItem("requests", "/requests", {AD: "Requests to administrator", ADM: "Requests"}, phase=8, ready=True),
     NavItem("candidates", "/candidates", _same("Candidates", AD, AT), phase=6, ready=True),
     NavItem("interviews", "/interviews", _same("My interviews", IV), phase=6, ready=True),
     NavItem("interviewer_profiles", "/interviewers", _same("Interviewer profiles", AD), phase=6, ready=True),
-    NavItem("users", "/users", _same("User access", AD), ready=True),
-    NavItem("settings", "/settings", _same("Account settings", AD), ready=True),
+    NavItem("users", "/users", _same("User access", ADM), ready=True),
+    NavItem("settings", "/settings", _same("Account settings", ADM), ready=True),
+    NavItem("rate_card", "/rate-card", _same("Rate card", ADM), phase=5, ready=True),
 )
 
 BY_KEY = {n.key: n for n in NAV}
@@ -52,8 +54,8 @@ def menu_for(role: Role) -> list[NavItem]:
     return [n for n in NAV if role in n.labels]
 
 
-# Where each role lands. The admin demand owner's day starts on the demands, not the overview.
-HOME = {AD: "demands"}
+# Where each role lands. The GTD team admin's day starts on the demands, not the overview.
+HOME = {AD: "demands", ADM: "requests"}
 
 
 def home_for(role: Role) -> str:

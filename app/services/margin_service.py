@@ -3,7 +3,7 @@
 When a demand reaches Offer in process, its candidate's offer is priced:
     margin = (client bill rate − vendor cost rate) ÷ client bill rate
 with the cost from the rate card in force on the offer date. At or above the account's cut-off (30% for
-Discover) the admin demand owner approves or declines; below it, leadership decides at their
+Discover) the GTD team admin approves or declines; below it, leadership decides at their
 discretion (confirmed 24 Sep). Every decision records approver, margin and time.
 
 An offer whose bill rate, supply channel or rate card entry is missing waits unpriced, with the reason
@@ -167,7 +167,7 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
     if approval.route is None:
         raise ApprovalError(f"Can't decide yet: {approval.blocked_reason}")
     if not can_decide(actor, approval):
-        who = "the admin demand owner" if approval.route == ApprovalRoute.ADMIN.value else "leadership"
+        who = "the GTD team admin" if approval.route == ApprovalRoute.ADMIN.value else "leadership"
         cut = f"{account.margin_threshold:g}%"
         raise ApprovalError(f"A {approval.margin_pct}% margin offer is decided by {who} (cut-off {cut}).")
     try:
@@ -248,12 +248,12 @@ def for_demand(db: Session, demand_id: int) -> list[OfferStatus]:
         elif a.decision == Decision.DECLINED.value:
             out.append(OfferStatus(c.name, "Declined", "esc", f"by {who}, {when}: {a.comment}", a))
         elif a.route == ApprovalRoute.ADMIN.value:
-            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with the admin demand owner", a))
+            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with the GTD team admin", a))
         elif a.route == ApprovalRoute.LEADERSHIP.value:
             out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with leadership", a))
         else:
             out.append(
-                OfferStatus(c.name, "Being priced", "gray", "the admin team is completing the details", a)
+                OfferStatus(c.name, "Being priced", "gray", "the GTD admin team is completing the details", a)
             )
     return out
 

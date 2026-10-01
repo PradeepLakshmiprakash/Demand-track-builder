@@ -83,6 +83,7 @@ DELIVERY_HEADS = {
 # belong to one account only, so Acme has its own (Nadia).
 USERS = [
     ("grace", "Grace H.", "grace.h@example.com", "admin", "L6", "full", BUSINESS_UNITS, [], None),
+    ("rosa", "Rosa D.", "rosa.d@example.com", "administrator", "L6", "app_controls", [], [], None),
     ("tomas", "Tomas R.", "tomas.r@example.com", "admin_team", "L3", "full", BUSINESS_UNITS, [], None),
     ("lena", "Lena W.", "lena.w@example.com", "demand_owner", "L5", "own", ["CLAIMS"], [], None),
     ("marco", "Marco B.", "marco.b@example.com", "demand_owner", "L5", "own_bu_read", ["POLICY"], [], None),
