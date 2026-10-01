@@ -191,6 +191,37 @@ class EscalationType(StrEnum):
         )
 
 
+class Severity(StrEnum):
+    """How urgent an escalation is. Sets how long the responsible person has to respond."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+    @property
+    def label(self) -> str:
+        return self.value.capitalize()
+
+
+class Responsible(StrEnum):
+    """Who has to act on an escalation. Everyone else is only informed."""
+
+    GTD_TEAM = "gtd_team"
+    DEMAND_OWNER = "demand_owner"
+    INTERVIEWER = "interviewer"
+
+    @property
+    def label(self) -> str:
+        return RESPONSIBLE_LABELS[self.value]
+
+
+RESPONSIBLE_LABELS = {
+    "gtd_team": "GTD admin team",
+    "demand_owner": "Demand owner",
+    "interviewer": "Interviewer",
+}
+
+
 class EscalationStatus(StrEnum):
     OPEN = "open"
     RESOLVED = "resolved"
@@ -198,10 +229,11 @@ class EscalationStatus(StrEnum):
 
 class ResolutionAction(StrEnum):
     RESUBMIT = "resubmit"  # back into the next admin mail; the new GTD ID chains to the old one
-    EXTEND = "extend"  # stays open at L1 with a new due date
+    EXTEND = "extend"  # stays open at its level with a new due date
     CLOSE = "close"  # the demand is closed
     NO_ACTION = "no_action"  # the condition has already cleared (e.g. the ID was linked late)
     RETURN = "return"  # back to the demand owner to correct; they resubmit
+    NEW_START = "new_start"  # past start: the owner gives a revised start date
 
     @property
     def label(self) -> str:
@@ -211,6 +243,7 @@ class ResolutionAction(StrEnum):
             "close": "Close demand",
             "no_action": "No further action (condition cleared)",
             "return": "Send back to demand owner for correction",
+            "new_start": "Revise the start date",
         }[self.value]
 
 

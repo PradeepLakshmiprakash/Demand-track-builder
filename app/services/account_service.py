@@ -9,7 +9,15 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.account_config import DP_FIELD_LABELS, DP_FIELDS, AccountConfig, StatusMapping, SupplyChannel
+from app.core.account_config import (
+    DP_FIELD_LABELS,
+    DP_FIELDS,
+    AccountConfig,
+    EscalationRule,
+    StatusMapping,
+    SupplyChannel,
+)
+from app.core.enums import EscalationType, Severity
 from app.models import Account, BusinessUnit, Demand, UserBusinessUnit
 
 
@@ -19,8 +27,8 @@ class SettingsError(ValueError):
 
 class Thresholds(BaseModel):
     grace_days: int = Field(ge=0, le=60)
-    l1_sla_days: int = Field(ge=1, le=60)
-    l2_sla_days: int = Field(ge=1, le=60)
+    l1_sla_days: int = Field(2, ge=1, le=60)  # superseded by response days per severity
+    l2_sla_days: int = Field(3, ge=1, le=60)
     panel_timer_hours: int = Field(ge=1, le=720)
     aging_days: int = Field(ge=1, le=365)
     rejection_limit: int = Field(ge=1, le=50)
@@ -190,5 +198,40 @@ def update_dp_columns(db: Session, account_id: int, headers: dict[str, str], bla
     cfg = acc.settings
     cfg.dp_columns = columns
     cfg.dp_blank_values = list(dict.fromkeys(b.strip() for b in blanks if b.strip()))
+    acc.settings = cfg
+    db.commit()
+
+
+def update_escalation_rules(db: Session, account_id: int, form: dict[str, str]) -> None:
+    """Per trigger: on/off, who is responsible, severity and the steps the email spells out; plus the
+    working days to respond per severity and who is informed when one goes overdue."""
+    acc = get_account(db, account_id)
+    cfg = acc.settings
+    rules = {}
+    for t in EscalationType:
+        steps = " ".join((form.get(f"steps_{t.value}") or "").split())
+        if not steps:
+            raise SettingsError(f"{t.label}: say what the responsible person should do.")
+        try:
+            rules[t.value] = EscalationRule(
+                enabled=form.get(f"enabled_{t.value}") == "on",
+                responsible=form.get(f"responsible_{t.value}", ""),  # type: ignore[arg-type]
+                severity=form.get(f"severity_{t.value}", ""),  # type: ignore[arg-type]
+                steps=steps[:400],
+            )
+        except ValidationError as e:
+            raise SettingsError(f"{t.label}: {_errors(e)}") from e
+    days = {}
+    for sev in Severity:
+        raw = (form.get(f"days_{sev.value}") or "").strip()
+        if not raw.isdigit() or not 1 <= int(raw) <= 30:
+            raise SettingsError(f"{sev.label} severity: days to respond must be 1 to 30.")
+        days[sev.value] = int(raw)
+    if not days["high"] <= days["medium"] <= days["low"]:
+        raise SettingsError("Higher severity can't have more days to respond than a lower one.")
+    cfg.escalation_rules = rules
+    cfg.response_days = days
+    cfg.l2_inform_leadership = form.get("inform_leadership") == "on"
+    cfg.l2_inform_delivery_head = form.get("inform_delivery_head") == "on"
     acc.settings = cfg
     db.commit()

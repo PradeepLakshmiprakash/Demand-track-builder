@@ -1,7 +1,8 @@
-"""GTD team admin, GTD admin team and leadership: open escalations, and resolving them.
+"""Escalations: opened automatically, closed only with a reason and an action.
 
-Opened automatically; closed only with a reason and an action. L1 is resolved by the admin demand
-owner or GTD admin team, L2 by leadership.
+The responsible party responds: the GTD admin team for what is theirs to do, the demand owner for
+their own demands (they see only those). Leadership and the GTD team admin see everything; leadership
+is informed, never the one to act.
 """
 
 from datetime import UTC, date, datetime
@@ -48,7 +49,8 @@ def escalations_page(
     status = q.get("status", "open")
     level = _int(q.get("level"))
     type_ = q.get("type") if q.get("type") in {t.value for t in EscalationType} else None
-    items = svc.listing(db, actor.account_id, status=status, level=level, type_=type_)
+    mine = actor.id if actor.role is Role.DEMAND_OWNER else None  # owners: their own demands only
+    items = svc.listing(db, actor.account_id, status=status, level=level, type_=type_, owner_id=mine)
     account = db.get_one(Account, actor.account_id)
     now = datetime.now(UTC)
 
@@ -58,7 +60,7 @@ def escalations_page(
         pool = (
             items
             if any(e.id == sel_id for e, _ in items)
-            else svc.listing(db, actor.account_id, status="all")
+            else svc.listing(db, actor.account_id, status="all", owner_id=mine)
         )
         selected = next(((e, d) for e, d in pool if e.id == sel_id), None)
 
@@ -84,7 +86,10 @@ def escalations_page(
             "audience": svc.audience(db, account, esc, d),
             "actions": svc.allowed_actions(db, account, esc, d) if esc.status == "open" else [],
             "cleared": esc.status == "open" and svc.is_cleared(db, account, esc, d, now),
-            "can_resolve": svc.can_resolve(actor, esc),
+            "can_resolve": svc.can_resolve(actor, esc, d),
+            "who_acts": svc.who_acts(esc),
+            "steps": account.settings.rule_for(esc.type).steps,
+            "is_owner": actor.id == d.owner_id,
             "reasons": account.settings.resolution_reasons,
             "names": names,
             "action_labels": {a.value: a.label for a in ResolutionAction},
@@ -120,7 +125,7 @@ async def resolve(
         db.rollback()
         return _back(esc_id, "open", err=str(e))
     if esc.status == "open":
-        return _back(esc_id, "open", msg=f"Due date extended to {esc.due_at:%d %b}; back at L1")
+        return _back(esc_id, "open", msg=f"Due date extended to {esc.due_at:%d %b}")
     return _back(esc_id, "resolved", msg="Escalation resolved")
 
 

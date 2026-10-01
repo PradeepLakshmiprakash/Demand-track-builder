@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.account_config import DEFAULT_RULES
 from app.core.db import Base
 from app.models import (
     Account,
@@ -113,6 +114,7 @@ def load(db: Session, now: datetime | None = None) -> None:
         esc = Escalation(
             demand_id=demands[ref].id, type=etype, level=esc_level, status="open", detail=detail,
             opened_at=opened, due_at=due, notified_level=esc_level,  # seeded as already mailed
+            severity=DEFAULT_RULES[etype][1].value, responsible=DEFAULT_RULES[etype][0].value,
         )  # fmt: skip
         db.add(esc)
         db.flush()

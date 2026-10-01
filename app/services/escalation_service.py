@@ -10,13 +10,21 @@ Triggers (§9.1):
   rejection limit panel rejections recorded in the app reach the account's limit (confirmed 24 Sep)
   panel SLA       no feedback within the account's panel hours of a scheduled interview's time
 
-Ladder (§9.2): every escalation opens at L1 (the BU's LOB delivery head; demand owner and admins
-copied), due after the account's L1 working days. Past due, the sweep promotes it to L2 (account
-leadership), due after the L2 working days. A person closes it with a reason and an action.
+Who acts (§9.2, redesigned 1 Oct): each trigger has a rule in Account settings: on or off, the
+*responsible* party (GTD admin team, demand owner or interviewer), a severity and the steps to take.
+The responsible person acts; everyone else is only informed.
 
-`sweep` runs every two hours: open new escalations, promote overdue ones, then mail whoever hasn't
-been told yet. Opening and mailing are separate (`notified_level`), so escalations opened by
-reconciliation are mailed by the next sweep and a failed mail is retried.
+- L1: the escalation opens with the rule's severity. The responsible person is mailed what to do and
+  by when (working days per severity). The demand owner and the GTD team admin are copied.
+- L2: the due date passed with no response. Leadership and the BU's delivery head are informed; the
+  same responsible person still has to act and is reminded once a day until they do.
+- The responsible person closes it with a reason and an action. Asking for more time keeps its level.
+  A late-feedback escalation closes itself when the feedback arrives.
+
+`sweep` runs every two hours: open new escalations, mark overdue ones L2, close cleared feedback
+ones, then mail whoever hasn't been told yet and send the day's reminders. Opening and mailing are
+separate (`notified_level`), so escalations opened by reconciliation are mailed by the next sweep and
+a failed mail is retried.
 """
 
 from collections import defaultdict
@@ -39,7 +47,9 @@ from app.core.enums import (
     InterviewOutcome,
     InterviewStatus,
     ResolutionAction,
+    Responsible,
     Role,
+    Severity,
     StageOrigin,
 )
 from app.core.security import Actor
@@ -77,8 +87,7 @@ AGING_STAGES = frozenset(
         DemandStatus.OFFER_IN_MARKET,
     }
 )
-# L1: GTD team admin and GTD admin team. L2: leadership, and the GTD team admin (confirmed 24 Sep).
-RESOLVERS = {1: (Role.ADMIN, Role.ADMIN_TEAM), 2: (Role.LEADERSHIP, Role.ADMIN)}
+GTD_TEAM_ROLES = (Role.ADMIN, Role.ADMIN_TEAM)
 
 
 class EscalationError(ValueError):
@@ -89,10 +98,10 @@ def _tz(account: Account) -> ZoneInfo:
     return ZoneInfo(account.settings.timezone)
 
 
-def due_at(account: Account, opened: datetime, level: int = 1) -> datetime:
-    """End of the account's working day, N working days after `opened` (L1 or L2 SLA)."""
+def due_at(account: Account, opened: datetime, severity: str = Severity.MEDIUM.value) -> datetime:
+    """End of the account's working day, N working days after `opened`; N comes from the severity."""
     tz = _tz(account)
-    days = account.l1_sla_days if level == 1 else account.l2_sla_days
+    days = account.settings.response_days.get(severity, 2)
     day = add_working_days(opened.astimezone(tz).date(), days)
     return datetime.combine(day, time(23, 59), tz)
 
@@ -120,7 +129,11 @@ def _event(
 def open_escalation(
     db: Session, account: Account, demand: Demand, type_: EscalationType, detail: str, now: datetime
 ) -> Escalation | None:
-    """Open an L1 escalation unless one of this type is already open for the demand (then None)."""
+    """Open an escalation by the account's rule for this trigger. None when the trigger is switched
+    off, or one of this type is already open for the demand."""
+    rule = account.settings.rule_for(type_.value)
+    if not rule.enabled:
+        return None
     existing = db.scalar(
         select(Escalation.id).where(
             Escalation.demand_id == demand.id,
@@ -130,6 +143,9 @@ def open_escalation(
     )
     if existing is not None:
         return None
+    severity = rule.severity
+    if type_ is EscalationType.PAST_START and demand.position_type == "Billable":
+        severity = Severity.HIGH  # revenue is being lost every working day
     esc = Escalation(
         demand_id=demand.id,
         type=type_.value,
@@ -137,8 +153,10 @@ def open_escalation(
         status=EscalationStatus.OPEN.value,
         detail=detail,
         opened_at=now,
-        due_at=due_at(account, now),
+        due_at=due_at(account, now, severity.value),
         notified_level=0,
+        severity=severity.value,
+        responsible=rule.responsible.value,
     )
     db.add(esc)
     db.flush()
@@ -281,7 +299,7 @@ class SweepResult:
 
     @property
     def message(self) -> str:
-        return f"{len(self.opened)} opened, {len(self.promoted)} moved to L2, {self.mails} mails sent"
+        return f"{len(self.opened)} opened, {len(self.promoted)} overdue (L2), {self.mails} mails sent"
 
 
 def open_triggered(db: Session, account: Account, now: datetime, result: SweepResult) -> None:
@@ -350,6 +368,7 @@ def open_triggered(db: Session, account: Account, now: datetime, result: SweepRe
 
 
 def promote_overdue(db: Session, account: Account, now: datetime, result: SweepResult) -> None:
+    """No response by the due date: it becomes L2. The responsible person keeps the action."""
     overdue = db.scalars(
         select(Escalation)
         .join(Demand)
@@ -363,10 +382,28 @@ def promote_overdue(db: Session, account: Account, now: datetime, result: SweepR
     )
     for esc in overdue:
         esc.level = 2
-        esc.due_at = due_at(account, now, level=2)
-        _event(db, esc, EscalationEventKind.PROMOTED, note="L1 due date passed", at=now)
+        _event(db, esc, EscalationEventKind.PROMOTED, note="No response by the due date", at=now)
         d = db.get_one(Demand, esc.demand_id)
         result.promoted.append(f"{d.app_ref} {esc.type_enum.label.lower()}")
+
+
+def close_cleared_feedback(db: Session, account: Account, now: datetime) -> int:
+    """A late-feedback escalation is answered by submitting the feedback: close it once it's in."""
+    n = 0
+    for esc in db.scalars(
+        select(Escalation)
+        .join(Demand)
+        .where(
+            Demand.account_id == account.id,
+            Escalation.status == EscalationStatus.OPEN.value,
+            Escalation.type == EscalationType.PANEL_SLA.value,
+        )
+    ):
+        d = db.get_one(Demand, esc.demand_id)
+        if is_cleared(db, account, esc, d, now):
+            _close(db, esc, None, "Feedback submitted", ResolutionAction.NO_ACTION, None, now)
+            n += 1
+    return n
 
 
 def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepResult:
@@ -374,9 +411,10 @@ def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepRes
     account = db.get_one(Account, account_id)
     result = SweepResult()
     open_triggered(db, account, now, result)
+    close_cleared_feedback(db, account, now)
     promote_overdue(db, account, now, result)
     db.commit()
-    result.mails = notify_pending(db, account, now)
+    result.mails = notify_pending(db, account, now) + remind_overdue(db, account, now)
     return result
 
 
@@ -385,39 +423,68 @@ def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepRes
 
 @dataclass
 class Audience:
-    to: list[str]
-    cc: list[str]
-    names: list[str]  # for the screen: "LOB delivery head (Asha P.), demand owner, admin"
+    to: list[str]  # the responsible person or people: they act
+    cc: list[str]  # informed only
+    names: list[str]  # for the screen: "Demand owner (Priya N.) acts · informed: GTD team admin"
+    acts: str = ""  # who acts, in words
 
 
 def _users(db: Session, account_id: int, *roles: Role) -> list[User]:
     return list(db.scalars(select(User).where(member_of(account_id, *roles))))
 
 
+def responsible_people(db: Session, account: Account, esc: Escalation, demand: Demand) -> list[User]:
+    """The people who have to act on this escalation."""
+    who = esc.responsible_enum
+    if who is Responsible.DEMAND_OWNER:
+        owner = db.get_one(User, demand.owner_id)
+        people = [owner] if owner.active else []
+    elif who is Responsible.INTERVIEWER:
+        ids = db.scalars(
+            select(Interview.interviewer_id).where(
+                Interview.demand_id == demand.id,
+                Interview.status == InterviewStatus.SCHEDULED.value,
+                Interview.interviewer_id.is_not(None),
+            )
+        )
+        people = list(db.scalars(select(User).where(User.id.in_(set(ids)), User.active)))
+    else:
+        people = _users(db, account.id, *GTD_TEAM_ROLES)
+    # Nobody to act (owner left, interviewer not assigned): it falls to the GTD team admin.
+    return people or _users(db, account.id, Role.ADMIN)
+
+
 def audience(db: Session, account: Account, esc: Escalation, demand: Demand) -> Audience:
+    cfg = account.settings
     bu = db.get_one(BusinessUnit, demand.bu_id)
     owner = db.get_one(User, demand.owner_id)
-    owners_cfg = account.settings.escalation_owners
-    head = f"{owners_cfg.get('L1', 'LOB delivery head')}" + (
-        f" ({bu.delivery_head_name})" if bu.delivery_head_name else ""
-    )
-    head_mail = [bu.delivery_head_email] if bu.delivery_head_email else []
-    owner_mail = [owner.email] if owner.active else []
-    admins = [u.email for u in _users(db, account.id, Role.ADMIN, Role.ADMIN_TEAM)]
-    if esc.level == 1:
-        to = head_mail or [u.email for u in _users(db, account.id, Role.ADMIN)]
-        return Audience(to, sorted(set(owner_mail + admins) - set(to)), [head, "demand owner", "admin"])
-    leaders = [u.email for u in _users(db, account.id, Role.LEADERSHIP)]
-    to = leaders or [u.email for u in _users(db, account.id, Role.ADMIN)]
-    return Audience(
-        to,
-        sorted(set(head_mail + owner_mail) - set(to)),
-        [owners_cfg.get("L2", "Account leadership"), head, "demand owner"],
-    )
+    people = responsible_people(db, account, esc, demand)
+    to = [u.email for u in people]
+    acts = f"{esc.responsible_enum.label} ({', '.join(u.name for u in people)})"
+    informed, cc = [], []
+    if owner.active and owner.email not in to:
+        informed.append("demand owner")
+        cc.append(owner.email)
+    team_admin = [u.email for u in _users(db, account.id, Role.ADMIN) if u.email not in to]
+    if team_admin:
+        informed.append("GTD team admin")
+        cc += team_admin
+    if esc.level == 2:
+        if cfg.l2_inform_leadership:
+            informed.append(cfg.escalation_owners.get("L2", "leadership"))
+            cc += [u.email for u in _users(db, account.id, Role.LEADERSHIP)]
+        if cfg.l2_inform_delivery_head and bu.delivery_head_email:
+            head = cfg.escalation_owners.get("L1", "delivery head")
+            informed.append(f"{head} ({bu.delivery_head_name})" if bu.delivery_head_name else head)
+            cc.append(bu.delivery_head_email)
+    cc = sorted(set(cc) - set(to))
+    names = [f"{acts} acts"] + ([f"informed: {', '.join(informed)}"] if informed else [])
+    return Audience(to, cc, names, acts)
 
 
 def notify_pending(db: Session, account: Account, now: datetime) -> int:
-    """Mail each group of recipients once about every escalation they haven't heard about yet."""
+    """Mail each group of responsible people once about every escalation they haven't heard about yet
+    (L1: action needed; L2: overdue, with leadership and the delivery head informed)."""
     pending = list(
         db.scalars(
             select(Escalation)
@@ -430,19 +497,59 @@ def notify_pending(db: Session, account: Account, now: datetime) -> int:
             .order_by(Escalation.level.desc(), Escalation.opened_at)
         )
     )
-    groups: dict[tuple[int, tuple[str, ...]], list[tuple[Escalation, Demand, Audience]]] = defaultdict(list)
+    today = now.astimezone(_tz(account)).date()
+    sent = _mail_groups(db, account, pending, now, reminder=False)
     for esc in pending:
+        if esc.notified_level == 2:
+            esc.last_reminded_on = today  # the overdue mail counts as today's reminder
+    db.commit()
+    return sent
+
+
+def remind_overdue(db: Session, account: Account, now: datetime) -> int:
+    """Once a day, remind the responsible person about each overdue (L2) escalation they still owe."""
+    today = now.astimezone(_tz(account)).date()
+    due = [
+        esc
+        for esc in db.scalars(
+            select(Escalation)
+            .join(Demand)
+            .where(
+                Demand.account_id == account.id,
+                Escalation.status == EscalationStatus.OPEN.value,
+                Escalation.level == 2,
+                Escalation.notified_level >= 2,
+                Escalation.due_at < now,
+            )
+            .order_by(Escalation.opened_at)
+        )
+        if esc.last_reminded_on is None or esc.last_reminded_on < today
+    ]
+    sent = _mail_groups(db, account, due, now, reminder=True)
+    for esc in due:
+        esc.last_reminded_on = today
+    db.commit()
+    return sent
+
+
+def _mail_groups(
+    db: Session, account: Account, escalations: list[Escalation], now: datetime, *, reminder: bool
+) -> int:
+    groups: dict[tuple[int, tuple[str, ...]], list[tuple[Escalation, Demand, Audience]]] = defaultdict(list)
+    for esc in escalations:
         d = db.get_one(Demand, esc.demand_id)
         a = audience(db, account, esc, d)
         groups[(esc.level, tuple(sorted(a.to)))].append((esc, d, a))
-
     sent = 0
     for (level, to), items in groups.items():
-        cc = sorted({c for _, _, a in items for c in a.cc} - set(to))
-        mail.send(_compose(account, level, items, list(to), cc))
+        # A daily reminder goes to the responsible person only; nobody else needs it again.
+        cc = [] if reminder else sorted({c for _, _, a in items for c in a.cc} - set(to))
+        mail.send(_compose(account, level, items, list(to), cc, reminder=reminder))
         for esc, _, a in items:
-            esc.notified_level = esc.level
-            _event(db, esc, EscalationEventKind.NOTIFIED, note="Mailed " + ", ".join(a.names), at=now)
+            if not reminder:
+                esc.notified_level = esc.level
+            note = "Reminded " + a.acts if reminder else "Mailed: " + " · ".join(a.names)
+            _event(db, esc, EscalationEventKind.NOTIFIED, note=note, at=now)
         db.commit()  # per group, so a later failure doesn't re-send earlier mails
         sent += 1
     return sent
@@ -454,34 +561,55 @@ def _compose(
     items: list[tuple[Escalation, Demand, Audience]],
     to: list[str],
     cc: list[str],
+    *,
+    reminder: bool = False,
 ) -> mail.Mail:
-    who = account.settings.escalation_owners.get(f"L{level}", f"L{level}")
+    cfg = account.settings
     link = f"{get_settings().app_base_url}/escalations"
     plural = "s" if len(items) > 1 else ""
-    subject = f"[Demand Tracker] {account.name} · {len(items)} escalation{plural} · L{level} {who}"
+    state = "Reminder: overdue" if reminder else ("Overdue" if level == 2 else "Action needed")
+    top = max((e.severity_enum for e, _, _ in items), key=lambda v: ["low", "medium", "high"].index(v.value))
+    subject = (
+        f"[Demand Tracker] {account.name} · {state} · {len(items)} escalation{plural} · {top.label} severity"
+    )
     tz = _tz(account)
-    text = [f"{len(items)} escalation(s) need action at L{level} ({who}).", ""]
+    if level == 1:
+        intro = f"{len(items)} escalation{plural} need{'' if plural else 's'} your action."
+    else:
+        intro = (
+            f"{len(items)} escalation{plural} {'are' if plural else 'is'} overdue: no response by the due "
+            "date. The responsible person still has to act and is reminded every day until they do."
+        )
+    text = [intro, ""]
     rows = []
-    for esc, d, _ in items:
+    for esc, d, a in items:
         due = esc.due_at.astimezone(tz)
+        steps = cfg.rule_for(esc.type).steps
+        when = f"Respond by {due:%d %b}" if level == 1 else f"Was due {due:%d %b}"
         text += [
-            f"  {esc.type_enum.label} · {d.app_ref} {d.gtd_req_id or ''} {d.name}",
-            f"    {esc.detail or ''}",
-            f"    Due {due:%d %b}. Unresolved by then, it moves up.",
+            f"{esc.type_enum.label} · {esc.severity_enum.label} severity",
+            f"  Demand: {d.app_ref} {d.gtd_req_id or ''} {d.name}",
+            f"  What happened: {esc.detail or ''}",
+            f"  Who acts: {a.acts}",
+            f"  Steps: {steps}",
+            f"  {when}.",
             "",
         ]
         rows.append(
-            f"<tr><td style='padding:6px 10px'><b>{escape(esc.type_enum.label)}</b></td>"
-            f"<td style='padding:6px 10px'><span style='font-family:monospace'>{escape(d.app_ref)}</span> "
-            f"{escape(d.name)}<br><span style='color:#5E5A50'>{escape(esc.detail or '')}</span></td>"
-            f"<td style='padding:6px 10px'>Due {due:%d %b}</td></tr>"
+            f"<tr><td style='padding:8px 10px;vertical-align:top'><b>{escape(esc.type_enum.label)}</b><br>"
+            f"{escape(esc.severity_enum.label)} severity</td>"
+            f"<td style='padding:8px 10px'><span style='font-family:monospace'>{escape(d.app_ref)}</span> "
+            f"{escape(d.name)}<br><span style='color:#5E5A50'>{escape(esc.detail or '')}</span><br>"
+            f"<b>Who acts:</b> {escape(a.acts)}<br><b>Steps:</b> {escape(steps)}</td>"
+            f"<td style='padding:8px 10px;vertical-align:top'>{escape(when)}</td></tr>"
         )
-    text += ["Resolve with a reason and an action:", link]
+    informed = "Others on this mail are copied for information only; they don't need to act."
+    text += [f"Respond with a reason and an action: {link}", informed]
     html = (
-        f"<p style='font:15px sans-serif'>{len(items)} escalation(s) need action at "
-        f"<b>L{level} ({escape(who)})</b>.</p><table style='border-collapse:collapse;font:14px sans-serif'>"
-        + "".join(rows)
-        + f"</table><p style='font:14px sans-serif'><a href='{link}'>Open escalations</a></p>"
+        f"<p style='font:15px sans-serif'>{escape(intro)}</p>"
+        "<table style='border-collapse:collapse;font:14px sans-serif'>" + "".join(rows) + "</table>"
+        f"<p style='font:14px sans-serif'><a href='{link}'>Respond on the Escalations screen</a><br>"
+        f"<span style='color:#5E5A50'>{informed}</span></p>"
     )
     return mail.Mail(to=to, cc=cc, subject=subject, text="\n".join(text), html=html)
 
@@ -489,15 +617,30 @@ def _compose(
 # --- Resolving ---------------------------------------------------------------------------------------
 
 
-def can_resolve(actor: Actor, esc: Escalation) -> bool:
-    """L1: GTD team admin and GTD admin team. L2: leadership and the GTD team admin."""
-    return esc.status == EscalationStatus.OPEN.value and actor.role in RESOLVERS[esc.level]
+def can_resolve(actor: Actor, esc: Escalation, demand: Demand) -> bool:
+    """Only the responsible party responds: the GTD admin team (and its admin) for what is theirs to
+    do, the demand owner for their own demand. Late feedback is answered by the interviewer giving it;
+    the GTD team may also close it (e.g. after reassigning the interview). Leadership never acts."""
+    if esc.status != EscalationStatus.OPEN.value:
+        return False
+    if esc.responsible_enum is Responsible.DEMAND_OWNER:
+        return actor.id == demand.owner_id
+    return actor.role in GTD_TEAM_ROLES
+
+
+def who_acts(esc: Escalation) -> str:
+    who = esc.responsible_enum
+    if who is Responsible.DEMAND_OWNER:
+        return "the demand owner"
+    return "the GTD admin team" if who is Responsible.GTD_TEAM else "the interviewer (by giving feedback)"
 
 
 def allowed_actions(db: Session, account: Account, esc: Escalation, demand: Demand) -> list[ResolutionAction]:
     actions = [ResolutionAction.EXTEND, ResolutionAction.CLOSE]
+    if esc.type_enum is EscalationType.PAST_START:
+        actions.insert(0, ResolutionAction.NEW_START)
     if esc.type_enum in LINK_TYPES and demand.status_enum not in FINISHED:
-        # Resubmit as it is (GTD lost it), or send back to the owner to correct it first.
+        # Resubmit as it is (GTD lost it), or back to the owner to correct it first.
         actions[0:0] = [ResolutionAction.RETURN, ResolutionAction.RESUBMIT]
     if is_cleared(db, account, esc, demand, datetime.now(UTC)):
         actions.append(ResolutionAction.NO_ACTION)
@@ -522,9 +665,8 @@ def resolve(
         raise EscalationError("Escalation not found.")
     if esc.status != EscalationStatus.OPEN.value:
         raise EscalationError("This escalation is already resolved.")
-    if not can_resolve(actor, esc):
-        who = "the GTD team admin or GTD admin team" if esc.level == 1 else "leadership or the GTD team admin"
-        raise EscalationError(f"An L{esc.level} escalation is resolved by {who}.")
+    if not can_resolve(actor, esc, demand):
+        raise EscalationError(f"This escalation is for {who_acts(esc)} to respond to.")
     account = db.get_one(Account, actor.account_id)
     if reason not in account.settings.resolution_reasons:
         raise EscalationError("Choose a reason.")
@@ -541,12 +683,18 @@ def resolve(
         today = now.astimezone(_tz(account)).date()
         if extend_to is None or extend_to <= today:
             raise EscalationError("Pick a new due date after today.")
-        esc.level = 1  # back to L1 with the new date (§9.2)
+        # More time, with a reason. The level stays: an overdue escalation doesn't go quiet again.
         esc.due_at = datetime.combine(extend_to, time(23, 59), _tz(account))
-        esc.notified_level = min(esc.notified_level, 1)
         _event(db, esc, EscalationEventKind.EXTENDED, actor.id, f"Due {extend_to:%d %b %Y}. {note}", now)
         db.commit()
         return esc
+
+    if act is ResolutionAction.NEW_START:
+        today = now.astimezone(_tz(account)).date()
+        if extend_to is None or extend_to <= today:
+            raise EscalationError("Give the revised start date, after today.")
+        demand.start_date = extend_to
+        comment = f"Start date revised to {extend_to:%d %b %Y}" + (f". {comment}" if comment else "")
 
     if act is ResolutionAction.RESUBMIT:
         # Back into the next admin mail; the new GTD ID will chain to the old one (gtd_service).
@@ -594,7 +742,7 @@ def _mail_owner_returned(db: Session, demand: Demand, reason: str, comment: str 
 def _close(
     db: Session,
     esc: Escalation,
-    actor_id: int,
+    actor_id: int | None,
     reason: str,
     act: ResolutionAction,
     comment: str | None,
@@ -614,8 +762,15 @@ def _close(
 
 
 def listing(
-    db: Session, account_id: int, *, status: str = "open", level: int | None = None, type_: str | None = None
+    db: Session,
+    account_id: int,
+    *,
+    status: str = "open",
+    level: int | None = None,
+    type_: str | None = None,
+    owner_id: int | None = None,
 ) -> list[tuple[Escalation, Demand]]:
+    """Escalations of the account; for a demand owner (owner_id), only those on their own demands."""
     stmt = (
         select(Escalation, Demand)
         .join(Demand)
@@ -630,5 +785,7 @@ def listing(
         stmt = stmt.where(Escalation.level == level)
     if type_:
         stmt = stmt.where(Escalation.type == type_)
+    if owner_id is not None:
+        stmt = stmt.where(Demand.owner_id == owner_id)
     order = (Escalation.due_at,) if status == "open" else (Escalation.resolved_at.desc(),)
     return [(e, d) for e, d in db.execute(stmt.order_by(*order, Escalation.id)).all()]

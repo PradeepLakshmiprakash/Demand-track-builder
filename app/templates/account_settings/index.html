@@ -13,6 +13,7 @@
   <a class="pill" href="#thresholds">Thresholds</a>
   <a class="pill" href="#business-units">Business units</a>
   <a class="pill" href="#lists">Practices and lists</a>
+  <a class="pill" href="#escalation-rules">Escalation rules</a>
   <a class="pill" href="#supply-channels">Supply channels</a>
   <a class="pill" href="#status-mapping">DP sheet status mapping</a>
   <a class="pill" href="#dp-columns">DP sheet columns</a>
@@ -23,8 +24,6 @@
   <form method="post" action="/settings/thresholds" class="panel-body stack">
     <div class="grid4">
       <label class="f">Grace period (working days)<input type="number" name="grace_days" min="0" max="60" value="{{ account.grace_days }}" required><span class="hint">Sent to GTD but not in the DP sheet → missing</span></label>
-      <label class="f">L1 due (working days)<input type="number" name="l1_sla_days" min="1" max="60" value="{{ account.l1_sla_days }}" required><span class="hint">{{ cfg.escalation_owners.get('L1', 'L1') }} before L2</span></label>
-      <label class="f">L2 due (working days)<input type="number" name="l2_sla_days" min="1" max="60" value="{{ account.l2_sla_days }}" required><span class="hint">{{ cfg.escalation_owners.get('L2', 'L2') }}</span></label>
       <label class="f">Aging (days without progress)<input type="number" name="aging_days" min="1" max="365" value="{{ account.aging_days }}" required></label>
       <label class="f">Panel SLA (hours)<input type="number" name="panel_timer_hours" min="1" max="720" value="{{ account.panel_timer_hours }}" required></label>
       <label class="f">Rejection limit<input type="number" name="rejection_limit" min="1" max="50" value="{{ account.rejection_limit }}" required><span class="hint">Panel + client rejections on one demand</span></label>
@@ -74,6 +73,35 @@
       <label class="f">Who owns L2 escalations<input type="text" name="escalation_owner_l2" value="{{ cfg.escalation_owners.get('L2', '') }}"></label>
     </div>
     <div><button class="btn primary">Save lists</button></div>
+  </form>
+</section>
+
+<section id="escalation-rules" class="panel">
+  <div class="panel-head"><div><h2>Escalation rules</h2><div class="hint">For each trigger: whether it's on, who has to act, how urgent it is, and the steps the email tells them. The responsible person acts; everyone else is only informed.</div></div></div>
+  <form method="post" action="/settings/escalation-rules" class="panel-body stack">
+    <div class="tbl plain esc-rules">
+      <div class="tr th"><div>Trigger</div><div>On</div><div>Who acts</div><div>Severity</div><div>Steps in the email</div></div>
+      {% for t in esc_types %}{% set r = cfg.rule_for(t.value) %}
+      <div class="tr">
+        <div><strong>{{ t.label }}</strong></div>
+        <div><input type="checkbox" name="enabled_{{ t.value }}" {{ 'checked' if r.enabled }} aria-label="{{ t.label }} on"></div>
+        <div><select name="responsible_{{ t.value }}" aria-label="Who acts on {{ t.label }}">{% for x in responsibles %}<option value="{{ x.value }}" {{ 'selected' if r.responsible == x }}>{{ x.label }}</option>{% endfor %}</select></div>
+        <div><select name="severity_{{ t.value }}" aria-label="Severity of {{ t.label }}">{% for x in severities %}<option value="{{ x.value }}" {{ 'selected' if r.severity == x }}>{{ x.label }}</option>{% endfor %}</select></div>
+        <div><textarea name="steps_{{ t.value }}" rows="2" required aria-label="Steps for {{ t.label }}">{{ r.steps }}</textarea></div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="grid4">
+      {% for x in severities %}
+      <label class="f">{{ x.label }}: respond within (working days)<input type="number" name="days_{{ x.value }}" min="1" max="30" value="{{ cfg.response_days.get(x.value, 2) }}" required></label>
+      {% endfor %}
+    </div>
+    <fieldset class="f radios"><legend>When the due date is missed (L2), inform</legend>
+      <label><input type="checkbox" name="inform_leadership" {{ 'checked' if cfg.l2_inform_leadership }}> Leadership</label>
+      <label><input type="checkbox" name="inform_delivery_head" {{ 'checked' if cfg.l2_inform_delivery_head }}> The business unit's delivery head</label>
+      <span class="hint">They are informed, not asked to act. The responsible person is reminded every day until they respond. A billable demand past its start date is always high severity.</span>
+    </fieldset>
+    <div><button class="btn primary">Save escalation rules</button></div>
   </form>
 </section>
 

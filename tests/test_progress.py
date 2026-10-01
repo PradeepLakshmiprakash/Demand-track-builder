@@ -64,7 +64,7 @@ def test_incorrect_demand_goes_back_to_its_owner(client: Client, db: Session) ->
 
     escalation_service.resolve(
         db,
-        actor(db, "farah"),
+        actor(db, "arjun"),
         esc.id,
         reason="Failed GTD basic checks",
         action="return",
@@ -272,7 +272,7 @@ def test_sheet_leaves_a_returned_demand_alone(client: Client, db: Session) -> No
     )
     assert esc is not None
     escalation_service.resolve(
-        db, actor(db, "farah"), esc.id, reason="Failed GTD basic checks", action="return", comment=None
+        db, actor(db, "arjun"), esc.id, reason="Failed GTD basic checks", action="return", comment=None
     )
     import_sample(client, date.today())
     d = by_ref(db, "DM-000133")

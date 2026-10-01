@@ -1,10 +1,18 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, String, Text, func, text
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, SmallInteger, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
-from app.core.enums import EscalationEventKind, EscalationStatus, EscalationType, ResolutionAction, check_in
+from app.core.enums import (
+    EscalationEventKind,
+    EscalationStatus,
+    EscalationType,
+    ResolutionAction,
+    Responsible,
+    Severity,
+    check_in,
+)
 
 
 class Escalation(Base):
@@ -15,6 +23,8 @@ class Escalation(Base):
         CheckConstraint(check_in("type", EscalationType), name="type_valid"),
         CheckConstraint(check_in("status", EscalationStatus), name="status_valid"),
         CheckConstraint("level IN (1, 2)", name="level_valid"),
+        CheckConstraint(check_in("severity", Severity), name="severity_valid"),
+        CheckConstraint(check_in("responsible", Responsible), name="responsible_valid"),
         CheckConstraint(f"action IS NULL OR {check_in('action', ResolutionAction)}", name="action_valid"),
         CheckConstraint(
             "status = 'open' OR (reason IS NOT NULL AND action IS NOT NULL AND resolved_at IS NOT NULL)",
@@ -46,6 +56,11 @@ class Escalation(Base):
     resolved_at: Mapped[datetime | None]
     # Highest level whose owners have been mailed. The sweep mails whatever is above it.
     notified_level: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    # Fixed when it opens, from the account's rule for the trigger (later rule changes don't rewrite it).
+    severity: Mapped[str] = mapped_column(String(6), default="medium", server_default="medium")
+    responsible: Mapped[str] = mapped_column(String(14), default="gtd_team", server_default="gtd_team")
+    # Overdue (L2): the responsible person is reminded once a day; the last day they were.
+    last_reminded_on: Mapped[date | None] = mapped_column(Date)
 
     events: Mapped[list["EscalationEvent"]] = relationship(
         order_by="EscalationEvent.id", cascade="all, delete-orphan"
@@ -54,6 +69,14 @@ class Escalation(Base):
     @property
     def type_enum(self) -> EscalationType:
         return EscalationType(self.type)
+
+    @property
+    def severity_enum(self) -> Severity:
+        return Severity(self.severity)
+
+    @property
+    def responsible_enum(self) -> Responsible:
+        return Responsible(self.responsible)
 
 
 class EscalationEvent(Base):

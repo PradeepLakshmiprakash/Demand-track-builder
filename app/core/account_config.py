@@ -7,7 +7,7 @@ because the escalation sweep filters on them in SQL.
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.enums import SHEET_STAGES, DemandStatus
+from app.core.enums import SHEET_STAGES, DemandStatus, Responsible, Severity
 
 
 class SupplyChannel(BaseModel):
@@ -28,6 +28,67 @@ class StatusMapping(BaseModel):
         if v not in SHEET_STAGES:
             raise ValueError(f"{v.label} can't be set from the DP sheet")
         return v
+
+
+class EscalationRule(BaseModel):
+    """One trigger's rule: is it on, who must act, how urgent, and the steps the email spells out."""
+
+    enabled: bool = True
+    responsible: Responsible
+    severity: Severity
+    steps: str
+
+
+DEFAULT_RULES: dict[str, tuple[Responsible, Severity, str]] = {
+    "not_submitted": (
+        Responsible.GTD_TEAM,
+        Severity.MEDIUM,
+        "Create the demand on GTD and link its requisition ID on the GTD queue.",
+    ),
+    "missing": (
+        Responsible.GTD_TEAM,
+        Severity.MEDIUM,
+        "Check on GTD whether the requisition was approved. Link the right ID, or send the demand back "
+        "to its owner to correct.",
+    ),
+    "dropped": (
+        Responsible.DEMAND_OWNER,
+        Severity.HIGH,
+        "Confirm whether the position is still needed. If yes, resubmit it; if not, close the demand with "
+        "the reason.",
+    ),
+    "incorrect": (
+        Responsible.DEMAND_OWNER,
+        Severity.MEDIUM,
+        "Open the demand, correct what was flagged, and resubmit it.",
+    ),
+    "aging": (
+        Responsible.DEMAND_OWNER,
+        Severity.LOW,
+        "Review the requirements with staffing. Update the demand, ask for more time with a reason, or "
+        "close it.",
+    ),
+    "rejection_limit": (
+        Responsible.DEMAND_OWNER,
+        Severity.MEDIUM,
+        "Review the job description and the bar with the panel. Update the demand, or close it.",
+    ),
+    "panel_sla": (
+        Responsible.INTERVIEWER,
+        Severity.LOW,
+        "Submit your feedback for the interview, from your invite link or My interviews.",
+    ),
+    "past_start": (
+        Responsible.DEMAND_OWNER,
+        Severity.HIGH,
+        "Give a revised start date, or confirm the date of joining with staffing. Close the demand if it "
+        "is no longer needed.",
+    ),
+}
+
+
+def _default_rules() -> dict[str, EscalationRule]:
+    return {k: EscalationRule(responsible=r, severity=s, steps=t) for k, (r, s, t) in DEFAULT_RULES.items()}
 
 
 # DP sheet columns the app reads: field → (default header in the Discover sheet, required?).
@@ -81,6 +142,13 @@ class AccountConfig(BaseModel):
     supply_channels: list[SupplyChannel] = []
     status_mapping: list[StatusMapping] = []
     escalation_owners: dict[str, str] = {"L1": "LOB delivery head", "L2": "Account leadership"}
+    # Escalations (flow-artifact §9): the responsible person acts; everyone else is informed.
+    escalation_rules: dict[str, EscalationRule] = Field(default_factory=_default_rules)
+    # Working days the responsible person has to respond, by severity. After that it is overdue (L2).
+    response_days: dict[str, int] = {"high": 1, "medium": 2, "low": 3}
+    # Who is informed when an escalation goes overdue. They don't act; the responsible person does.
+    l2_inform_leadership: bool = True
+    l2_inform_delivery_head: bool = True
     # What a panelist rates, each 1 to 5 (flow-artifact §7).
     interview_ratings: list[str] = ["Technical depth", "Problem solving", "Communication"]
     # Revenue lost = hourly bill rate × these hours × working days late (flow-artifact §10).
@@ -106,6 +174,10 @@ class AccountConfig(BaseModel):
             if m.status_group.strip().casefold() == g:
                 return m.stage
         return hits[0].stage if hits else None
+
+    def rule_for(self, trigger: str) -> EscalationRule:
+        """The account's rule for a trigger; the default for one the account hasn't set."""
+        return self.escalation_rules.get(trigger) or _default_rules()[trigger]
 
     def grade_rank(self, grade: str) -> int:
         try:

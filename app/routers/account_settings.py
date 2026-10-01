@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.account_config import DP_FIELD_LABELS, DP_FIELDS
 from app.core.db import get_db
-from app.core.enums import SHEET_STAGES
+from app.core.enums import SHEET_STAGES, EscalationType, Responsible, Severity
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.services import account_service as svc
@@ -47,6 +47,9 @@ def settings_page(
         db,
         account=account,
         cfg=account.settings,
+        esc_types=list(EscalationType),
+        responsibles=list(Responsible),
+        severities=list(Severity),
         bus=[(b, *svc.bu_usage(db, b.id)) for b in account.business_units],
         stages=SHEET_STAGES,
         dp_fields=[(f, DP_FIELD_LABELS[f], req) for f, (_, req) in DP_FIELDS.items()],
@@ -110,6 +113,14 @@ async def save_channels(
     raw = {k: [str(v) for v in form.getlist(k)] for k in ("label", "sheet_marker", "needs_sourcing_req")}
     rows = _rows(raw, "label", "sheet_marker", "needs_sourcing_req")
     return _done("supply-channels", lambda: svc.update_supply_channels(db, actor.account_id, rows), db)
+
+
+@router.post("/settings/escalation-rules")
+async def save_escalation_rules(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    form = {k: str(v) for k, v in (await request.form()).items()}
+    return _done("escalation-rules", lambda: svc.update_escalation_rules(db, actor.account_id, form), db)
 
 
 @router.post("/settings/dp-columns")
