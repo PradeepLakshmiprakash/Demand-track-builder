@@ -57,7 +57,7 @@ def load(db: Session, now: datetime | None = None) -> None:
 
     users: dict[str, User] = {}
     for key, name, email, role, level, scope, bu_names, practices, iv in data.USERS:
-        u = User(name=name, email=email, active=True, is_platform_admin=key == "anil")
+        u = User(name=name, email=email, active=True)
         u.memberships = [
             UserAccount(account_id=account.id, role=role, level=level, visibility_scope=scope, active=True)
         ]

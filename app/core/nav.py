@@ -52,6 +52,8 @@ NAV: tuple[NavItem, ...] = (
     NavItem("users", "/users", _same("User access", ADM), ready=True),
     NavItem("settings", "/settings", _same("Account settings", ADM), ready=True),
     NavItem("rate_card", "/rate-card", _same("Rate card", ADM), phase=5, ready=True),
+    # Adding and deactivating client accounts is part of the Administrator's job.
+    NavItem("accounts", "/platform/accounts", _same("Accounts", ADM), phase=8, ready=True),
 )
 
 BY_KEY = {n.key: n for n in NAV}

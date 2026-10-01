@@ -18,7 +18,7 @@ def main() -> None:
     )
     print(
         "Seeded Acme Insurance: 3 BUs, 7 people (Sanjay shared with Discover),"
-        " 6 demands, 1 interview, 15 rate card rows. Anil (Administrator) is the platform admin."
+        " 6 demands, 1 interview, 15 rate card rows. Administrators: Anil (Discover), Rosa (Acme)."
     )
 
 

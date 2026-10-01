@@ -60,10 +60,6 @@
       {% endif %}
     {% endfor %}
 
-    {% if actor and actor.is_platform_admin %}
-      <a class="nav-link platform {{ 'active' if path.startswith('/platform') }}" href="/platform/accounts">Accounts <span class="tag">Platform</span></a>
-    {% endif %}
-
     {% if actor %}
     <div class="side-foot">Access: {{ actor.scope.label | lower }}<br>{{ 'All BUs' if actor.is_full else (actor.bu_names | join(', ') or 'No BU') }} · {{ actor.account_name }}</div>
     {% endif %}

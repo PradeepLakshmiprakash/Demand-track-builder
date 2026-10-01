@@ -1,4 +1,4 @@
-"""Accounts: the platform admin creates a client account, names its first GTD team admin, and can
+"""Accounts: an Administrator creates a client account, names its first GTD team admin, and can
 deactivate it. Everything else about the client is set by that admin in the account's own settings.
 
 A new account starts either blank (defaults only) or with a copy of another account's settings: lists,

@@ -1,4 +1,4 @@
-"""Switching between the accounts a person works in, and the platform admin's Accounts screen."""
+"""Switching between the accounts a person works in, and the Administrator's Accounts screen."""
 
 from urllib.parse import quote
 
@@ -8,13 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import ACCOUNT_COOKIE, Actor, current_user, require_platform_admin
+from app.core.security import ACCOUNT_COOKIE, Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import Account
 from app.services import platform_service
 from app.services.platform_service import PlatformError
 
 router = APIRouter(tags=["accounts"])
+guard = require_screen("accounts")  # the Administrator
 
 
 @router.get("/switch-account/{account_id}")
@@ -30,7 +31,7 @@ def switch_account(account_id: int, actor: Actor = Depends(current_user)) -> Red
 
 @router.get("/platform/accounts", response_class=HTMLResponse)
 def accounts_page(
-    request: Request, actor: Actor = Depends(require_platform_admin), db: Session = Depends(get_db)
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> HTMLResponse:
     return render(
         request,
@@ -44,7 +45,7 @@ def accounts_page(
 
 @router.post("/platform/accounts")
 async def create_account(
-    request: Request, actor: Actor = Depends(require_platform_admin), db: Session = Depends(get_db)
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     f = await request.form()
     copy = str(f.get("copy_from") or "")
@@ -69,7 +70,7 @@ async def create_account(
 async def set_active(
     account_id: int,
     request: Request,
-    actor: Actor = Depends(require_platform_admin),
+    actor: Actor = Depends(guard),
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     active = (await request.form()).get("active") == "1"

@@ -44,7 +44,6 @@ class Actor:
     bu_ids: frozenset[int]
     bu_names: tuple[str, ...]
     practices: tuple[str, ...]
-    is_platform_admin: bool = False
     accounts: tuple[tuple[int, str], ...] = ()  # every account this person may switch to
 
     @property
@@ -89,7 +88,6 @@ def actor_from_user(db: Session, user: User, account_id: int | None = None) -> A
         bu_ids=frozenset(b.id for b in bus),
         bu_names=tuple(b.name for b in bus),
         practices=tuple(p for p in user.practices if p in set(account.settings.practices)),
-        is_platform_admin=user.is_platform_admin,
         accounts=tuple((x.account_id, x.account.name) for x in usable),
     )
 
@@ -127,12 +125,6 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> Actor:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No users yet. Run the seed script.")
     raw_account = request.cookies.get(ACCOUNT_COOKIE, "")
     return actor_from_user(db, user, int(raw_account) if raw_account.isdigit() else None)
-
-
-def require_platform_admin(actor: Actor = Depends(current_user)) -> Actor:
-    if not actor.is_platform_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a platform admin can manage accounts.")
-    return actor
 
 
 def require_role(*roles: Role) -> Callable[..., Actor]:

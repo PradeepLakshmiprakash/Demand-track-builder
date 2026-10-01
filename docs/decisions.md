@@ -425,3 +425,7 @@ one inbox while people's real addresses aren't in use; each mail says who it was
 
 Parked: the leadership charts (cost pie, ABC → allocation, CPF → closed), to be discussed.
 
+
+**D68. Client accounts are added by the Administrator** (user, 1 Oct). There is no separate platform
+admin: the Accounts screen is in every Administrator's menu, and whoever creates an account becomes its
+Administrator. The `is_platform_admin` flag is gone (migration 0013).

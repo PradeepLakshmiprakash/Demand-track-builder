@@ -3,7 +3,7 @@
 - Acme Insurance (seeded) keeps its data apart from Discover NA, reads its own DP sheet format, prices
   offers from its own rate card and routes them with its own margin cut-off.
 - People who work in both accounts have one login, a role per account and an account switcher.
-- Exit: the platform admin creates a third account (Globex Retail) and its admin sets it up entirely
+- Exit: an Administrator creates a third account (Globex Retail) and its admin sets it up entirely
   through the screens, then a demand goes from raise to an approved offer.
 """
 
@@ -201,7 +201,7 @@ def _post(c: Client, path: str, data: dict[str, Any]) -> None:
 
 def test_phase8_exit_new_account_through_settings_only(client: Client, db: Session) -> None:
     mail.sent.clear()
-    # 1. Only a platform admin may create accounts.
+    # 1. Only an Administrator may create accounts.
     assert client.as_user("grace").get("/platform/accounts").status_code == 403
     admin_form = {
         "name": "Globex Retail",
@@ -392,3 +392,23 @@ def test_deactivated_account_blocks_its_people(client: Client) -> None:
     c = client.as_user("sanjay")
     assert c.get("/overview").status_code == 200  # still has Discover
     assert c.get(f"/switch-account/{acme}").status_code == 404
+
+
+def test_any_administrator_adds_accounts_and_becomes_its_administrator(client: Client, db: Session) -> None:
+    form = {
+        "name": "Initech",
+        "timezone": "America/Chicago",
+        "copy_from": str(account_id(ACME)),
+        "admin_name": "Sam T.",
+        "admin_email": "sam.t@example.com",
+    }
+    rosa = client.as_user("rosa")  # Acme's Administrator: no separate platform admin
+    _post(rosa, "/platform/accounts", form)
+    roles = {
+        m.user.email: m.role
+        for m in db.scalars(select(UserAccount).where(UserAccount.account_id == account_id("Initech")))
+    }
+    assert roles == {"sam.t@example.com": "admin", "rosa.d@example.com": "administrator"}
+    assert "Accounts" in rosa.get("/requests").text
+    for who in ("kavya", "sanjay", "priya"):  # nobody else manages accounts
+        assert client.as_user(who).get("/platform/accounts").status_code == 403
