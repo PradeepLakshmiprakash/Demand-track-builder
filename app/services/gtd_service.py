@@ -1,7 +1,7 @@
 """GTD queue: demands waiting to be entered on GTD, and linking the requisition ID GTD generates.
 
 The app has no view into GTD. The GTD team admin or the GTD admin team enters each demand there by
-hand (name prefixed `[DM-000142] …`) and pastes the requisition ID back. That link is the key the
+hand (the plain demand name) and pastes the requisition ID back. That link is the key the
 DP sheet reconciles on, so an ID can be linked only once, ever.
 """
 
@@ -121,7 +121,7 @@ EXPORT_COLUMNS = [
 
 
 def export_csv(demands: list[Demand]) -> str:
-    """What the admin needs to key each demand into GTD. The name carries the [DM-…] prefix."""
+    """What the admin needs to key each demand into GTD. The name is the plain demand name."""
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(EXPORT_COLUMNS)

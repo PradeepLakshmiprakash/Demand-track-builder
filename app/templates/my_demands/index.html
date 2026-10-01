@@ -47,7 +47,7 @@
     {% set d = r.demand %}
     <a class="tr link" role="row" href="/demands/{{ d.app_ref }}">
       <div class="mono">{{ d.app_ref }}</div>
-      <div class="mono">{{ r.req_id or '—' }}</div>
+      <div class="mono">{{ r.req_id or '—' }}{% if show_owner and d.status != 'draft' %}<div class="note" style="font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif">GTD created: <strong>{{ 'Yes' if r.req_id else 'No' }}</strong></div>{% endif %}</div>
       <div>
         <div class="title">{{ d.name }}</div>
         {% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}

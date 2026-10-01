@@ -266,7 +266,7 @@ def _check(cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date) -
 
 def _apply(demand: Demand, form: DemandForm) -> None:
     for field in (
-        "name", "practice", "grade", "category", "type", "replaced_resource", "position_type",
+        "name", "practice", "grade", "category", "type", "replaced_resource", "lwd", "position_type",
         "client_interview_required",
         "primary_skills", "secondary_skills", "exp_min", "exp_max", "start_date", "region",
         "location", "work_mode", "hiring_manager",

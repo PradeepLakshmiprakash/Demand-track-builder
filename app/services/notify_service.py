@@ -127,7 +127,7 @@ def compose(
 
     def line(d: Demand) -> str:
         again = f" · resubmit, was {d.gtd_req_id}" if d.submissions else ""
-        return f"  {d.gtd_name}\n    {facts(d)} · start {start(d)} · owner {d.owner.name}{again}"
+        return f"  {d.app_ref}  {d.gtd_name}\n    {facts(d)} · start {start(d)} · owner {d.owner.name}{again}"
 
     def rows(ds: list[Demand]) -> str:
         td = "<td style='padding:6px 10px'>{}</td>"

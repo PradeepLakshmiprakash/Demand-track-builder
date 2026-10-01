@@ -28,6 +28,7 @@
       <div class="facts">
         {{ field('Practice', d.practice) }}{{ field('Grade', d.grade) }}{{ field('Category', d.category) }}
         {{ field('Type', d.type ~ (' · replacing ' ~ d.replaced_resource if d.replaced_resource else '')) }}
+        {% if d.lwd %}{{ field('Last working day (leaver)', (d.lwd | d) ~ (' · %d days uncovered before the requested start' % d.uncovered_days if d.uncovered_days else '') ~ (' · loss counts from ' ~ (d.loss_from | d) if d.loss_from and d.loss_from != d.start_date else '')) }}{% endif %}
         {{ field('Position', d.position_type) }}{{ field('Name on GTD', d.gtd_name) }}
         {{ field('Client interview', 'Required' if d.client_interview_required else 'Not required: panel decision is final') }}
       </div>

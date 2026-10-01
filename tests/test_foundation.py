@@ -33,7 +33,7 @@ def test_postgres_assigns_app_ref(db: Session) -> None:
     db.add(d)
     db.commit()
     assert d.app_ref == "DM-000152"  # continues after the highest seeded ref
-    assert d.gtd_name == "[DM-000152] New"
+    assert d.gtd_name == "New"  # the plain name goes to GTD: no DM reference to type
 
 
 def test_rows_and_summary_for_priya(db: Session) -> None:

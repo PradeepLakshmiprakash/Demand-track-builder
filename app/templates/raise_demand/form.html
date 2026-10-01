@@ -37,7 +37,7 @@
       </div>
       <label class="f">Demand request name
         <input type="text" name="name" value="{{ v.name or '' }}" required minlength="3" maxlength="200" placeholder="e.g. Java AWS Developer Payments Chicago">
-        <span class="hint">Goes to GTD as <span class="mono">[{{ demand.app_ref if demand else 'DM-xxxxxx' }}] {{ v.name or 'name' }}</span></span>
+        <span class="hint">A plain role title, e.g. "Java Developer": no reference number or BU in it. It goes to GTD exactly as typed.</span>
       </label>
       <div class="grid3">
         <fieldset class="f radios"><legend>Category</legend>
@@ -55,7 +55,10 @@
         <label><input type="radio" name="client_interview_required" value="true" {{ 'checked' if v.client_interview_required in (none, true, 'true', 'True') }}> Required: a panel select goes to the client next</label>
         <label><input type="radio" name="client_interview_required" value="false" {{ 'checked' if v.client_interview_required in (false, 'false', 'False') }}> Not required: the panel's decision is final</label>
       </fieldset>
-      <label class="f" id="replaced">Who is being replaced<input type="text" name="replaced_resource" value="{{ v.replaced_resource or '' }}" maxlength="120"></label>
+      <div class="grid2" id="replaced">
+        <label class="f">Who is being replaced<input type="text" name="replaced_resource" value="{{ v.replaced_resource or '' }}" maxlength="120"></label>
+        <label class="f">Their last working day<input type="date" name="lwd" value="{{ v.lwd or '' }}"><span class="hint">Revenue loss counts from the requested start date, or from the day after this date when that is later.</span></label>
+      </div>
       {% if not demand %}
       <label class="f" style="max-width:220px">Number of positions<input type="number" name="positions" min="1" max="20" value="{{ v.positions or 1 }}"><span class="hint">Creates one demand per position</span></label>
       {% endif %}

@@ -2,7 +2,17 @@ from datetime import datetime, time
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Time, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,7 +54,10 @@ class Account(Base):
 
 class BusinessUnit(Base):
     __tablename__ = "business_units"
-    __table_args__ = (UniqueConstraint("account_id", "name", name="uq_business_units_account_name"),)
+    __table_args__ = (
+        UniqueConstraint("account_id", "name", name="uq_business_units_account_name"),
+        CheckConstraint("nb_cap IS NULL OR nb_cap >= 0", name="nb_cap_positive"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
@@ -53,5 +66,7 @@ class BusinessUnit(Base):
     # L1 escalation owner for this BU. Not an app user: they're mailed, they don't sign in.
     delivery_head_name: Mapped[str | None] = mapped_column(String(120))
     delivery_head_email: Mapped[str | None] = mapped_column(String(254))
+    # Agreed number of non-billable (proactive) positions for this BU; set by the GTD team admin.
+    nb_cap: Mapped[int | None] = mapped_column(Integer)
 
     account: Mapped[Account] = relationship(back_populates="business_units")

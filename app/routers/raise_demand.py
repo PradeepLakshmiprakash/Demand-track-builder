@@ -24,7 +24,7 @@ router = APIRouter(tags=["raise demand"])
 guard = require_screen("raise")
 
 FIELDS = (
-    "bu_id", "name", "practice", "grade", "category", "type", "replaced_resource", "position_type",
+    "bu_id", "name", "practice", "grade", "category", "type", "replaced_resource", "lwd", "position_type",
     "client_interview_required",
     "primary_skills", "secondary_skills", "exp_min", "exp_max", "client_rate", "start_date", "region",
     "location", "work_mode", "hiring_manager", "positions",

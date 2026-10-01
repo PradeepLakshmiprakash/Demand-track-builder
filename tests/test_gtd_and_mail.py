@@ -48,7 +48,7 @@ def test_mail_lists_submitted_and_marks_them_notified(db: Session) -> None:
     [m] = mail.sent
     assert set(m.to) == {"kavya.r@example.com", "farah.q@example.com", "deepak.l@example.com"}
     assert "2 to enter on GTD" in m.subject
-    assert "[DM-000151] Senior Java Full Stack Developer" in m.text
+    assert "Senior Java Full Stack Developer" in m.text and "[DM-000151]" not in m.text
     assert "Still without a requisition ID (1)" in m.text and "DM-000149" in m.text
 
 
@@ -129,7 +129,7 @@ def test_queue_shows_mail_and_new_submissions(team: Client) -> None:
     q = team.get("/api/gtd-queue").json()
     assert [d["app_ref"] for d in q["in_mail"]] == ["DM-000149"]
     assert {d["app_ref"] for d in q["next_mail"]} == {"DM-000151", "DM-000147"}
-    assert q["in_mail"][0]["gtd_name"] == "[DM-000149] Cards Mainframe Developer · Chicago"
+    assert q["in_mail"][0]["gtd_name"] == "Cards Mainframe Developer · Chicago"
 
 
 def test_link_requisition(team: Client, db: Session) -> None:
@@ -176,12 +176,12 @@ def test_only_admin_roles_use_the_queue(client: Client, db: Session) -> None:
     assert client.as_user("kavya").get("/gtd-queue").status_code == 200
 
 
-def test_export_has_gtd_name_prefix(team: Client) -> None:
+def test_export_has_the_plain_gtd_name(team: Client) -> None:
     r = team.get("/gtd-queue/export.csv")
     assert r.headers["content-type"].startswith("text/csv")
     rows = list(csv.DictReader(io.StringIO(r.text)))
     names = {row["Demand request name"] for row in rows}
-    assert "[DM-000151] Senior Java Full Stack Developer (Java + Spring Boot + AWS)" in names
+    assert "Senior Java Full Stack Developer (Java + Spring Boot + AWS)" in names
     assert len(rows) == 3
 
 
@@ -203,7 +203,7 @@ def test_phase2_exit_draft_to_sent_to_gtd(client: Client, db: Session) -> None:
 
     notify_service.send_daily_admin_mail(db, account(db).id, force=True)
     assert by_ref(db, ref).status == "notified"
-    assert any("kavya.r@example.com" in m.to and f"[{ref}]" in m.text for m in mail.sent)
+    assert any("kavya.r@example.com" in m.to and ref in m.text for m in mail.sent)
 
     client.as_user("deepak").post(f"/gtd-queue/{by_ref(db, ref).id}/link", data={"gtd_req_id": "Q4WN8Z"})
     d = by_ref(db, ref)

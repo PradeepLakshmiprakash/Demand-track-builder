@@ -237,12 +237,13 @@ def overdue_panels(
 
 
 def _past_start(d: Demand, doj: date | None, today: date) -> bool:
+    start = d.loss_from  # a replacement isn't late until its leaver has gone
     return bool(
-        d.start_date
-        and d.start_date < today
+        start
+        and start < today
         and d.status_enum not in FINISHED
         and d.status_enum is not DemandStatus.DRAFT
-        and (doj is None or doj > d.start_date)
+        and (doj is None or doj > start)
     )
 
 

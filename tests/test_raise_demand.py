@@ -46,7 +46,7 @@ def test_save_draft_gets_app_ref_from_postgres(priya: Client, db: Session) -> No
     assert ref == "DM-000152"
     d = demand(db, ref)
     assert d.status == "draft" and d.submitted_at is None
-    assert d.gtd_name == "[DM-000152] Java AWS Developer Payments Chicago"
+    assert d.gtd_name == "Java AWS Developer Payments Chicago"
 
 
 def test_submit_puts_it_in_the_queue(priya: Client, db: Session) -> None:

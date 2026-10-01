@@ -19,7 +19,7 @@ ACCOUNT = {
 
 CONFIG = {
     "timezone": "America/Chicago",
-    "practices": ["CCA-FS", "DCX-FS", "DMN-FS", "TES-FS", "ADM-FS"],
+    "practices": ["CCA-FS", "DCX-FS", "DMN-FS", "TES-FS", "ADM-FS", "Cloud-Java", "Cloud-MF", "Cloud-APM"],
     "grades": ["A5", "B1", "B2", "C1", "C2", "D1", "D2", "E1"],
     "regions": ["US", "CA"],
     "work_modes": ["Onsite", "Hybrid", "Remote"],

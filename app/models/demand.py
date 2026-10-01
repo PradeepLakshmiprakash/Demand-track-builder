@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -62,6 +62,8 @@ class Demand(Base):
     # Known when the demand is raised: does a panel select go to a client interview, or is it final?
     client_interview_required: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     replaced_resource: Mapped[str | None] = mapped_column(String(120))
+    # Replacement only: the last working day of the person being replaced.
+    lwd: Mapped[date | None] = mapped_column(Date)
     primary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     secondary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     exp_min: Mapped[int | None] = mapped_column(Integer)
@@ -98,5 +100,21 @@ class Demand(Base):
 
     @property
     def gtd_name(self) -> str:
-        """Name as entered on GTD. The prefix lets reconciliation match rows with no recorded ID."""
-        return f"[{self.app_ref}] {self.name}"
+        """Name as entered on GTD: the plain demand name. The GTD admin team doesn't type the DM
+        reference there; the demand is tied to GTD by the requisition ID they link back."""
+        return self.name
+
+    @property
+    def loss_from(self) -> date | None:
+        """The first day the position is unfilled and losing revenue: the requested start date, or
+        the day after the leaver's last working day when that is later (they bill until they go)."""
+        if self.start_date is None or self.lwd is None:
+            return self.start_date
+        return max(self.start_date, self.lwd + timedelta(days=1))
+
+    @property
+    def uncovered_days(self) -> int | None:
+        """Replacement: calendar days between the leaver's last working day and the requested start."""
+        if self.start_date is None or self.lwd is None or self.start_date <= self.lwd:
+            return None
+        return (self.start_date - self.lwd).days - 1

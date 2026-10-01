@@ -26,6 +26,7 @@ class DemandForm(BaseModel):
     category: str | None = None
     type: Literal["New", "Replacement"] = "New"
     replaced_resource: str | None = Field(None, max_length=120)
+    lwd: date | None = None  # replacement: the leaver's last working day
     position_type: Literal["Billable", "Non-billable"] = "Billable"
     # Does a panel select go on to a client interview, or is the panel's decision final?
     client_interview_required: bool = True
@@ -61,7 +62,7 @@ class DemandForm(BaseModel):
         if self.exp_min is not None and self.exp_max is not None and self.exp_min > self.exp_max:
             raise ValueError("Experience min is more than max")
         if self.type == "New":
-            self.replaced_resource = None
+            self.replaced_resource = self.lwd = None
         return self
 
     def missing_for_submit(self) -> list[str]:
@@ -79,4 +80,6 @@ class DemandForm(BaseModel):
         missing = [label for label, value in need.items() if not value]
         if self.type == "Replacement" and not self.replaced_resource:
             missing.append("Who is being replaced")
+        if self.type == "Replacement" and not self.lwd:
+            missing.append("Their last working day")
         return missing

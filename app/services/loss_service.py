@@ -46,7 +46,7 @@ class Loss:
     def filled(self) -> bool:
         """Joined, or has a DOJ on or before the start: not at risk any more."""
         return self.demand.status_enum is DemandStatus.STAFFED or (
-            self.doj is not None and self.demand.start_date is not None and self.doj <= self.demand.start_date
+            self.doj is not None and self.demand.loss_from is not None and self.doj <= self.demand.loss_from
         )
 
 
@@ -60,20 +60,19 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
         .where(Demand.account_id == account_id, Demand.status.notin_([s.value for s in NOT_LIVE]))
         .options(selectinload(Demand.submissions), selectinload(Demand.business_unit))
     ):
-        if d.start_date is None:
+        start = d.loss_from  # the start date, or the day after the leaver's last working day if later
+        if start is None:
             continue
         j = doj.get(d.id)
         end = min(j, today) if j else today
-        if end <= d.start_date:
+        if end <= start:
             continue
-        wd = working_days(d.start_date, end)
+        wd = working_days(start, end)
         daily = d.client_rate * hours if d.client_rate is not None else None
         projected = None
         if j and j > today and daily is not None:
-            projected = daily * working_days(max(today, d.start_date), j)
-        out.append(
-            Loss(d, j, (end - d.start_date).days, wd, daily * wd if daily is not None else None, projected)
-        )
+            projected = daily * working_days(max(today, start), j)
+        out.append(Loss(d, j, (end - start).days, wd, daily * wd if daily is not None else None, projected))
     return sorted(out, key=lambda x: (-x.days_late, x.demand.app_ref))
 
 
