@@ -14,11 +14,11 @@ from sqlalchemy.orm import Session, selectinload
 from app.core import storage
 from app.core.account_config import AccountConfig
 from app.core.enums import (
-    BEFORE_GTD,
     FINISHED,
     LINK_PROBLEMS,
     DemandStatus,
     EscalationStatus,
+    MainStage,
     Role,
     Scope,
     StageOrigin,
@@ -55,13 +55,8 @@ def account_today(db: Session, account_id: int) -> date:
     return datetime.now(ZoneInfo(tz)).date()
 
 
-FILTERS = {
-    "all": "All",
-    "attention": "Needs attention",
-    "before_gtd": "Before GTD",
-    "linked": "Linked to GTD",
-    "finished": "Staffed or closed",
-}
+FILTERS = {"all": "All", "attention": "Needs attention"} | {m.value: m.label for m in MainStage}
+OPEN_MAIN = (MainStage.COVERAGE, MainStage.SELECTION, MainStage.ALLOC_PENDING)
 
 
 @dataclass
@@ -76,11 +71,9 @@ class DemandRow:
     open_escalations: list[Escalation]
 
     @property
-    def group(self) -> str:
-        s = self.demand.status_enum
-        if s in FINISHED:
-            return "finished"
-        return "before_gtd" if s in BEFORE_GTD else "linked"
+    def main(self) -> MainStage:
+        """The main stage; `status_label` is the sub-stage (or the open escalation) within it."""
+        return self.demand.status_enum.main
 
 
 def _describe(d: Demand, escs: list[Escalation], today: date) -> tuple[str, str, str, bool]:
@@ -161,8 +154,8 @@ def filter_rows(rows: list[DemandRow], filter_key: str = "all", bu_id: int | Non
         rows = [r for r in rows if r.demand.bu_id == bu_id]
     if filter_key == "attention":
         return [r for r in rows if r.attention]
-    if filter_key in ("before_gtd", "linked", "finished"):
-        return [r for r in rows if r.group == filter_key]
+    if filter_key in {m.value for m in MainStage}:
+        return [r for r in rows if r.main.value == filter_key]
     return rows
 
 
@@ -171,12 +164,13 @@ def filter_counts(rows: list[DemandRow]) -> dict[str, int]:
 
 
 def summary(rows: list[DemandRow]) -> dict[str, int]:
-    """The four cards above the list. Counts open demands only."""
-    open_rows = [r for r in rows if r.group != "finished"]
+    """The cards above the list: open demands, by main stage, and those needing attention."""
+    open_rows = [r for r in rows if r.main in OPEN_MAIN]
     return {
         "open": len(open_rows),
-        "before_gtd": sum(r.group == "before_gtd" for r in open_rows),
-        "in_coverage": sum(r.group == "linked" and not r.attention for r in open_rows),
+        "coverage": sum(r.main is MainStage.COVERAGE for r in rows),
+        "selection": sum(r.main is MainStage.SELECTION for r in rows),
+        "alloc_pending": sum(r.main is MainStage.ALLOC_PENDING for r in rows),
         "attention": sum(r.attention for r in open_rows),
     }
 

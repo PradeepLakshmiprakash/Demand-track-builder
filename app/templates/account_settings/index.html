@@ -136,13 +136,13 @@
       <div class="tr">
         <input type="text" name="status_group" value="{{ m.status_group }}" placeholder="(blank)" aria-label="Status group {{ loop.index }}">
         <input type="text" name="status" value="{{ m.status }}" aria-label="Status {{ loop.index }}">
-        <select name="stage" aria-label="App stage {{ loop.index }}">{% for st in stages %}<option value="{{ st.value }}" {{ 'selected' if m.stage == st }}>{{ st.label }}</option>{% endfor %}</select>
+        <select name="stage" aria-label="App stage {{ loop.index }}">{% for st in stages %}<option value="{{ st.value }}" {{ 'selected' if m.stage == st }}>{{ st.full }}</option>{% endfor %}</select>
       </div>
       {% endfor %}
       <div class="tr">
         <input type="text" name="status_group" placeholder="New status group" aria-label="New status group">
         <input type="text" name="status" placeholder="New status" aria-label="New status">
-        <select name="stage" aria-label="New app stage">{% for st in stages %}<option value="{{ st.value }}">{{ st.label }}</option>{% endfor %}</select>
+        <select name="stage" aria-label="New app stage">{% for st in stages %}<option value="{{ st.value }}">{{ st.full }}</option>{% endfor %}</select>
       </div>
     </div>
     <div class="panel-body"><button class="btn primary">Save mapping</button></div>

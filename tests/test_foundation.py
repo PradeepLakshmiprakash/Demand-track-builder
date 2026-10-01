@@ -48,8 +48,17 @@ def test_rows_and_summary_for_priya(db: Session) -> None:
     assert not by_ref["DM-000116"].attention  # staffed is never "past start"
     assert by_ref["DM-000142"].req_id == "2ZT7KP"
 
-    assert summary(rows) == {"open": 7, "before_gtd": 2, "in_coverage": 1, "attention": 4}
-    assert filter_counts(rows) == {"all": 8, "attention": 4, "before_gtd": 2, "linked": 5, "finished": 1}
+    assert summary(rows) == {"open": 7, "coverage": 4, "selection": 0, "alloc_pending": 3, "attention": 4}
+    assert filter_counts(rows) == {
+        "all": 8,
+        "attention": 4,
+        "coverage": 4,
+        "selection": 0,
+        "alloc_pending": 3,
+        "alloc_done": 1,
+        "abandoned": 0,
+    }
+    assert by_ref["DM-000142"].main.label == "Coverage Required"  # main stage; the sub-stage is the label
 
 
 def test_seed_has_two_accounts(db: Session) -> None:

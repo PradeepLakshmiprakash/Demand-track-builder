@@ -43,14 +43,15 @@
 
 <section class="panel panel-body">
   <h2>Pipeline by stage</h2>
-  <div class="hint" style="margin-top:4px">Every demand past draft, by where it is now.</div>
+  <div class="hint" style="margin-top:4px">Every demand past draft, by main stage, with the sub-stages inside each.</div>
   <div class="bars" role="list" aria-label="Demands by stage">
     {% for key, label, n in o.pipeline %}
     <div class="bar-row" role="listitem" title="{{ label }}: {{ n }} demand{{ 's' if n != 1 }}">
       <div class="bar-label">{{ label }}</div>
-      <div class="bar-track"><div class="bar {{ 'bar-risk' if key == 'incorrect' or key == 'gtd' }}" style="width: {{ (100 * n / max_group) | round(1) }}%"></div></div>
+      <div class="bar-track"><div class="bar {{ 'bar-risk' if key == 'abandoned' }}" style="width: {{ (100 * n / max_group) | round(1) }}%"></div></div>
       <div class="bar-value">{{ n }}</div>
     </div>
+    {% if o.subs.get(key) %}<div class="bar-subs small muted">{% for name, c in o.subs[key] %}{{ c }} {{ name | lower }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
     {% endfor %}
   </div>
 </section>

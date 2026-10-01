@@ -237,7 +237,7 @@ def test_demands_list_shows_panel_progress(client: Client, db: Session) -> None:
         db, db.get_one(Account, 1), user_id("vikram"), svc.ensure_candidate(db, 1, d, "Shown Here"), fb()
     )
     row = next(x for x in client.as_user("neha").get("/api/demands").json() if x["app_ref"] == "DM-000146")
-    assert row["status_label"] == "Selected by panel"
+    assert (row["main_stage"], row["status_label"]) == ("Selection In Progress", "Panel selected")
     assert "Shown Here selected by the panel at L1 · client interview next" in client.get("/demands").text
 
 

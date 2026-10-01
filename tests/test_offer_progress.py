@@ -83,4 +83,4 @@ def test_date_of_joining_and_candidate_stage_come_from_the_sheet(client: Client,
     cand = db.scalars(
         select(Candidate).where(Candidate.demand_id == d.id, Candidate.name == "Candidate D")
     ).one()
-    assert cand.current_stage == "Offer in market"
+    assert cand.current_stage == "Offer made, joining awaited"

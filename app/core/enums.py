@@ -106,27 +106,90 @@ class DemandStatus(StrEnum):
     def phase(self) -> str:
         return STATUS_META[self][2]
 
+    @property
+    def main(self) -> "MainStage":
+        """The main stage this sub-stage belongs to."""
+        return MAIN_OF[self]
 
-# label, chip colour, phase
+    @property
+    def full(self) -> str:
+        """Main stage and sub-stage together: "Coverage Required · GTD approval pending"."""
+        return f"{MAIN_OF[self].label} · {STATUS_META[self][0]}"
+
+
+# sub-stage name, chip colour, phase
 STATUS_META: dict[DemandStatus, tuple[str, str, str]] = {
     DemandStatus.DRAFT: ("Draft", "gray", "before_gtd"),
-    DemandStatus.SUBMITTED: ("Submitted", "gray", "before_gtd"),
-    DemandStatus.NOTIFIED: ("In admin mail", "gray", "before_gtd"),
-    DemandStatus.SENT_TO_GTD: ("Sent to GTD", "blue", "before_gtd"),
-    DemandStatus.RETURNED: ("Returned for correction", "risk", "before_gtd"),
-    DemandStatus.LINKED: ("Linked", "teal", "linking"),
-    DemandStatus.MISSING: ("Missing from sheet", "esc", "linking"),
-    DemandStatus.DROPPED: ("Dropped from sheet", "esc", "linking"),
-    DemandStatus.INCORRECT: ("Incorrect demand", "esc", "linking"),
-    DemandStatus.COVERAGE_REQUIRED: ("Coverage required", "teal", "coverage"),
-    DemandStatus.INTERVIEWING: ("Interviewing", "teal", "coverage"),
-    DemandStatus.PANEL_SELECTED: ("Selected by panel", "blue", "coverage"),
-    DemandStatus.PROFILES_WITH_CLIENT: ("Profiles with client", "teal", "coverage"),
-    DemandStatus.OFFER_IN_PROCESS: ("Offer in process", "blue", "coverage"),
-    DemandStatus.OFFER_IN_MARKET: ("Offer in market", "blue", "coverage"),
-    DemandStatus.STAFFED: ("Staffed", "done", "coverage"),
-    DemandStatus.CANCELLED: ("Cancelled", "gray", "end"),
-    DemandStatus.CLOSED: ("Closed", "gray", "end"),
+    DemandStatus.SUBMITTED: ("GTD creation pending", "gray", "before_gtd"),
+    DemandStatus.NOTIFIED: ("GTD creation pending", "gray", "before_gtd"),
+    DemandStatus.SENT_TO_GTD: ("GTD approval pending", "blue", "before_gtd"),
+    DemandStatus.RETURNED: ("Correction required", "risk", "before_gtd"),
+    DemandStatus.LINKED: ("GTD approved", "teal", "linking"),
+    DemandStatus.MISSING: ("GTD approval overdue", "esc", "linking"),
+    DemandStatus.DROPPED: ("Removed from sheet", "esc", "linking"),
+    DemandStatus.INCORRECT: ("Marked incorrect", "esc", "linking"),
+    DemandStatus.COVERAGE_REQUIRED: ("Sourcing profiles", "teal", "coverage"),
+    DemandStatus.INTERVIEWING: ("Panel interview", "teal", "coverage"),
+    DemandStatus.PANEL_SELECTED: ("Panel selected", "blue", "coverage"),
+    DemandStatus.PROFILES_WITH_CLIENT: ("Client interview", "teal", "coverage"),
+    DemandStatus.OFFER_IN_PROCESS: ("Offer approval pending", "blue", "coverage"),
+    DemandStatus.OFFER_IN_MARKET: ("Offer made, joining awaited", "blue", "coverage"),
+    DemandStatus.STAFFED: ("Joined", "done", "coverage"),
+    DemandStatus.CANCELLED: ("Cancelled in sheet", "gray", "end"),
+    DemandStatus.CLOSED: ("Closed by owner or GTD team", "gray", "end"),
+}
+
+
+class MainStage(StrEnum):
+    """The five stages leadership talks in (the names Acquisition Central uses). Every demand status is
+    a sub-stage of exactly one of them."""
+
+    COVERAGE = "coverage"
+    SELECTION = "selection"
+    ALLOC_PENDING = "alloc_pending"
+    ALLOC_DONE = "alloc_done"
+    ABANDONED = "abandoned"
+
+    @property
+    def label(self) -> str:
+        return MAIN_STAGE_META[self][0]
+
+    @property
+    def chip(self) -> str:
+        return MAIN_STAGE_META[self][1]
+
+    @property
+    def subs(self) -> tuple["DemandStatus", ...]:
+        return tuple(s for s in DemandStatus if MAIN_OF[s] is self)
+
+
+MAIN_STAGE_META = {
+    MainStage.COVERAGE: ("Coverage Required", "teal"),
+    MainStage.SELECTION: ("Selection In Progress", "blue"),
+    MainStage.ALLOC_PENDING: ("Allocation Pending", "blue"),
+    MainStage.ALLOC_DONE: ("Allocation Completed", "done"),
+    MainStage.ABANDONED: ("Abandoned", "gray"),
+}
+
+MAIN_OF: dict[DemandStatus, MainStage] = {
+    DemandStatus.DRAFT: MainStage.COVERAGE,
+    DemandStatus.SUBMITTED: MainStage.COVERAGE,
+    DemandStatus.NOTIFIED: MainStage.COVERAGE,
+    DemandStatus.SENT_TO_GTD: MainStage.COVERAGE,
+    DemandStatus.RETURNED: MainStage.COVERAGE,
+    DemandStatus.LINKED: MainStage.COVERAGE,
+    DemandStatus.MISSING: MainStage.COVERAGE,
+    DemandStatus.DROPPED: MainStage.COVERAGE,
+    DemandStatus.INCORRECT: MainStage.COVERAGE,
+    DemandStatus.COVERAGE_REQUIRED: MainStage.COVERAGE,
+    DemandStatus.INTERVIEWING: MainStage.SELECTION,
+    DemandStatus.PANEL_SELECTED: MainStage.SELECTION,
+    DemandStatus.PROFILES_WITH_CLIENT: MainStage.SELECTION,
+    DemandStatus.OFFER_IN_PROCESS: MainStage.ALLOC_PENDING,
+    DemandStatus.OFFER_IN_MARKET: MainStage.ALLOC_PENDING,
+    DemandStatus.STAFFED: MainStage.ALLOC_DONE,
+    DemandStatus.CANCELLED: MainStage.ABANDONED,
+    DemandStatus.CLOSED: MainStage.ABANDONED,
 }
 
 BEFORE_GTD = frozenset(s for s in DemandStatus if s.phase == "before_gtd")

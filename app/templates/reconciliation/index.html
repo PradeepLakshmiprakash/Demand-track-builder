@@ -46,7 +46,7 @@
     <div class="tbl plain">
       {% for ref in refs %}{% set d = demands.get(ref) %}
       <div class="tr">
-        <div>{{ dref(ref) }}{% if d %}<div class="note">{{ d.owner.name }} · {{ d.status_enum.label }}</div>{% endif %}</div>
+        <div>{{ dref(ref) }}{% if d %}<div class="note">{{ d.owner.name }} · {{ d.status_enum.full }}</div>{% endif %}</div>
         <div class="small">{% for e in escs.get(d.id, []) if d %}<span class="chip esc">{{ e.type_enum.short }} · L{{ e.level }}</span> <span class="muted">{{ e.detail }}</span>{% endfor %}</div>
       </div>
       {% endfor %}

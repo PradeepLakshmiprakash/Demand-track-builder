@@ -91,6 +91,7 @@ def overview_json(actor: Actor = Depends(guard), db: Session = Depends(get_db)) 
         "projected_to_doj": o.projected,
         "missing_bill_rates": o.missing_rates,
         "pipeline": {key: n for key, _, n in o.pipeline},
+        "sub_stages": {key: dict(rows) for key, rows in o.subs.items()},
         "at_risk": [
             {
                 "app_ref": x.demand.app_ref,

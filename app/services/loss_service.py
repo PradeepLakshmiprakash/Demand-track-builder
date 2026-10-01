@@ -16,7 +16,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.enums import DemandStatus
+from app.core.enums import DemandStatus, MainStage
 from app.core.workdays import is_working_day
 from app.models import Account, BusinessUnit, Demand
 from app.services.escalation_service import current_doj
@@ -79,24 +79,13 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
 # --- Leadership overview -----------------------------------------------------------------------------
 
 # Pipeline groups, in the order the demand moves through them.
-GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [
-    ("before_gtd", "Before GTD", (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED, DemandStatus.RETURNED)),
-    (
-        "gtd",
-        "With GTD, not in sheet yet",
-        (DemandStatus.SENT_TO_GTD, DemandStatus.MISSING, DemandStatus.DROPPED),
-    ),
-    ("wip", "Work in progress", (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)),
-    ("interviewing", "Interviewing (panel)", (DemandStatus.INTERVIEWING,)),
-    ("selected", "Selected by panel", (DemandStatus.PANEL_SELECTED,)),
-    ("client", "Profiles with client", (DemandStatus.PROFILES_WITH_CLIENT,)),
-    ("offer", "Offer in market or process", (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)),
-    ("staffed", "Staffed", (DemandStatus.STAFFED,)),
-    ("cancelled", "Cancelled or closed", (DemandStatus.CANCELLED, DemandStatus.CLOSED)),
-    ("incorrect", "Incorrect demand", (DemandStatus.INCORRECT,)),
-]
-GROUP_OF = {s: key for key, _, statuses in GROUPS for s in statuses}
-OPEN_GROUPS = ("before_gtd", "gtd", "wip", "interviewing", "selected", "client", "offer", "incorrect")
+# The pipeline is read by main stage (the five stages leadership talks in); each bar breaks down into
+# its sub-stages.
+GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [(m.value, m.label, m.subs) for m in MainStage]
+GROUP_OF = {s: s.main.value for s in DemandStatus}
+OPEN_GROUPS = (MainStage.COVERAGE.value, MainStage.SELECTION.value, MainStage.ALLOC_PENDING.value)
+# Still looking for someone: linked to GTD and sourcing, nobody in the panel yet.
+NEED_COVERAGE = (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)
 
 
 @dataclass
@@ -116,7 +105,8 @@ class Slice:
 @dataclass
 class Overview:
     today: date
-    pipeline: list[tuple[str, str, int]]  # key, label, count
+    pipeline: list[tuple[str, str, int]]  # main stage: key, label, count
+    subs: dict[str, list[tuple[str, int]]]  # main stage key → (sub-stage name, count), non-empty only
     open: int
     live: int
     need_coverage: int
@@ -139,8 +129,17 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
         )
     )
     counts = {key: 0 for key, _, _ in GROUPS}
+    by_sub: dict[DemandStatus, int] = {}
     for d in demands:
         counts[GROUP_OF[d.status_enum]] += 1
+        by_sub[d.status_enum] = by_sub.get(d.status_enum, 0) + 1
+    subs: dict[str, list[tuple[str, int]]] = {}
+    for m in MainStage:
+        merged: dict[str, int] = {}  # two statuses can share a sub-stage name (GTD creation pending)
+        for st in m.subs:
+            if by_sub.get(st):
+                merged[st.label] = merged.get(st.label, 0) + by_sub[st]
+        subs[m.value] = list(merged.items())
 
     loss = losses(db, account_id, today)
     lost_by_demand = {x.demand.id: x.lost or Decimal(0) for x in loss}
@@ -160,9 +159,10 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
     return Overview(
         today=today,
         pipeline=[(k, label, counts[k]) for k, label, _ in GROUPS],
+        subs=subs,
         open=sum(counts[k] for k in OPEN_GROUPS),
         live=len(demands),
-        need_coverage=counts["wip"],
+        need_coverage=sum(by_sub.get(st, 0) for st in NEED_COVERAGE),
         at_risk=[x for x in loss if not x.filled],
         lost_to_date=sum((x.lost for x in loss if x.lost is not None), Decimal(0)),
         projected=sum((x.projected for x in loss if x.projected is not None), Decimal(0)),

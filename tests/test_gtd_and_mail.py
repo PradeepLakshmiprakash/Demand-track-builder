@@ -215,4 +215,4 @@ def test_phase2_exit_draft_to_sent_to_gtd(client: Client, db: Session) -> None:
     assert history == ["draft", "submitted", "notified", "sent_to_gtd"]
 
     page = client.as_user("arjun").get(f"/demands/{ref}").text
-    assert "Q4WN8Z" in page and "Sent to GTD" in page
+    assert "Q4WN8Z" in page and "Coverage Required" in page and "GTD approval pending" in page

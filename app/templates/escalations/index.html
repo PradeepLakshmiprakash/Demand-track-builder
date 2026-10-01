@@ -57,7 +57,7 @@
     <div>
       <div class="eyebrow">{{ 'Respond' if e.status == 'open' else 'Resolved' }}</div>
       <h2 style="font-size:20px;margin-top:2px"><a class="mono" href="/demands/{{ sd.app_ref }}">{{ sd.gtd_req_id or sd.app_ref }}</a> {{ sd.name }}</h2>
-      <div class="small muted" style="margin-top:4px">{{ e.type_enum.label }} · <span class="sev-{{ e.severity }}">{{ e.severity_enum.label }} severity</span> · L{{ e.level }} · {{ sd.app_ref }} · owner {{ sd.owner.name }} · {{ sd.status_enum.label }}</div>
+      <div class="small muted" style="margin-top:4px">{{ e.type_enum.label }} · <span class="sev-{{ e.severity }}">{{ e.severity_enum.label }} severity</span> · L{{ e.level }} · {{ sd.app_ref }} · owner {{ sd.owner.name }} · {{ sd.status_enum.full }}</div>
     </div>
     <div class="small stack" style="gap:4px">
       <div>{{ e.detail }}</div>

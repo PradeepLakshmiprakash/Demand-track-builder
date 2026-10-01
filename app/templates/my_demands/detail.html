@@ -7,7 +7,7 @@
     <a href="/demands" class="small">← {{ 'My demands' if actor.scope.value != 'full' else 'All demands' }}</a>
     <div class="eyebrow" style="margin-top:8px"><span class="mono">{{ d.app_ref }}</span>{% if d.gtd_req_id %} · GTD <span class="mono">{{ d.gtd_req_id }}</span>{% endif %} · {{ d.business_unit.name }} · {{ d.owner.name }}</div>
     <h1>{{ d.name }}</h1>
-    <div style="margin-top:10px"><span class="chip {{ d.status_enum.chip }}">{{ d.status_enum.label }}</span></div>
+    <div style="margin-top:10px"><span class="chip {{ d.status_enum.main.chip }}">{{ d.status_enum.main.label }}</span> <span class="chip {{ d.status_enum.chip }}">{{ d.status_enum.label }}</span></div>
   </div>
   <div class="row">
     {% if can_change %}<a class="btn" href="/demands/{{ d.app_ref }}/edit">Edit</a>{% endif %}
