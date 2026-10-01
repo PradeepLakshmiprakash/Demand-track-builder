@@ -44,8 +44,8 @@ def _values(demand: Demand | None, actor: Actor) -> dict[str, Any]:
     v = {f: getattr(demand, f, None) for f in FIELDS if f != "positions"}
     v["primary_skills"] = ", ".join(demand.primary_skills)
     v["secondary_skills"] = ", ".join(demand.secondary_skills)
-    if not actor.can_see_bill_rate:
-        v["client_rate"] = None  # write-only for demand owners
+    if not actor.sees_rates(demand.owner_id):
+        v["client_rate"] = None  # hidden from a BU colleague who can only read the demand
     return v
 
 

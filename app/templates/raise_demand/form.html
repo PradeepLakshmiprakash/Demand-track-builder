@@ -82,8 +82,8 @@
       <legend>Commercial and timing</legend>
       <div class="grid2">
         <label class="f">Client bill rate (per hour)
-          <input type="number" name="client_rate" min="0" step="0.01" value="{{ v.client_rate if v.client_rate is not none else '' }}" placeholder="{{ 'On file. Leave blank to keep it.' if rate_on_file and not actor.can_see_bill_rate else '' }}">
-          <span class="hint">Only the GTD team admin and leadership see this after it's saved.</span>
+          <input type="number" name="client_rate" min="0" step="0.01" value="{{ v.client_rate if v.client_rate is not none else '' }}" >
+          <span class="hint">Seen by you, the GTD team admin and leadership. Used for the offer margin and revenue loss.</span>
         </label>
         <label class="f">Requested start date<input type="date" name="start_date" value="{{ v.start_date or '' }}"><span class="hint">Revenue loss is counted from this date</span></label>
         <label class="f">Region

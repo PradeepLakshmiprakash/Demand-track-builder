@@ -367,11 +367,12 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
     assert demand(db, ref).status == "offer_in_process"
     offer = db.scalars(select(OfferApproval).where(OfferApproval.demand_id == d.id)).one()
     assert (offer.cost_rate, offer.margin_pct, offer.route) == (Decimal("50.00"), Decimal("37.50"), "admin")
-    _post(client.as_user("pat"), f"/approvals/{offer.id}/decide", {"decision": "approved", "comment": ""})
+    # 37.5% is above the 20% cut-off: the demand owner approves; the GTD team admin is notified.
+    _post(client.as_user("uma"), f"/approvals/{offer.id}/decide", {"decision": "approved", "comment": ""})
     assert any(
-        "Offer for Candidate Z approved" in m.subject for m in mail.sent if m.to == ["uma.s@example.com"]
+        "Offer for Candidate Z approved" in m.subject for m in mail.sent if m.to == ["pat.q@example.com"]
     )
-    assert "Globex Retail" in client.get("/overview").text
+    assert "Globex Retail" in client.as_user("pat").get("/overview").text
     escalation_service.sweep(db, account_id("Globex Retail"))
 
     # 5. Still isolated, and Farah is still GTD admin team in Discover.

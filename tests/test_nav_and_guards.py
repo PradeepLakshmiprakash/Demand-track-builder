@@ -18,7 +18,13 @@ def menu(client: Client) -> list[str]:
 
 
 def test_demand_owner_menu(client: Client) -> None:
-    assert menu(client.as_user("priya")) == ["My demands", "Raise demand", "My escalations"]
+    assert menu(client.as_user("priya")) == [
+        "My demands",
+        "Raise demand",
+        "My escalations",
+        "Offer approvals",
+        "Margin calculator",
+    ]
 
 
 def test_admin_menu(client: Client) -> None:

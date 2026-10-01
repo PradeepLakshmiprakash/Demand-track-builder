@@ -1,4 +1,5 @@
-"""GTD team admin and leadership: offer margin approvals."""
+"""Offer margin approvals: the demand owner decides at or above the cut-off (the GTD team admin is
+notified), leadership below it."""
 
 from urllib.parse import quote
 

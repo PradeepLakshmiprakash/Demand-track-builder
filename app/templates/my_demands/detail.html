@@ -45,7 +45,7 @@
     <section class="panel panel-body">
       <h2>Commercial and timing</h2>
       <div class="facts">
-        {% if actor.can_see_bill_rate %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
+        {% if sees_rates %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
         {{ field('Requested start date', d.start_date | d) }}
         {% if loss %}{{ field('Revenue lost to date', (loss.lost | money if loss.lost is not none else 'bill rate missing') ~ ' · ' ~ loss.working_days_late ~ ' working days unfilled since ' ~ (d.loss_from | d)) }}{% endif %}
         {% if doj %}{{ field('Date of joining', (doj | d) ~ (' · %d days after the requested start' % (doj - d.start_date).days if d.start_date and doj > d.start_date else '')) }}{% endif %}
@@ -70,7 +70,7 @@
       {% for o in offers %}
         <div class="cand-mini">
           <div class="title">{{ o.candidate }} <span class="chip {{ o.chip }}">{{ o.state }}</span></div>
-          <div class="small muted">{{ o.detail }}{% if actor.can_see_bill_rate and o.approval.margin_pct is not none %} · margin {{ '%.1f' % o.approval.margin_pct }}%{% endif %}</div>
+          <div class="small muted">{{ o.detail }}{% if sees_rates and o.approval.margin_pct is not none %} · bill {{ '$%.2f' % o.approval.bill_rate }}/h · cost {{ '$%.2f' % o.approval.cost_rate }}/h · margin {{ '%.1f' % o.approval.margin_pct }}%{% endif %}{% if o.state == 'Waiting for approval' and o.detail == 'with the demand owner' and actor.id == d.owner_id %} · <a href="/approvals#a{{ o.approval.id }}">Decide</a>{% endif %}</div>
         </div>
       {% endfor %}
     </section>

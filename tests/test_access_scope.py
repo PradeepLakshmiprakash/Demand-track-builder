@@ -47,9 +47,13 @@ def test_full_account_roles_see_everything(client: Client) -> None:
         assert {d["business_unit"] for d in seen.values()} == {"CARDS", "BANKING", "PAYMENTS", "DATA"}
 
 
-def test_bill_rate_hidden_from_demand_owners(client: Client) -> None:
-    assert all("client_rate" not in d for d in refs(client.as_user("priya")).values())
+def test_owners_see_the_bill_rate_on_their_own_demands_only(client: Client) -> None:
+    assert all("client_rate" in d for d in refs(client.as_user("priya")).values())  # all her own
+    rahul = refs(client.as_user("rahul"))  # his own, plus the rest of CARDS read-only
+    assert {("client_rate" in d) for d in rahul.values() if d["read_only"]} == {False}
+    assert all("client_rate" in d for d in rahul.values() if not d["read_only"])
     assert all("client_rate" in d for d in refs(client.as_user("kavya")).values())
+    assert all("client_rate" not in d for d in refs(client.as_user("farah")).values())  # GTD admin team
 
 
 def test_leadership_sees_but_cannot_edit(client: Client) -> None:

@@ -51,7 +51,7 @@
       <div class="bar-track"><div class="bar {{ 'bar-risk' if key == 'abandoned' }}" style="width: {{ (100 * n / max_group) | round(1) }}%"></div></div>
       <div class="bar-value">{{ n }}</div>
     </div>
-    {% if o.subs.get(key) %}<div class="bar-subs small muted">{% for name, c in o.subs[key] %}{{ c }} {{ name | lower }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
+    {% if o.subs.get(key) %}<div class="bar-subs small muted">{% for name, c in o.subs[key] %}{{ c }} {{ name }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
     {% endfor %}
   </div>
 </section>

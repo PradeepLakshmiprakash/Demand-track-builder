@@ -38,7 +38,7 @@ def test_owner_sees_revenue_lost_on_their_own_demands(client: Client) -> None:
     assert "Revenue lost to date" in listing and "of my demands unfilled past their start" in listing
     page = c.get("/demands/DM-000117").text  # past its start, no joining date
     assert "Revenue lost to date" in page and "working days unfilled since" in page
-    assert "Client bill rate" not in page  # the rate itself stays hidden
+    assert "Client bill rate" in page  # the owner sees the rate on their own demand
     # not for someone else's demand, and not for the GTD admin team
     assert "Revenue lost to date" not in client.as_user("farah").get("/demands/DM-000117").text
 
@@ -56,12 +56,16 @@ def test_owner_asks_for_the_offer_approval(client: Client, db: Session) -> None:
     offer = db.scalars(select(OfferApproval).where(OfferApproval.candidate_id == cid)).one()
     # D1 Sogeti: cost 80, bill 125 → 36%: the GTD team admin decides
     assert offer.channel == "sogeti" and offer.route == "admin"
-    [m] = mail.sent
-    assert m.to == ["kavya.r@example.com"] and m.cc == ["neha.t@example.com"]
-    assert "Offer approval requested for Asked For" in m.subject and "Steps:" in m.text
+    [m] = mail.sent  # at 36% it is hers to decide; the GTD team admin is notified
+    assert m.to == ["neha.t@example.com"] and m.cc == ["kavya.r@example.com"]
+    assert "Offer approval needed for Asked For" in m.subject and "Steps:" in m.text
 
     page = neha.get("/demands/DM-000146").text
     assert "Waiting for approval" in page and "Ask for offer approval" not in page
+    assert "margin 36.0%" in page and ">Decide</a>" in page
+    r = neha.post(f"/approvals/{offer.id}/decide", data={"decision": "approved", "comment": ""})
+    assert "msg=Offer" in r.headers["location"]
+    assert "Approved" in neha.get("/demands/DM-000146").text
     assert (
         "err="
         in neha.post(

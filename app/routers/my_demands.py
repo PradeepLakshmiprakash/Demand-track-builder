@@ -96,7 +96,7 @@ def demands_json(
             "owner": d.owner.name,
             "read_only": r.read_only,
         }
-        if actor.can_see_bill_rate:
+        if actor.sees_rates(d.owner_id):
             item["client_rate"] = d.client_rate
         out.append(item)
     return out
@@ -141,6 +141,7 @@ def demand_page(
         returned=_returned(db, demand),
         doj=current_doj(db, actor.account_id).get(demand.id),
         offers=margin_service.for_demand(db, demand.id),
+        sees_rates=actor.sees_rates(demand.owner_id),
         # The owner follows the money on their own demand; so do the roles that see rates.
         loss=_loss(db, actor, demand),
         askable=margin_service.askable(db, demand) if actor.id == demand.owner_id else [],

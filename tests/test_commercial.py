@@ -153,15 +153,20 @@ def test_offers_from_the_sheet_are_priced_and_routed(client: Client, db: Session
     )
 
 
-def test_admin_decides_at_or_above_cutoff_only(client: Client, db: Session) -> None:
+def test_demand_owner_decides_at_or_above_cutoff_only(client: Client, db: Session) -> None:
     import_sample(client)
-    admin = actor(db, "kavya")
-    with pytest.raises(ApprovalError, match="decided by leadership"):
-        margin_service.decide(db, admin, offer_for(db, "DM-000121").id, "approved", "ok")
-    a = margin_service.decide(db, admin, offer_for(db, "DM-000131").id, "approved", None)
-    assert (a.decision, a.approver_id) == ("approved", user_id("kavya")) and a.decided_at is not None
+    rahul = actor(db, "rahul")  # owner of DM-000131 (43.75%)
+    with pytest.raises(ApprovalError, match="decided by the demand owner"):
+        margin_service.decide(db, actor(db, "kavya"), offer_for(db, "DM-000131").id, "approved", None)
+    with pytest.raises(ApprovalError, match="decided by the demand owner"):  # another owner can't either
+        margin_service.decide(db, actor(db, "neha"), offer_for(db, "DM-000131").id, "approved", None)
+    a = margin_service.decide(db, rahul, offer_for(db, "DM-000131").id, "approved", None)
+    assert (a.decision, a.approver_id) == ("approved", user_id("rahul")) and a.decided_at is not None
     with pytest.raises(ApprovalError, match="already been decided"):
-        margin_service.decide(db, admin, a.id, "declined", "changed my mind")
+        margin_service.decide(db, rahul, a.id, "declined", "changed my mind")
+    # below the cut-off even the demand's own owner can't: leadership decides
+    with pytest.raises(ApprovalError, match="decided by leadership"):
+        margin_service.decide(db, actor(db, "priya"), offer_for(db, "DM-000121").id, "approved", "ok")
 
 
 def test_leadership_exception_needs_a_comment(client: Client, db: Session) -> None:
@@ -170,7 +175,7 @@ def test_leadership_exception_needs_a_comment(client: Client, db: Session) -> No
     below = offer_for(db, "DM-000121")
     with pytest.raises(ApprovalError, match="why the exception"):
         margin_service.decide(db, lead, below.id, "approved", "")
-    with pytest.raises(ApprovalError, match="decided by the GTD team admin"):
+    with pytest.raises(ApprovalError, match="decided by the demand owner"):
         margin_service.decide(db, lead, offer_for(db, "DM-000131").id, "approved", "fine")
     a = margin_service.decide(db, lead, below.id, "approved", "Strategic account, client pays in Q4")
     assert a.decision == "approved" and a.margin_pct == Decimal("24.84")
@@ -179,7 +184,7 @@ def test_leadership_exception_needs_a_comment(client: Client, db: Session) -> No
 def test_decline_needs_a_comment(client: Client, db: Session) -> None:
     import_sample(client)
     with pytest.raises(ApprovalError, match="why it's declined"):
-        margin_service.decide(db, actor(db, "kavya"), offer_for(db, "DM-000131").id, "declined", None)
+        margin_service.decide(db, actor(db, "rahul"), offer_for(db, "DM-000131").id, "declined", None)
 
 
 def test_unpriced_offer_waits_then_reprices(client: Client, db: Session) -> None:
@@ -247,14 +252,21 @@ def test_admin_raises_approval_by_hand(client: Client, db: Session) -> None:
 
 def test_approvals_screen_by_role(client: Client, db: Session) -> None:
     import_sample(client)
-    admin_page = client.as_user("kavya").get("/approvals").text
+    admin_page = client.as_user("kavya").get("/approvals").text  # notified of all; decides none
     assert "Candidate B" in admin_page and "43.8%" in admin_page and "with leadership" in admin_page
+    assert "With the demand owner (Rahul K.)" in admin_page and 'value="approved"' not in admin_page
+    owner_page = client.as_user("rahul").get("/approvals").text  # his own demand's offer, his to decide
+    assert "Candidate B" in owner_page and 'value="approved"' in owner_page and "$45.00" in owner_page
+    assert "Candidate A" not in owner_page  # Priya's demand
+    priya_page = client.as_user("priya").get("/approvals").text  # hers is below the cut-off
+    assert "Candidate A" in priya_page and "with leadership" in priya_page
+    assert 'value="approved"' not in priya_page
     lead_page = client.as_user("sanjay").get("/approvals").text
     assert "Candidate A" in lead_page and "Why the exception" in lead_page
     a = offer_for(db, "DM-000121")
     r = client.post(f"/approvals/{a.id}/decide", data={"decision": "approved", "comment": "Strategic"})
     assert "msg=Offer" in r.headers["location"]
-    for who in ("priya", "farah", "vikram"):
+    for who in ("farah", "vikram"):
         assert client.as_user(who).get("/approvals").status_code == 403
 
 

@@ -24,10 +24,9 @@ from app.core.config import get_settings
 from app.core.enums import ApprovalRoute, Decision, DemandStatus, Role
 from app.core.security import Actor
 from app.models import Account, Candidate, Demand, OfferApproval, User, member_of
-from app.services import interview_service, rate_card_service
+from app.services import interview_service, notify_service, rate_card_service
 
 OFFER_STAGES = (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)
-DECIDERS = {ApprovalRoute.ADMIN.value: (Role.ADMIN,), ApprovalRoute.LEADERSHIP.value: (Role.LEADERSHIP,)}
 
 
 class ApprovalError(ValueError):
@@ -102,7 +101,49 @@ def ensure_offer(
     db.add(approval)
     price(db, account, approval, demand)
     db.flush()
+    notify_service.safely(_mail_raised, db, account, demand, cand, approval)
     return approval
+
+
+def _team_admins(db: Session, account_id: int) -> list[str]:
+    return [u.email for u in db.scalars(select(User).where(member_of(account_id, Role.ADMIN)))]
+
+
+def _numbers(approval: OfferApproval) -> str:
+    if approval.margin_pct is None:
+        return f"It can't be priced yet: {approval.blocked_reason}"
+    return f"Bill {approval.bill_rate}/h, vendor cost {approval.cost_rate}/h, margin {approval.margin_pct}%."
+
+
+def _mail_raised(
+    db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval
+) -> None:
+    """An offer needs a decision: mail whoever decides it. The GTD team admin is always notified."""
+    owner = db.get_one(User, demand.owner_id)
+    admins = _team_admins(db, account.id)
+    if approval.route == ApprovalRoute.LEADERSHIP.value:
+        to = [u.email for u in db.scalars(select(User).where(member_of(account.id, Role.LEADERSHIP)))]
+        who = f"Below the {account.margin_threshold:g}% cut-off: leadership decides."
+    else:  # at or above the cut-off, or not priced yet: the demand owner
+        to = [owner.email] if owner.active else []
+        who = "The demand owner decides." if approval.route else "The demand owner decides once it is priced."
+    to = to or admins
+    cc = sorted(({owner.email} if owner.active else set()) | set(admins) - set(to))
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    mail.send(
+        mail.Mail(
+            to=to,
+            cc=[c for c in cc if c not in to],
+            subject=f"[{ref}] Offer approval needed for {cand.name}",
+            text=(
+                f"An offer for {cand.name} on {demand.app_ref} ({demand.name}) needs a decision.\n"
+                f"{_numbers(approval)}\n{who}\n\n"
+                "Steps: open Offer approvals, check the margin, then approve or decline:\n"
+                f"{get_settings().app_base_url}/approvals\n\n"
+                "Others on this mail are notified only."
+            ),
+        )
+    )
 
 
 def request(db: Session, actor: Actor, demand_id: int, candidate_name: str, channel: str) -> OfferApproval:
@@ -145,7 +186,7 @@ def askable(db: Session, demand: Demand) -> list[Candidate]:
 
 def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: str) -> OfferApproval:
     """The demand owner raises the offer approval for a selected candidate, instead of waiting for
-    the BCM sheet to show the offer. It is priced and routed like any other; the deciders are mailed."""
+    the BCM sheet to show the offer. It is priced and routed like any other (ensure_offer mails it)."""
     if demand.account_id != actor.account_id or actor.id != demand.owner_id:
         raise ApprovalError("Only the demand's owner asks for its offer approval.")
     cand = next((c for c in askable(db, demand) if c.id == candidate_id), None)
@@ -157,22 +198,6 @@ def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: s
     approval = ensure_offer(db, account, demand, cand.name, channel)
     if approval is None:
         raise ApprovalError("An approval for this candidate already exists.")
-    roles = DECIDERS.get(approval.route or "", (Role.ADMIN,))  # unpriced: the GTD team admin completes it
-    to = [u.email for u in db.scalars(select(User).where(member_of(account.id, *roles)))]
-    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
-    mail.send(
-        mail.Mail(
-            to=to,
-            cc=[actor.email],
-            subject=f"[{ref}] Offer approval requested for {cand.name}",
-            text=(
-                f"{actor.name} asks for the offer approval for {cand.name}\n"
-                f"on {demand.app_ref} ({demand.name}).\n\n"
-                "Steps: open Offer approvals, check the margin, then approve or decline:\n"
-                f"{get_settings().app_base_url}/approvals"
-            ),
-        )
-    )
     db.commit()
     return approval
 
@@ -212,8 +237,13 @@ def _pending(db: Session, actor: Actor, approval_id: int) -> tuple[OfferApproval
     return approval, demand, db.get_one(Account, actor.account_id)
 
 
-def can_decide(actor: Actor, approval: OfferApproval) -> bool:
-    return approval.decision is None and approval.route is not None and actor.role in DECIDERS[approval.route]
+def can_decide(actor: Actor, approval: OfferApproval, demand: Demand) -> bool:
+    """At or above the cut-off the demand's owner decides; below it, leadership."""
+    if approval.decision is not None or approval.route is None:
+        return False
+    if approval.route == ApprovalRoute.LEADERSHIP.value:
+        return actor.role is Role.LEADERSHIP
+    return actor.id == demand.owner_id
 
 
 def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: str | None) -> OfferApproval:
@@ -221,8 +251,8 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
     price(db, account, approval, demand)  # decide on current numbers
     if approval.route is None:
         raise ApprovalError(f"Can't decide yet: {approval.blocked_reason}")
-    if not can_decide(actor, approval):
-        who = "the GTD team admin" if approval.route == ApprovalRoute.ADMIN.value else "leadership"
+    if not can_decide(actor, approval, demand):
+        who = ApprovalRoute(approval.route).decider
         cut = f"{account.margin_threshold:g}%"
         raise ApprovalError(f"A {approval.margin_pct}% margin offer is decided by {who} (cut-off {cut}).")
     try:
@@ -241,28 +271,35 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
     approval.approver_id, approval.decided_at = actor.id, datetime.now(UTC)
     cand = db.get_one(Candidate, approval.candidate_id)
     cand.current_stage = "Offer approved" if d is Decision.APPROVED else "Offer declined"
-    _mail_owner(db, demand, cand, approval, actor)
+    _mail_decision(db, account, demand, cand, approval, actor)
     db.commit()
     return approval
 
 
-def _mail_owner(db: Session, demand: Demand, cand: Candidate, approval: OfferApproval, actor: Actor) -> None:
-    """The demand owner hears the decision. No rates or margin: owners don't see them."""
+def _mail_decision(
+    db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval, actor: Actor
+) -> None:
+    """The decision goes to the GTD team admin (always notified) and to the demand owner when someone
+    else decided."""
     owner = db.get_one(User, demand.owner_id)
-    if not owner.active or owner.id == actor.id:
-        return
+    to = set(_team_admins(db, account.id)) | ({owner.email} if owner.active else set())
+    to.discard(actor.email)
     approved = approval.decision == Decision.APPROVED.value
     word = "approved" if approved else "declined"
     ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
     by = actor.name.rstrip(".")
     text = f"The offer for {cand.name} on {demand.app_ref} ({demand.name}) was {word} by {by}.\n"
+    text += f"{_numbers(approval)}\n"
+    if approval.comment:
+        text += f"Reason: {approval.comment}\n"
     text += (
-        "Staffing can now make the offer; the BCM sheet will show it in market with a date of joining.\n"
+        "Next: staffing makes the offer. Once it is accepted, the demand owner records the expected "
+        "date of joining on the demand; the BCM sheet confirms it.\n"
         if approved
-        else f"Reason: {approval.comment}\nStaffing goes back to the other candidates.\n"
+        else "Staffing goes back to the other candidates.\n"
     )
     text += f"\n{get_settings().app_base_url}/demands/{demand.app_ref}"
-    mail.send(mail.Mail(to=[owner.email], subject=f"[{ref}] Offer for {cand.name} {word}", text=text))
+    mail.send(mail.Mail(to=sorted(to), subject=f"[{ref}] Offer for {cand.name} {word}", text=text))
 
 
 @dataclass
@@ -303,7 +340,7 @@ def for_demand(db: Session, demand_id: int) -> list[OfferStatus]:
         elif a.decision == Decision.DECLINED.value:
             out.append(OfferStatus(c.name, "Declined", "esc", f"by {who}, {when}: {a.comment}", a))
         elif a.route == ApprovalRoute.ADMIN.value:
-            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with the GTD team admin", a))
+            out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with the demand owner", a))
         elif a.route == ApprovalRoute.LEADERSHIP.value:
             out.append(OfferStatus(c.name, "Waiting for approval", "risk", "with leadership", a))
         else:
@@ -316,7 +353,7 @@ def for_demand(db: Session, demand_id: int) -> list[OfferStatus]:
 @dataclass
 class Board:
     mine: list[tuple[OfferApproval, Demand, Candidate]]  # waiting for this actor
-    others: list[tuple[OfferApproval, Demand, Candidate]]  # waiting for the other route
+    others: list[tuple[OfferApproval, Demand, Candidate]]  # waiting for someone else to decide
     blocked: list[tuple[OfferApproval, Demand, Candidate]]
     decided: list[tuple[OfferApproval, Demand, Candidate]]
     without_request: list[Demand]  # at the offer stage with no approval yet
@@ -331,6 +368,8 @@ def board(db: Session, actor: Actor) -> Board:
         .where(Demand.account_id == actor.account_id)
         .order_by(OfferApproval.created_at.desc())
     ).all()
+    if actor.role is Role.DEMAND_OWNER:  # a demand owner sees the offers on their own demands only
+        rows = [r for r in rows if r[1].owner_id == actor.id]
     b = Board([], [], [], [], [])
     for a, d, c in rows:
         item = (a, d, c)
@@ -338,22 +377,27 @@ def board(db: Session, actor: Actor) -> Board:
             b.decided.append(item)
         elif a.route is None:
             b.blocked.append(item)
-        elif can_decide(actor, a):
+        elif can_decide(actor, a, d):
             b.mine.append(item)
         else:
             b.others.append(item)
     has = {d.id for _, d, _ in rows}
-    b.without_request = [
-        d
-        for d in db.scalars(
-            select(Demand)
-            .where(
-                Demand.account_id == actor.account_id, Demand.status == DemandStatus.OFFER_IN_PROCESS.value
+    b.without_request = (
+        []
+        if actor.role is not Role.ADMIN
+        else [
+            d
+            for d in db.scalars(
+                select(Demand)
+                .where(
+                    Demand.account_id == actor.account_id,
+                    Demand.status == DemandStatus.OFFER_IN_PROCESS.value,
+                )
+                .order_by(Demand.app_ref)
             )
-            .order_by(Demand.app_ref)
-        )
-        if d.id not in has
-    ]
+            if d.id not in has
+        ]
+    )
     return b
 
 
@@ -395,7 +439,7 @@ def what_if(
         margin = decides = None
         if bill:
             margin = ((bill - cost) / bill * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            decides = "GTD team admin" if margin >= threshold else "Leadership"
+            decides = "Demand owner" if margin >= threshold else "Leadership"
         min_bill = None
         if threshold < 100:
             min_bill = (cost / (1 - threshold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

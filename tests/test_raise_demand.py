@@ -101,14 +101,15 @@ def test_submit_validation(priya: Client, db: Session, change: dict[str, str], m
     assert db.scalar(select(Demand).where(Demand.app_ref == "DM-000152")) is None
 
 
-def test_bill_rate_is_write_only_for_demand_owners(priya: Client, client: Client, db: Session) -> None:
+def test_owner_sees_their_own_bill_rate(priya: Client, client: Client, db: Session) -> None:
     ref = ref_from(priya.post("/demands/new", data=form(client_rate="98.50", action="draft")))
-    assert "98.50" not in priya.get(f"/demands/{ref}").text
-    assert "98.50" not in priya.get(f"/demands/{ref}/edit").text
-    priya.post(f"/demands/{ref}/edit", data=form(client_rate="", action="draft", name="Renamed"))
+    assert "$98.50" in priya.get(f"/demands/{ref}").text
+    assert "98.50" in priya.get(f"/demands/{ref}/edit").text
+    priya.post(f"/demands/{ref}/edit", data=form(client_rate="", action="submit", name="Renamed"))
     d = demand(db, ref)
     assert d.name == "Renamed" and str(d.client_rate) == "98.50"  # blank kept it
     assert "$98.50" in client.as_user("kavya").get(f"/demands/{ref}").text
+    assert "98.50" not in client.as_user("farah").get(f"/demands/{ref}").text  # not the GTD admin team
 
 
 def test_edit_until_it_goes_out_in_the_mail(priya: Client, db: Session) -> None:

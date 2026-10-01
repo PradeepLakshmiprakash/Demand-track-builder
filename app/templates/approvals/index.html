@@ -19,16 +19,16 @@
   {% elif a.decision %}
   <div class="small"><span class="chip {{ 'done' if a.decision == 'approved' else 'esc' }}">{{ a.decision | capitalize }}</span>{% if a.comment %}<div class="muted">{{ a.comment }}</div>{% endif %}<div class="muted">{{ a.decided_at | at(tz, '%d %b %Y') }}</div></div>
   {% else %}
-  <span class="chip {{ 'risk' if a.route == 'leadership' else 'gray' }}">{{ 'Below ' ~ ('%g' % cutoff) ~ '% · with leadership' if a.route == 'leadership' else 'With the GTD team admin' }}</span>
+  <span class="chip {{ 'risk' if a.route == 'leadership' else 'gray' }}">{{ 'Below ' ~ ('%g' % cutoff) ~ '% · with leadership' if a.route == 'leadership' else 'With the demand owner (' ~ d.owner.name ~ ')' }}</span>
   {% endif %}
 </div>
 {% endmacro %}
 {% block main %}
 <div class="head">
   <div>
-    <div class="eyebrow">{{ actor.role.label }} · all BUs</div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ 'my demands' if actor.role.value == 'demand_owner' else 'all BUs' }}</div>
     <h1>Offer approvals</h1>
-    <div class="lede">Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with the cost from the rate card on the offer date. {{ '%g' % cutoff }}% and above: the GTD team admin approves. Below {{ '%g' % cutoff }}%: leadership decides.</div>
+    <div class="lede">Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with the cost from the rate card on the offer date. {{ '%g' % cutoff }}% and above: the demand owner approves, and the GTD team admin is notified. Below {{ '%g' % cutoff }}%: leadership decides.</div>
   </div>
   {% if is_admin %}<a class="btn" href="/requests">Ask the Administrator for a rate change</a>{% endif %}
 </div>
@@ -40,7 +40,7 @@
 
 {% if b.others %}
 <section class="panel">
-  <div class="panel-head"><h2>Waiting for {{ 'leadership' if actor.role.value == 'admin' else 'the GTD team admin' }}</h2><span class="chip gray">{{ b.others | length }}</span></div>
+  <div class="panel-head"><h2>Waiting for someone else to decide</h2><span class="chip gray">{{ b.others | length }}</span></div>
   {% for a, d, c in b.others %}{{ offer(a, d, c, false) }}{% endfor %}
 </section>
 {% endif %}

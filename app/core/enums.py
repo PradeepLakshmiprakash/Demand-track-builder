@@ -342,8 +342,15 @@ class RowOutcome(StrEnum):
 
 
 class ApprovalRoute(StrEnum):
+    """Who decides an offer. At or above the margin cut-off: the demand's owner (the stored value is
+    still "admin" from when the GTD team admin decided these). Below it: leadership."""
+
     ADMIN = "admin"
     LEADERSHIP = "leadership"
+
+    @property
+    def decider(self) -> str:
+        return "the demand owner" if self is ApprovalRoute.ADMIN else "leadership"
 
 
 class Decision(StrEnum):

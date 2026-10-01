@@ -21,8 +21,8 @@ def test_calculator_shows_cost_margin_and_who_approves_per_channel(client: Clien
     # C2 US: Sogeti cost 68 → 28.4%, below 30%: leadership. Lowest bill for 30% = 68 / 0.7 = 97.14
     assert "Sogeti" in page and "$68.00" in page and "28.4%" in page and "Leadership" in page
     assert "$97.14" in page
-    # GTD supply costs 57.80 → 39.2%: the GTD team admin
-    assert "39.2%" in page and "GTD team admin" in page
+    # GTD supply costs 57.80 → 39.2%: the demand owner approves
+    assert "39.2%" in page and "Demand owner" in page
     assert "Calculate" in c.get("/margin-calculator").text  # empty form opens fine
     assert "number above 0" in c.get("/margin-calculator?grade=C2&bill_rate=abc").text
 
@@ -32,9 +32,14 @@ def test_calculator_says_when_the_rate_card_has_no_entry(client: Client) -> None
     assert "No rate card entry for this combination" in page
 
 
-@pytest.mark.parametrize("who", ["priya", "farah", "vikram", "anil"])
-def test_calculator_is_for_the_gtd_team_admin_and_leadership(client: Client, who: str) -> None:
+@pytest.mark.parametrize("who", ["farah", "vikram", "anil"])
+def test_calculator_is_not_for_everyone(client: Client, who: str) -> None:
     assert client.as_user(who).get("/margin-calculator").status_code == 403
+
+
+def test_demand_owners_have_the_calculator_too(client: Client) -> None:
+    page = client.as_user("priya").get("/margin-calculator?grade=C2&region=US&bill_rate=110").text
+    assert "38.2%" in page and "Demand owner" in page  # Sogeti 68 against 110: hers to approve
 
 
 def _raise_nb(client: Client) -> str:
