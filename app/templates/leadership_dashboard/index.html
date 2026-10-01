@@ -41,6 +41,35 @@
 </div>
 {% endif %}
 
+<div class="donuts">
+  {% for c in charts %}
+  <section class="panel panel-body donut-card">
+    <h2>{{ c.title }}</h2>
+    <div class="hint">{{ c.hint }}</div>
+    {% if c.drawn %}
+    <div class="donut-body">
+      <svg viewBox="0 0 140 140" width="168" height="168" role="img" aria-label="{{ c.title }}: {% for s in c.slices if s.dash %}{{ s.label }} {{ s.display }}{{ ', ' if not loop.last }}{% endfor %}">
+        <g transform="rotate(-90 70 70)" fill="none" stroke-width="22">
+          {% for s in c.drawn %}
+          <circle class="slice" cx="70" cy="70" r="54" stroke="{{ s.color }}" stroke-dasharray="{{ s.dash }}" stroke-dashoffset="{{ '%.2f' % s.offset }}"><title>{{ s.label }}: {{ s.display }} ({{ s.pct }}%)</title></circle>
+          {% endfor %}
+        </g>
+        <text x="70" y="68" text-anchor="middle" class="donut-total">{{ c.center }}</text>
+        <text x="70" y="86" text-anchor="middle" class="donut-unit">{{ c.center_label }}</text>
+      </svg>
+      <ul class="donut-legend">
+        {% for s in c.slices %}
+        <li class="{{ 'zero' if not s.dash }}"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div class="empty">Nothing to show yet.</div>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
 <section class="panel panel-body">
   <h2>Pipeline by stage</h2>
   <div class="hint" style="margin-top:4px">Every demand past draft, by main stage, with the sub-stages inside each.</div>

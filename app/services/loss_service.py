@@ -86,6 +86,8 @@ GROUP_OF = {s: s.main.value for s in DemandStatus}
 OPEN_GROUPS = (MainStage.COVERAGE.value, MainStage.SELECTION.value, MainStage.ALLOC_PENDING.value)
 # Still looking for someone: linked to GTD and sourcing, nobody in the panel yet.
 NEED_COVERAGE = (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)
+# The four kinds of open position, in a fixed order (the order is the chart's colour order).
+MIX = ("New · billable", "Replacement · billable", "New · non-billable", "Replacement · non-billable")
 
 
 @dataclass
@@ -107,6 +109,7 @@ class Overview:
     today: date
     pipeline: list[tuple[str, str, int]]  # main stage: key, label, count
     subs: dict[str, list[tuple[str, int]]]  # main stage key → (sub-stage name, count), non-empty only
+    mix: dict[str, int]  # open positions: new or replacement × billable or non-billable
     open: int
     live: int
     need_coverage: int
@@ -141,6 +144,12 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
                 merged[st.label] = merged.get(st.label, 0) + by_sub[st]
         subs[m.value] = list(merged.items())
 
+    mix = dict.fromkeys(MIX, 0)
+    for d in demands:
+        if GROUP_OF[d.status_enum] in OPEN_GROUPS:
+            kind = "Replacement" if d.type == "Replacement" else "New"
+            mix[f"{kind} · {'non-billable' if d.position_type == 'Non-billable' else 'billable'}"] += 1
+
     loss = losses(db, account_id, today)
     lost_by_demand = {x.demand.id: x.lost or Decimal(0) for x in loss}
 
@@ -160,6 +169,7 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
         today=today,
         pipeline=[(k, label, counts[k]) for k, label, _ in GROUPS],
         subs=subs,
+        mix=mix,
         open=sum(counts[k] for k in OPEN_GROUPS),
         live=len(demands),
         need_coverage=sum(by_sub.get(st, 0) for st in NEED_COVERAGE),

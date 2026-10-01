@@ -1,6 +1,7 @@
 """Leadership and the GTD team admin: account overview. Fill speed, pipeline, and revenue lost
 to missed start dates."""
 
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -13,7 +14,7 @@ from app.core.enums import EscalationStatus, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, OfferApproval
-from app.services import loss_service, reconcile_service
+from app.services import chart_service, loss_service, reconcile_service
 from app.services.demand_service import account_today
 
 router = APIRouter(tags=["leadership"])
@@ -58,8 +59,49 @@ def overview_page(
         offers_waiting=waiting or 0,
         max_group=max((n for _, _, n in o.pipeline), default=1) or 1,
         nb=loss_service.non_billable_by_bu(db, actor.account_id),
+        charts=_charts(o),
         sets_caps=actor.role is Role.ADMIN,
     )
+
+
+def _money(v: Decimal) -> str:
+    return f"${v:,.0f}"
+
+
+def _short_money(v: Decimal) -> str:
+    """For the middle of a donut, where a full figure doesn't fit: $80,856 → $81K."""
+    if v >= 1_000_000:
+        return f"${v / 1_000_000:.1f}M"
+    return f"${v / 1000:.0f}K" if v >= 10_000 else _money(v)
+
+
+def _charts(o: loss_service.Overview) -> list[chart_service.Donut]:
+    """The high-level picture: positions by stage, where the money is being lost, and the demand mix."""
+    by_bu = sorted(o.by_bu, key=lambda s: s.name)  # a BU keeps its colour whatever its rank
+    open_positions = sum(o.mix.values())
+    return [
+        chart_service.donut(
+            "Positions by stage",
+            "Every demand past draft, by main stage.",
+            [(label, n, str(n)) for _, label, n in o.pipeline],
+            str(o.live),
+            "positions",
+        ),
+        chart_service.donut(
+            "Revenue lost by business unit",
+            "Lost to date on positions unfilled past their start.",
+            [(s.name, s.lost, _money(s.lost)) for s in by_bu],
+            _short_money(o.lost_to_date),
+            "lost to date",
+        ),
+        chart_service.donut(
+            "Open positions by type",
+            "New or replacement, billable or non-billable.",
+            [(label, n, str(n)) for label, n in o.mix.items()],
+            str(open_positions),
+            "open positions",
+        ),
+    ]
 
 
 @router.post("/overview/nb-caps")
