@@ -11,7 +11,7 @@ from datetime import datetime
 from html import escape
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core import mail
@@ -188,6 +188,19 @@ def send_landed(db: Session, demand: Demand) -> None:
     account = db.get_one(Account, demand.account_id)
     to = [u.email for u in recipients(db, account.id)]
     again = f"\nThis is a resubmission; it was {demand.gtd_req_id}." if demand.submissions else ""
+    bu = demand.business_unit
+    if demand.position_type == "Non-billable" and bu.nb_cap is not None:
+        used = db.scalar(
+            select(func.count(Demand.id)).where(
+                Demand.bu_id == bu.id,
+                Demand.position_type == "Non-billable",
+                Demand.status.notin_(["draft", "cancelled", "closed"]),
+            )
+        )
+        if used and used > bu.nb_cap:
+            again += (
+                f"\nNote: non-billable. This takes {bu.name} to {used} against an agreed cap of {bu.nb_cap}."
+            )
     link = f"{get_settings().app_base_url}/gtd-queue"
     mail.send(
         mail.Mail(

@@ -1,8 +1,8 @@
 # Demand Tracker — Application Flows
 
-Version 1.4 · 24 Sep 2026 — updated to match what is built through Phase 8 (see §14–§16 for what changed since 1.1).
+Version 1.5 · 1 Oct 2026 — Phase 8 plus the 1 Oct review changes: see §17, which supersedes §9 (escalations) and the role names used above.
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D57 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D67 in `docs/decisions.md`.
 
 ---
 
@@ -398,3 +398,51 @@ flowchart LR
 - §1.1, §1.3: role, visibility and level per account membership; account switcher; platform admin and the Accounts screen (D53–D55).
 - §1.4: Acme Insurance seeded as a second, differently configured account.
 - Account settings also hold the interview rating dimensions and the L1/L2 escalation owner labels (D56).
+
+## 17. Changes in 1.5 (review of 1 Oct)
+
+Where this section differs from the text above, this section is what is built.
+
+**Roles.** Administrator (app controls only: User access, Account settings, Rate card, Accounts; no
+demands) · GTD team admin (was admin demand owner) · GTD admin team (was admin team) · demand owner ·
+leadership · interviewer. The GTD team admin asks the Administrator for control changes through
+*Requests*, by email both ways.
+
+**Intake.** A replacement needs the leaver's last working day. The name goes to GTD as typed, with no
+DM reference. Mail: on submit (GTD admin team, owner copied) → every morning until created on GTD →
+completion mail when the requisition ID is linked.
+
+**Revenue loss** counts from the requested start date, or from the day after the LWD when that is later.
+Demand owners see the loss on their own demands.
+
+**Escalations (replaces §9.2–§9.3).**
+
+| Trigger | Responsible (default) | Severity (default) |
+|---|---|---|
+| Not submitted | GTD admin team | Medium |
+| Missing from sheet | GTD admin team | Medium |
+| Dropped from sheet | Demand owner | High |
+| Incorrect demand | Demand owner | Medium |
+| Aging | Demand owner | Low |
+| Past start date | Demand owner | High (always, when billable) |
+| Rejection limit | Demand owner | Medium |
+| Late panel feedback | Interviewer | Low |
+
+1. A trigger fires; the escalation takes its rule's responsible party and severity.
+2. **L1:** the responsible person is mailed what happened, the steps to take and the date to respond by
+   (1, 2 or 3 working days for high, medium, low). The demand owner and GTD team admin are copied.
+3. They respond with a reason and an action: send back / correct and resubmit, resubmit as is, ask
+   for more time, revise the start date (past start), close the demand, or no further action once
+   the condition has cleared. Only the responsible party can respond.
+4. **L2:** if the date passes, leadership and the BU delivery head are informed. The same person still
+   has to act and is reminded once a day. More time keeps the level.
+5. Late feedback closes itself when the feedback is submitted.
+
+Every part of this is an account setting the Administrator edits: each trigger on or off, who is
+responsible, its severity and steps, the days per severity, and who is informed at L2.
+
+**Offers.** A demand owner can ask for the offer approval for a panel-selected candidate. The margin
+calculator gives the GTD team admin and leadership a what-if per supply channel.
+
+**Non-billable positions** are capped per business unit by the GTD team admin; leadership sees used
+against agreed.

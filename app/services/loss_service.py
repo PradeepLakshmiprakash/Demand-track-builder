@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import DemandStatus
 from app.core.workdays import is_working_day
-from app.models import Account, Demand
+from app.models import Account, BusinessUnit, Demand
 from app.services.escalation_service import current_doj
 
 NOT_LIVE = frozenset({DemandStatus.DRAFT, DemandStatus.CANCELLED, DemandStatus.CLOSED})
@@ -171,3 +171,37 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
         by_bu=slices(lambda d: d.business_unit.name),
         hours_per_day=account.settings.billable_hours_per_day,
     )
+
+
+# --- Non-billable positions against the agreed cap ---------------------------------------------------------
+
+
+@dataclass
+class NbRow:
+    bu: BusinessUnit
+    used: int  # open non-billable demands (submitted onwards, not staffed out or closed)
+    by_practice: dict[str, int]
+
+    @property
+    def over(self) -> bool:
+        return self.bu.nb_cap is not None and self.used > self.bu.nb_cap
+
+
+def non_billable_by_bu(db: Session, account_id: int) -> list[NbRow]:
+    """Per business unit: open non-billable (proactive) positions against the cap the GTD team admin set."""
+    counts: dict[int, dict[str, int]] = {}
+    for d in db.scalars(
+        select(Demand).where(
+            Demand.account_id == account_id,
+            Demand.position_type == "Non-billable",
+            Demand.status.notin_([s.value for s in NOT_LIVE]),
+        )
+    ):
+        per = counts.setdefault(d.bu_id, {})
+        per[d.practice or "—"] = per.get(d.practice or "—", 0) + 1
+    bus = db.scalars(
+        select(BusinessUnit)
+        .where(BusinessUnit.account_id == account_id, BusinessUnit.active)
+        .order_by(BusinessUnit.name)
+    )
+    return [NbRow(b, sum(counts.get(b.id, {}).values()), counts.get(b.id, {})) for b in bus]

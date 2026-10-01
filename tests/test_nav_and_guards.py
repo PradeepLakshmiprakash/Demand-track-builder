@@ -52,7 +52,7 @@ def test_administrator_menu_has_only_app_controls(client: Client) -> None:
 
 def test_leadership_menu(client: Client) -> None:
     items = menu(client.as_user("sanjay"))
-    assert items == ["Account overview", "All demands", "Escalations", "Offer approvals"]
+    assert items == ["Account overview", "All demands", "Escalations", "Offer approvals", "Margin calculator"]
 
 
 def test_admin_team_menu(client: Client) -> None:

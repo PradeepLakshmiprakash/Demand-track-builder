@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Margin calculator{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ account.name }}</div>
+    <h1>Margin calculator</h1>
+    <div class="lede">A what-if: nothing is saved. Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with today's cost from the rate card. At {{ '%g' % account.margin_threshold }}% and above the GTD team admin approves an offer; below it, leadership decides.</div>
+  </div>
+</div>
+
+<section class="panel">
+  <form method="get" class="panel-body stack">
+    {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
+    <div class="grid4">
+      <label class="f">Practice
+        <select name="practice"><option value="">Any practice</option>{% for p in cfg.practices %}<option {{ 'selected' if v.practice == p }}>{{ p }}</option>{% endfor %}</select>
+      </label>
+      <label class="f">Grade
+        <select name="grade" required><option value="">Choose…</option>{% for g in cfg.grades %}<option {{ 'selected' if v.grade == g }}>{{ g }}</option>{% endfor %}</select>
+      </label>
+      <label class="f">Region
+        <select name="region">{% for r in cfg.regions %}<option {{ 'selected' if v.region == r }}>{{ r }}</option>{% endfor %}</select>
+      </label>
+      <label class="f">Client bill rate (per hour)
+        <input type="number" name="bill_rate" min="0" step="0.01" value="{{ v.bill_rate }}" placeholder="e.g. 95">
+        <span class="hint">Leave empty to see only costs and the lowest bill rate</span>
+      </label>
+    </div>
+    <div><button class="btn primary">Calculate</button></div>
+  </form>
+</section>
+
+{% if rows %}
+<section class="panel">
+  <div class="panel-head"><div><h2>{{ v.grade }} · {{ v.practice or 'any practice' }} · {{ v.region }}{% if bill %} · bill {{ '$%.2f' % bill }}/h{% endif %}</h2><div class="hint">Rate card on {{ today | d }}, by supply channel.</div></div></div>
+  <div class="tbl plain">
+    <div class="tr th calc"><div>Supply channel</div><div>Vendor cost / h</div><div>Margin</div><div>An offer would go to</div><div>Lowest bill rate for {{ '%g' % account.margin_threshold }}%</div></div>
+    {% for r in rows %}
+    <div class="tr calc">
+      <div><strong>{{ r.label }}</strong></div>
+      {% if r.cost is none %}
+        <div class="muted" style="grid-column: span 4">No rate card entry for this combination. Ask the Administrator to add one.</div>
+      {% else %}
+        <div>{{ '$%.2f' % r.cost }}</div>
+        <div>{% if r.margin_pct is not none %}<strong class="{{ 'sev-high' if r.decides == 'Leadership' }}">{{ '%.1f' % r.margin_pct }}%</strong>{% else %}—{% endif %}</div>
+        <div>{% if r.decides %}<span class="chip {{ 'risk' if r.decides == 'Leadership' else 'done' }}">{{ r.decides }}</span>{% else %}—{% endif %}</div>
+        <div>{{ '$%.2f' % r.min_bill if r.min_bill is not none else '—' }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% elif v.grade and not error %}
+<section class="panel panel-body"><p style="margin:0">This account has no supply channels yet.</p></section>
+{% endif %}
+{% endblock %}

@@ -29,6 +29,7 @@ from app.routers import (
     integrations,
     interviewer_profiles,
     leadership_dashboard,
+    margin_calculator,
     my_demands,
     my_interviews,
     raise_demand,
@@ -58,6 +59,7 @@ ROUTERS = [
     user_access.router,
     account_settings.router,
     accounts.router,
+    margin_calculator.router,
     requests.router,
     cron.router,
 ]

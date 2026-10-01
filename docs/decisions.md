@@ -367,3 +367,61 @@ dimensions and the L1/L2 escalation owner labels.
 account can't be given the interviewer role, and an interviewer can't be added to another account in
 any role, including as a new account's first admin. Other roles may span accounts. Acme has its own
 interviewer (Nadia K.); Vikram is Discover's only.
+
+## Review notes of 1 Oct (handwritten pages) and the escalation redesign
+
+**D58. Roles.** *Administrator* is a new role that runs the app's controls and nothing else: User
+access, Account settings, Rate card and the platform Accounts screen. They see no demands. The former
+"admin demand owner" is the **GTD team admin** (heads the GTD admin team) and the "admin team" is the
+**GTD admin team**. The GTD team admin doesn't edit the controls: they raise a **request to the
+Administrator** in the app, which mails the Administrators; the Administrator makes the change and
+marks it done or declined, which mails the requester. An account always keeps one active
+Administrator and one GTD team admin. Whoever creates an account becomes its Administrator.
+
+**D59. Replacement demands record the leaver's last working day (LWD)**, required to submit. Revenue
+loss (and the past-start escalation) counts from the requested start date, or from the day after the
+LWD when that is later, because the leaver bills until they go. The demand page shows the uncovered
+days between the LWD and the requested start.
+
+**D60. The name sent to GTD is the plain demand name.** The GTD admin team doesn't type the DM
+reference on GTD; the demand is tied to GTD by the requisition ID they link back. (A sheet row that
+happens to carry a `[DM-…]` prefix is still matched by it.) Owners are told to type a plain role title.
+
+**D61. Mail flow for a new demand:** an email the moment it is submitted (to the GTD admin team, demand
+owner copied), a reminder every morning until it is created on GTD (the daily mail, owners copied on
+their own demands), and a completion email when the requisition ID is linked (to the owner, team
+copied). The all-demands list shows "GTD created: Yes/No".
+
+**D62. Escalations: the responsible person acts; everyone else is informed.** Each trigger has a rule
+in Account settings (edited by the Administrator): on or off, who is responsible (GTD admin team,
+demand owner or interviewer), a severity and the steps the email spells out. Defaults: not submitted
+and missing → GTD admin team; dropped, incorrect, aging, past start, rejection limit → demand owner;
+late feedback → the interviewer. Anything the GTD team has to do is theirs to solve, with the demand
+owner copied. The GTD team admin is notified on everything and responds only to the GTD team's own.
+
+**D63. Severity and L1/L2.** High, medium or low gives 1, 2 or 3 working days to respond (editable). A
+billable demand past its start is always high. L1 = the responsible person has been mailed and is in
+time. L2 = the due date passed: leadership and the BU delivery head are informed (each can be switched
+off), the same person still has to act and is reminded once a day. Leadership never acts. Asking for
+more time keeps the level. Late feedback closes itself when the feedback arrives; for a past start the
+owner can revise the start date.
+
+**D64. Demand owners** see the revenue lost on their own demands (the rate stays hidden), have a *My
+escalations* screen for their own demands, and can **ask for the offer approval** for a candidate the
+panel selected (candidate + supply channel); it is priced and routed as usual and the deciders are
+mailed.
+
+**D65. Margin calculator** (GTD team admin and leadership): practice, grade, region and a bill rate
+give, per supply channel, today's vendor cost, the margin, who would approve an offer, and the lowest
+bill rate that meets the cut-off. Nothing is saved. May open to demand owners later.
+
+**D66. Non-billable cap per business unit**, set by the GTD team admin on the Account overview;
+leadership sees open non-billable positions against it, by practice. A new non-billable demand that
+takes a BU over its cap is flagged in the "new demand" email and on the overview.
+
+**D67. Practices** Cloud-Java, Cloud-MF and Cloud-APM are added to Discover's list (alongside the
+existing five). **Mail** can be sent through Gmail SMTP, and `MAIL_REDIRECT_TO` delivers every mail to
+one inbox while people's real addresses aren't in use; each mail says who it was meant for.
+
+Parked: the leadership charts (cost pie, ABC → allocation, CPF → closed), to be discussed.
+

@@ -4,7 +4,7 @@ to missed start dates."""
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from app.core.db import get_db
 from app.core.enums import EscalationStatus, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import Demand, Escalation, OfferApproval
+from app.models import BusinessUnit, Demand, Escalation, OfferApproval
 from app.services import loss_service, reconcile_service
 from app.services.demand_service import account_today
 
@@ -58,7 +58,26 @@ def overview_page(
         escalations=_open_escalations(db, actor.account_id),
         offers_waiting=waiting or 0,
         max_group=max((n for _, _, n in o.pipeline), default=1) or 1,
+        nb=loss_service.non_billable_by_bu(db, actor.account_id),
+        sets_caps=actor.role is Role.ADMIN,
     )
+
+
+@router.post("/overview/nb-caps")
+async def save_nb_caps(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """The GTD team admin sets the agreed number of non-billable positions per business unit."""
+    if actor.role is not Role.ADMIN:
+        return RedirectResponse("/overview?err=Only+the+GTD+team+admin+sets+the+caps#nb", status_code=303)
+    form = await request.form()
+    for bu in db.scalars(select(BusinessUnit).where(BusinessUnit.account_id == actor.account_id)):
+        raw = str(form.get(f"cap_{bu.id}") or "").strip()
+        if raw and (not raw.isdigit() or int(raw) > 500):
+            return RedirectResponse(f"/overview?err={bu.name}:+enter+a+whole+number#nb", status_code=303)
+        bu.nb_cap = int(raw) if raw else None
+    db.commit()
+    return RedirectResponse("/overview?msg=Non-billable+caps+saved#nb", status_code=303)
 
 
 @router.get("/api/overview")

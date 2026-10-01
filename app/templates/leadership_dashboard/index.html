@@ -75,6 +75,24 @@
   </div>
 </section>
 
+<section class="panel" id="nb">
+  <div class="panel-head"><div><h2>Non-billable positions against the agreed cap</h2><div class="hint">Open non-billable (proactive) demands per business unit. The GTD team admin sets each cap; blank means no cap agreed.</div></div></div>
+  <form method="post" action="/overview/nb-caps">
+    <div class="tbl plain">
+      <div class="tr th" style="display:grid;grid-template-columns:140px 110px 150px 1fr;gap:12px"><div>BU</div><div>Open</div><div>Agreed cap</div><div>By practice</div></div>
+      {% for r in nb %}
+      <div class="tr" style="display:grid;grid-template-columns:140px 110px 150px 1fr;gap:12px;align-items:center">
+        <div><strong>{{ r.bu.name }}</strong></div>
+        <div>{{ r.used }}{% if r.over %} <span class="chip esc">over cap</span>{% endif %}</div>
+        <div>{% if sets_caps %}<input type="number" name="cap_{{ r.bu.id }}" min="0" max="500" value="{{ r.bu.nb_cap if r.bu.nb_cap is not none else '' }}" aria-label="Non-billable cap for {{ r.bu.name }}" style="max-width:110px;min-height:36px">{% else %}{{ r.bu.nb_cap if r.bu.nb_cap is not none else '—' }}{% endif %}</div>
+        <div class="small muted">{% for p, n in r.by_practice.items() %}{{ n }} {{ p }}{{ ' · ' if not loop.last }}{% else %}None open{% endfor %}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if sets_caps %}<div class="panel-body"><button class="btn">Save caps</button></div>{% endif %}
+  </form>
+</section>
+
 <div class="grid2 align-start">
   {{ breakdown('By practice', 'Practice', o.by_practice) }}
   {{ breakdown('By business unit', 'BU', o.by_bu) }}

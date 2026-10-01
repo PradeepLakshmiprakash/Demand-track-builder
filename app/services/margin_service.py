@@ -355,3 +355,49 @@ def board(db: Session, actor: Actor) -> Board:
         if d.id not in has
     ]
     return b
+
+
+# --- Margin calculator (what-if) ------------------------------------------------------------------------
+
+
+@dataclass
+class WhatIf:
+    channel: str
+    label: str
+    cost: Decimal | None  # None: no rate card entry for this combination today
+    margin_pct: Decimal | None
+    decides: str | None  # who would approve an offer at this margin
+    min_bill: Decimal | None  # lowest bill rate that still meets the account's margin cut-off
+
+
+def what_if(
+    db: Session,
+    account: Account,
+    *,
+    grade: str,
+    practice: str | None,
+    region: str,
+    bill: Decimal | None,
+    on: date,
+) -> list[WhatIf]:
+    """For each supply channel: today's vendor cost, the margin at this bill rate, who would approve
+    an offer at that margin, and the lowest bill rate that reaches the cut-off."""
+    threshold = Decimal(account.margin_threshold)
+    out = []
+    for c in account.settings.supply_channels:
+        rate = rate_card_service.lookup(
+            db, account.id, grade=grade, practice=practice or None, region=region, channel=c.key, on=on
+        )
+        if rate is None:
+            out.append(WhatIf(c.key, c.label, None, None, None, None))
+            continue
+        cost = Decimal(rate.cost_rate)
+        margin = decides = None
+        if bill:
+            margin = ((bill - cost) / bill * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            decides = "GTD team admin" if margin >= threshold else "Leadership"
+        min_bill = None
+        if threshold < 100:
+            min_bill = (cost / (1 - threshold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        out.append(WhatIf(c.key, c.label, cost, margin, decides, min_bill))
+    return out
