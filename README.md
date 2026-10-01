@@ -83,8 +83,8 @@ tests/
 | GTD admin team | Farah Q., Deepak L. | Full account; GTD queue, BCM sheet import, reconciliation, escalations |
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
-| Administrator | Anil V. | App controls only: User access, Account settings, Rate card, Accounts (platform admin). No demands |
+| Administrator | Anil V. | App controls only: User access, Account settings, Rate card, Accounts. No demands |
 
-**Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Nadia K. is Acme's interviewer. Sanjay M. (leadership) works in both accounts and switches between them in the sidebar; an interviewer belongs to one account only. Rosa D. is Acme's Administrator; Anil V. is the **platform admin** (Accounts screen).
+**Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Nadia K. is Acme's interviewer. Sanjay M. (leadership) works in both accounts and switches between them in the sidebar; an interviewer belongs to one account only. Rosa D. is Acme's Administrator. Administrators add client accounts.
 
 All names are placeholders. Never commit a real BCM sheet: it carries candidate personal data.

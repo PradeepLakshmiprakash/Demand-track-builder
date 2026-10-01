@@ -6,9 +6,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import mail
 from app.core.account_config import AccountConfig
 from app.models import Account, Demand, Escalation, ExcelImport, ExcelRow, GtdSubmission, StageEvent
-from app.services import reconcile_service
+from app.services import escalation_service, reconcile_service
 from app.services.excel_parser import SheetError, parse
 from app.services.import_service import date_from_filename
 from seed import sample_sheet
@@ -102,7 +103,8 @@ def test_phase3_exit_sample_sheet_links_everything_and_flags_missing(team: Clien
     s = latest(db).summary
 
     # Every seeded demand in the sheet is linked, and none is linked twice.
-    assert s["in_sheet"] == 13 and s["matched"] == 12 and s["prefix"] == ["DM-000147"]
+    assert s["in_sheet"] == 14 and s["matched"] == 13 and s["prefix"] == ["DM-000147"]
+    assert s["auto_linked"] == ["DM-000151 (W3NX5A)"]  # one clear match: linked with no person
     linked = {row(db, x[1]).submission_id for x in sample_sheet.ROWS[:13]}
     assert None not in linked and len(linked) == 13
 
@@ -116,7 +118,7 @@ def test_phase3_exit_sample_sheet_links_everything_and_flags_missing(team: Clien
     assert by_ref(db, "DM-000147").status == "coverage_required"
     assert by_ref(db, "DM-000116").status == "staffed"  # "Allocation Pending " with a trailing space
     assert s["incorrect"] == ["DM-000133"]
-    assert s["needs_person"] == 2 and s["sent"] == 15
+    assert s["needs_person"] == 1 and s["sent"] == 16
 
 
 def test_prefix_match_records_the_requisition_id(team: Client, db: Session) -> None:
@@ -134,28 +136,105 @@ def test_reconciliation_page(team: Client) -> None:
     upload(team, sample_sheet.build())
     page = team.get("/reconciliation").text
     assert "Missing from the sheet" in page and "DM-000148" in page
-    assert "W3NX5A" in page and "N9T49U" in page and "98%" in page
+    assert "Linked automatically" in page and "DM-000151 (W3NX5A)" in page
+    assert "N9T49U" in page and "is escalated to the GTD admin team" in page
 
 
 # --- People resolve rows --------------------------------------------------------------------------
 
 
-def test_confirm_fuzzy_suggestion(team: Client, db: Session) -> None:
+def test_one_clear_match_links_itself(team: Client, db: Session) -> None:
+    mail.sent.clear()
     upload(team, sample_sheet.build())
-    r = row(db, "W3NX5A")
-    assert r.outcome == "suggested" and r.suggestions[0]["app_ref"] == "DM-000151"
-    res = team.post(
-        f"/reconciliation/rows/{r.id}/confirm", data={"demand_id": str(r.suggestions[0]["demand_id"])}
+    r = row(db, "W3NX5A")  # no ID recorded in the app, but clearly DM-000151: same originator, 98% alike
+    assert (r.outcome, r.match_tier) == ("matched", 3) and "Linked automatically to DM-000151" in (
+        r.note or ""
     )
-    assert "Row+linked+to+DM-000151" in res.headers["location"] or "DM-000151" in res.headers["location"]
     d = by_ref(db, "DM-000151")
     assert d.gtd_req_id == "W3NX5A" and d.status == "coverage_required"
+    done = [m for m in mail.sent if "Created on GTD: DM-000151 is W3NX5A" in m.subject]
+    assert len(done) == 1 and done[0].to == ["priya.n@example.com"]  # the owner is told, as for a manual link
+    team.post(f"/imports/{latest(db).id}/rerun")  # a re-run keeps it
     db.expire_all()
-    assert row(db, "W3NX5A").outcome == "confirmed" and row(db, "W3NX5A").matched_by == user_id("farah")
-    # A re-run keeps the person's decision.
-    team.post(f"/imports/{latest(db).id}/rerun")
+    assert row(db, "W3NX5A").outcome == "matched" and latest(db).summary["needs_person"] == 1
+
+
+def test_an_unclear_match_is_not_guessed(team: Client, db: Session) -> None:
+    # A second demand just like DM-000151: two candidates within a few points, so nobody guesses.
+    twin = by_ref(db, "DM-000150")
+    twin.status, twin.grade, twin.name = (
+        "submitted",
+        "D1",
+        "Senior Java Full Stack Developer (Java + Spring Boot + AWS)",
+    )
+    db.commit()
+    upload(team, sample_sheet.build())
+    r = row(db, "W3NX5A")
+    assert r.outcome == "suggested" and len(r.suggestions) >= 2 and r.submission_id is None
+    assert by_ref(db, "DM-000151").gtd_req_id is None
+
+
+def test_sheet_row_not_in_the_app_is_escalated_to_the_gtd_team_with_the_owner_copied(
+    team: Client, db: Session
+) -> None:
+    mail.sent.clear()
+    upload(team, sample_sheet.build())
+    esc = db.scalars(select(Escalation).where(Escalation.sheet_req_id == "N9T49U")).one()
+    assert (esc.type, esc.status, esc.demand_id, esc.responsible) == (
+        "unlinked_row",
+        "open",
+        None,
+        "gtd_team",
+    )
+    assert esc.sheet_owner_id == user_id("meera")  # the sheet's originator is a demand owner
+    escalation_service.sweep(db, 1)
+    m = next(m for m in mail.sent if "N9T49U" in m.text)
+    assert "farah.q@example.com" in m.to and "meera.s@example.com" in m.cc
+    assert "Sheet row: N9T49U" in m.text and "Reconciliation page" in m.text
+
+    page = team.get(f"/escalations?id={esc.id}").text
+    assert (
+        "In BCM sheet, not in the app" in page and "Match it or create the demand on Reconciliation" in page
+    )
+    assert "N9T49U" in team.as_user("meera").get("/escalations").text  # informed, in My escalations
+    assert ">Respond</button>" not in team.get(f"/escalations?id={esc.id}").text
+
+    # Creating the demand from the row answers it: the escalation closes itself.
+    team.as_user("farah").post(
+        f"/reconciliation/rows/{row(db, 'N9T49U').id}/create",
+        data={"owner_id": str(user_id("meera")), "bu_id": ""},
+    )
     db.expire_all()
-    assert row(db, "W3NX5A").outcome == "confirmed" and latest(db).summary["needs_person"] == 1
+    done = db.get_one(Escalation, esc.id)
+    assert done.status == "resolved" and done.reason == "Linked to a demand" and done.resolved_by is None
+
+
+def test_a_row_declared_not_ours_is_not_raised_again(team: Client, db: Session) -> None:
+    upload(team, sample_sheet.build())
+    esc = db.scalars(select(Escalation).where(Escalation.sheet_req_id == "N9T49U")).one()
+    r = team.post(
+        f"/escalations/{esc.id}/resolve",
+        data={"reason": "Unknown", "action": "no_action", "comment": "Another account's requisition"},
+    )
+    assert "msg=Escalation" in r.headers["location"]
+    upload(team, sample_sheet.build(title=False), date.today() + timedelta(days=7))
+    db.expire_all()
+    again = db.scalars(select(Escalation).where(Escalation.sheet_req_id == "N9T49U")).all()
+    assert [e.status for e in again] == ["resolved"]
+
+
+def test_confirm_a_row_by_hand(team: Client, db: Session) -> None:
+    upload(team, sample_sheet.build())
+    r = row(db, "N9T49U")
+    target = by_ref(db, "DM-000149")  # in the admin mail, no ID yet
+    res = team.post(f"/reconciliation/rows/{r.id}/confirm", data={"demand_id": str(target.id)})
+    assert "DM-000149" in res.headers["location"]
+    db.expire_all()
+    assert by_ref(db, "DM-000149").gtd_req_id == "N9T49U"
+    assert row(db, "N9T49U").outcome == "confirmed" and row(db, "N9T49U").matched_by == user_id("farah")
+    team.post(f"/imports/{latest(db).id}/rerun")  # a re-run keeps the person's decision
+    db.expire_all()
+    assert row(db, "N9T49U").outcome == "confirmed" and latest(db).summary["needs_person"] == 0
 
 
 def test_create_demand_from_row(team: Client, db: Session) -> None:
@@ -215,9 +294,20 @@ def test_cannot_act_on_matched_rows_or_other_demands(team: Client, db: Session) 
 
 def test_prefix_pointing_at_linked_demand_is_a_conflict(team: Client, db: Session) -> None:
     rows = sample_sheet.ROWS + [
-        ("Priya N.", "ZZ9ZZ9", "[DM-000142] Senior Java", "CCA-FS", "D1", "US", date(2026, 10, 27), "0", None,
-         "Coverage Required", "Work in Progress"),
-    ]  # fmt: skip
+        (
+            "Priya N.",
+            "ZZ9ZZ9",
+            "[DM-000142] Senior Java",
+            "CCA-FS",
+            "D1",
+            "US",
+            date(2026, 10, 27),
+            "0",
+            None,
+            "Coverage Required",
+            "Work in Progress",
+        ),
+    ]
     upload(team, sample_sheet.build(rows))
     r = row(db, "ZZ9ZZ9")
     assert r.outcome == "conflict" and "already linked to 2ZT7KP" in (r.note or "")

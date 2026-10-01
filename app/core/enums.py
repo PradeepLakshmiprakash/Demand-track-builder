@@ -232,10 +232,12 @@ class EscalationType(StrEnum):
     REJECTION_LIMIT = "rejection_limit"
     PANEL_SLA = "panel_sla"
     PAST_START = "past_start"
+    UNLINKED_ROW = "unlinked_row"  # a BCM sheet row whose requisition no demand in the app is linked to
 
     @property
     def label(self) -> str:
         return {
+            "unlinked_row": "In BCM sheet, not in the app",
             "not_submitted": "Not submitted",
             "missing": "Missing from sheet",
             "dropped": "Dropped from sheet",

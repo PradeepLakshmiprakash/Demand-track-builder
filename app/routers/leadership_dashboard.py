@@ -23,8 +23,7 @@ guard = require_screen("overview")
 def _open_escalations(db: Session, account_id: int) -> dict[int, int]:
     rows = db.execute(
         select(Escalation.level, func.count())
-        .join(Demand)
-        .where(Demand.account_id == account_id, Escalation.status == EscalationStatus.OPEN.value)
+        .where(Escalation.account_id == account_id, Escalation.status == EscalationStatus.OPEN.value)
         .group_by(Escalation.level)
     ).all()
     return {level: n for level, n in rows}

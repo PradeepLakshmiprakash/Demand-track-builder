@@ -429,3 +429,46 @@ Parked: the leadership charts (cost pie, ABC → allocation, CPF → closed), to
 **D68. Client accounts are added by the Administrator** (user, 1 Oct). There is no separate platform
 admin: the Accounts screen is in every Administrator's menu, and whoever creates an account becomes its
 Administrator. The `is_platform_admin` flag is gone (migration 0013).
+
+## Second round of 1 Oct
+
+**D69. Main stages and sub-stages.** The five main stages are Acquisition Central's: Coverage
+Required, Selection In Progress, Allocation Pending, Allocation Completed, Abandoned. Every demand
+status is a sub-stage of one of them:
+
+| Main stage | Sub-stages |
+|---|---|
+| Coverage Required | Draft · GTD creation pending · Correction required · GTD approval pending · GTD approval overdue · Removed from sheet · Marked incorrect · GTD approved · Sourcing profiles |
+| Selection In Progress | Panel interview · Panel selected · Client interview |
+| Allocation Pending | Offer approval pending · Offer made, joining awaited |
+| Allocation Completed | Joined |
+| Abandoned | Cancelled in sheet · Closed by owner or GTD team |
+
+Lists, filters, cards and the leadership pipeline read by main stage, with the sub-stage beside it.
+
+**D70. The sheet is the BCM sheet** in every screen, mail and document (was "DP sheet").
+
+**D71. The demand owner approves offers** at or above the margin cut-off; the GTD team admin is
+notified of every new offer and every decision and decides none. Below the cut-off leadership still
+decides, with a reason. A new offer mails whoever decides it.
+
+**D72. Demand owners see rates** on their own demands: client bill rate, vendor cost and margin, and
+they have the margin calculator. Not on a BU colleague's demand they can only read; never the GTD
+admin team.
+
+**D73. Joining date.** After an offer is approved the demand owner records "offer accepted" with the
+expected date of joining; the demand moves to Allocation Pending · Offer made, joining awaited, and
+the GTD team admin is mailed. The BCM sheet's DOJ replaces the owner's date when it arrives. A sheet
+that is behind doesn't undo progress the app recorded. Start and joining dates show on the demand
+page and in the lists.
+
+**D74. Reconciliation is automatic.** A sheet row whose requisition isn't linked in the app links
+itself when exactly one demand clearly matches (score 85 or more, the sheet's originator is the
+demand's owner, no other demand within 10 points, and the demand is still waiting for its first ID);
+the owner and GTD admin team get the completion mail. Every other unlinked row opens an escalation
+*In BCM sheet, not in the app* to the GTD admin team, with the demand owner (the sheet's originator)
+copied. It closes itself when the row is matched or a demand is created from it on the
+Reconciliation page; closing it as "not ours" stops it being raised again.
+
+**D75. Accounts are added by the Administrator** (see D68); there is no platform admin.
+

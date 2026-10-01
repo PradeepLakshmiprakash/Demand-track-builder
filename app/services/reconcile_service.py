@@ -50,9 +50,9 @@ from app.models import (
     User,
     member_of,
 )
-from app.services import interview_service, margin_service, pipeline_service
+from app.services import interview_service, margin_service, notify_service, pipeline_service
 from app.services.demand_service import record_stage
-from app.services.escalation_service import open_escalation
+from app.services.escalation_service import close_linked_rows, open_escalation, open_row_escalation
 
 log = logging.getLogger("demand_tracker.reconcile")
 PREFIX = re.compile(r"\[(DM-\d{6})\]")
@@ -66,6 +66,10 @@ SHEET_CANDIDATE_STAGES = (
 )
 # Back with the owner or the GTD admin team for a new GTD entry: the old ID's rows wait for the new one.
 RESUBMITTING = (DemandStatus.RETURNED, DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)
+# One clear match links itself: this score or more, the sheet's originator is the demand's owner, and
+# no other demand comes within AUTO_GAP points.
+AUTO_MIN = 85
+AUTO_GAP = 10
 SUGGEST_MIN = 60
 SUGGEST_MAX = 3
 
@@ -94,6 +98,7 @@ class Summary:
     new_escalations: list[str] = field(default_factory=list)
     offers: list[str] = field(default_factory=list)  # new offer approvals raised from the sheet
     superseded: list[str] = field(default_factory=list)  # rows for replaced requisition IDs, ignored
+    auto_linked: list[str] = field(default_factory=list)  # rows linked to their demand with no person
     resubmitting: list[str] = field(default_factory=list)  # rows of IDs about to be replaced, ignored
     held: list[str] = field(default_factory=list)  # sheet behind the panel progress recorded in the app
     warnings: list[str] = field(default_factory=list)
@@ -155,6 +160,26 @@ def _score(row: ExcelRow, d: Demand) -> tuple[int, list[str]]:
             total += 15 * (1 - gap / 14)
             reasons.append("same start date" if gap == 0 else f"start {gap} days apart")
     return round(total), reasons
+
+
+def _sure_match(row: ExcelRow, by_id: dict[int, Demand], in_sheet: dict[int, ExcelRow]) -> Demand | None:
+    """The one demand this row clearly is, or None. Only a demand still waiting for its first ID."""
+    if not row.suggestions:
+        return None
+    top = row.suggestions[0]
+    runner_up = row.suggestions[1]["score"] if len(row.suggestions) > 1 else 0
+    target = by_id.get(top["demand_id"])
+    if (
+        target is None
+        or top["score"] < AUTO_MIN
+        or top["score"] - runner_up < AUTO_GAP
+        or "originator is the owner" not in top["reasons"]
+        or target.status_enum not in LINKABLE
+        or target.submissions
+        or target.id in in_sheet
+    ):
+        return None
+    return target
 
 
 def _suggest(rows: list[ExcelRow], candidates: list[Demand]) -> None:
@@ -297,6 +322,27 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
     ]
     _suggest(unmatched, candidates)
 
+    # Automatic matching: a row with exactly one clear demand links itself. The rest are escalated.
+    by_id = {d.id: d for d in demands}
+    auto: list[tuple[Demand, str]] = []
+    for row in unmatched:
+        target = _sure_match(row, by_id, in_sheet)
+        if target is None:
+            continue
+        sub = GtdSubmission(
+            demand_id=target.id, gtd_req_id=row.gtd_req_id, submitted_by=actor_id, submitted_at=now
+        )
+        db.add(sub)
+        db.flush()
+        target.submissions.insert(0, sub)
+        subs[sub.gtd_req_id], sub_demand[sub.id] = sub, target
+        why = ", ".join(row.suggestions[0]["reasons"])
+        row.submission_id, row.match_tier, row.outcome = sub.id, 3, RowOutcome.MATCHED.value
+        row.note, row.suggestions = f"Linked automatically to {target.app_ref}: {why}", []
+        in_sheet[target.id] = row
+        summary.auto_linked.append(f"{target.app_ref} ({row.gtd_req_id})")
+        auto.append((target, row.gtd_req_id or ""))
+
     # 2. Matched rows set the stage.
     for demand_id, row in in_sheet.items():
         d = next(x for x in demands if x.id == demand_id)
@@ -377,6 +423,34 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
                           f"{d.gtd_req_id} was in the BCM sheet of {prev_date}, gone from {as_of:%d %b}",
                           now, summary)  # fmt: skip
 
+    # 5. In the BCM sheet but not in the app: an escalation to the GTD admin team, with the demand owner
+    #    (the sheet's originator, when they are one) copied. It closes itself once the row is linked.
+    for row in rows:
+        if not RowOutcome(row.outcome).needs_person or not row.gtd_req_id:
+            continue
+        owner = owner_for_originator(db, account.id, row.originator)
+        closest = ""
+        if row.suggestions:
+            top = row.suggestions[0]
+            closest = f" Closest demand: {top['app_ref']} ({top['score']}% alike)."
+        detail = (
+            f'The BCM sheet of {as_of:%d %b} has {row.gtd_req_id} "{row.demand_request_name}"'
+            + (f", raised by {row.originator}" if row.originator else "")
+            + f". No demand in the app is linked to it.{closest}"
+        )
+        esc = open_row_escalation(
+            db,
+            account,
+            req_id=row.gtd_req_id,
+            name=row.demand_request_name,
+            owner_id=owner.id if owner else None,
+            detail=detail,
+            now=now,
+        )
+        if esc is not None:
+            summary.new_escalations.append(row.gtd_req_id)
+    close_linked_rows(db, account, set(subs), {r.gtd_req_id for r in rows if r.gtd_req_id}, now)
+
     counts = [RowOutcome(r.outcome) for r in rows]
     summary.in_sheet = len(in_sheet)
     summary.matched = counts.count(RowOutcome.MATCHED)
@@ -392,6 +466,10 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
         )  # fmt: skip
     imp.summary = asdict(summary) | {"parse_warnings": summary_parse_warnings}
     db.commit()
+    for target, req_id in auto:  # completion mail, as when a person links the ID
+        notify_service.safely(
+            notify_service.send_created, db, target, req_id, "the BCM sheet (matched automatically)"
+        )
     try:  # heads-up to interviewers; a mail problem must not undo the import
         interview_service.alert_interviewers(db, account, list(in_sheet))
         db.commit()

@@ -78,6 +78,12 @@ DEFAULT_RULES: dict[str, tuple[Responsible, Severity, str]] = {
         Severity.LOW,
         "Submit your feedback for the interview, from your invite link or My interviews.",
     ),
+    "unlinked_row": (
+        Responsible.GTD_TEAM,
+        Severity.MEDIUM,
+        "Match the sheet row to its demand, or create the demand from the row, on the Reconciliation "
+        "page. If the requisition isn't ours, close this with the reason.",
+    ),
     "past_start": (
         Responsible.DEMAND_OWNER,
         Severity.HIGH,

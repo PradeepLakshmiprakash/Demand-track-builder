@@ -59,7 +59,7 @@
 {{ problem_list('Incorrect demand', s.get('incorrect', []), 'The sheet marks these as incorrect demands.') }}
 
 <section class="panel" id="to-match">
-  <div class="panel-head"><div><h2>Rows that need a person</h2><div class="hint">Match each to a demand, or create the demand from the row. The app never guesses without you.</div></div><span class="chip {{ 'risk' if todo else 'teal' }}">{{ todo | length }}</span></div>
+  <div class="panel-head"><div><h2>Rows that need a person</h2><div class="hint">A row with one clear match is linked automatically. These had none or more than one: each is escalated to the GTD admin team, with the demand owner copied, until it is matched here or a demand is created from the row.</div></div><span class="chip {{ 'risk' if todo else 'teal' }}">{{ todo | length }}</span></div>
   {% for r in todo %}
   <div class="match-row" id="row{{ r.id }}">
     <div class="match-head">
@@ -125,6 +125,10 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
+
+{% if s.get('auto_linked') %}
+<section class="panel panel-body"><strong>Linked automatically:</strong> {{ s.auto_linked | join(', ') }}. One clear match each (same originator, very close name); the owner and the GTD admin team were emailed.</section>
 {% endif %}
 
 {% if s.get('superseded') or s.get('resubmitting') or s.get('held') %}

@@ -23,6 +23,7 @@ class Escalation(Base):
         CheckConstraint(check_in("type", EscalationType), name="type_valid"),
         CheckConstraint(check_in("status", EscalationStatus), name="status_valid"),
         CheckConstraint("level IN (1, 2)", name="level_valid"),
+        CheckConstraint("demand_id IS NOT NULL OR sheet_req_id IS NOT NULL", name="demand_or_row"),
         CheckConstraint(check_in("severity", Severity), name="severity_valid"),
         CheckConstraint(check_in("responsible", Responsible), name="responsible_valid"),
         CheckConstraint(f"action IS NULL OR {check_in('action', ResolutionAction)}", name="action_valid"),
@@ -39,10 +40,24 @@ class Escalation(Base):
             unique=True,
             postgresql_where=text("status = 'open'"),
         ),
+        # ... and one open escalation per unlinked sheet requisition.
+        Index(
+            "uq_escalations_open_per_row",
+            "account_id",
+            "sheet_req_id",
+            unique=True,
+            postgresql_where=text("status = 'open' AND sheet_req_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    demand_id: Mapped[int] = mapped_column(ForeignKey("demands.id"), index=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    # None for a BCM sheet row that no demand is linked to; then the sheet_* fields say which row.
+    demand_id: Mapped[int | None] = mapped_column(ForeignKey("demands.id"), index=True)
+    sheet_req_id: Mapped[str | None] = mapped_column(String(20))
+    sheet_name: Mapped[str | None] = mapped_column(Text)
+    # The sheet's originator when they are a known demand owner: copied, and sees it in My escalations.
+    sheet_owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     type: Mapped[str] = mapped_column(String(20))
     level: Mapped[int] = mapped_column(SmallInteger, default=1)
     status: Mapped[str] = mapped_column(String(10), default=EscalationStatus.OPEN.value)
@@ -65,6 +80,11 @@ class Escalation(Base):
     events: Mapped[list["EscalationEvent"]] = relationship(
         order_by="EscalationEvent.id", cascade="all, delete-orphan"
     )
+
+    @property
+    def subject(self) -> str:
+        """What it is about, when there is no demand: the sheet row."""
+        return f"{self.sheet_req_id} {self.sheet_name or ''}".strip()
 
     @property
     def type_enum(self) -> EscalationType:

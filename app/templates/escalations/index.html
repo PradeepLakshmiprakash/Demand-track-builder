@@ -40,8 +40,13 @@
       <a class="tr {{ 'on' if selected and selected.id == e.id }}" href="?status={{ status }}{% if level %}&level={{ level }}{% endif %}{% if type %}&type={{ type }}{% endif %}&id={{ e.id }}" {% if selected and selected.id == e.id %}aria-current="true"{% endif %}>
         <div><span class="chip {{ chips[e.type] }}">{{ e.type_enum.label }}</span><div class="note sev-{{ e.severity }}">{{ e.severity_enum.label }} severity</div></div>
         <div>
+          {% if d %}
           <div><span class="mono">{{ d.gtd_req_id or d.app_ref }}</span> {{ d.name }}</div>
           <div class="note">{{ d.app_ref }} · {{ d.business_unit.name }} · {{ e.detail }}</div>
+          {% else %}
+          <div><span class="mono">{{ e.sheet_req_id }}</span> {{ e.sheet_name }}</div>
+          <div class="note">BCM sheet row, no demand in the app · {{ e.detail }}</div>
+          {% endif %}
         </div>
         <div>{{ e.responsible_enum.label }}<div class="note">L{{ e.level }}{{ ' · overdue' if e.level == 2 and e.status == 'open' }}</div>{% if e.status != 'open' %}<div class="note">{{ action_labels.get(e.action, '') if action_labels else e.action }}</div>{% endif %}</div>
         <div>{{ due(e) }}</div>
@@ -56,8 +61,12 @@
   <aside class="panel panel-body editor stack">
     <div>
       <div class="eyebrow">{{ 'Respond' if e.status == 'open' else 'Resolved' }}</div>
+      {% if sd %}
       <h2 style="font-size:20px;margin-top:2px"><a class="mono" href="/demands/{{ sd.app_ref }}">{{ sd.gtd_req_id or sd.app_ref }}</a> {{ sd.name }}</h2>
-      <div class="small muted" style="margin-top:4px">{{ e.type_enum.label }} · <span class="sev-{{ e.severity }}">{{ e.severity_enum.label }} severity</span> · L{{ e.level }} · {{ sd.app_ref }} · owner {{ sd.owner.name }} · {{ sd.status_enum.full }}</div>
+      {% else %}
+      <h2 style="font-size:20px;margin-top:2px"><span class="mono">{{ e.sheet_req_id }}</span> {{ e.sheet_name }}</h2>
+      {% endif %}
+      <div class="small muted" style="margin-top:4px">{{ e.type_enum.label }} · <span class="sev-{{ e.severity }}">{{ e.severity_enum.label }} severity</span> · L{{ e.level }}{% if sd %} · {{ sd.app_ref }} · owner {{ sd.owner.name }} · {{ sd.status_enum.full }}{% else %} · BCM sheet row with no demand in the app{% endif %}</div>
     </div>
     <div class="small stack" style="gap:4px">
       <div>{{ e.detail }}</div>
@@ -69,6 +78,7 @@
     {% if cleared %}<div class="flash ok small">The condition has cleared since this opened. It still needs a person to close it.</div>{% endif %}
 
     {% if e.status == 'open' and can_resolve %}
+    {% if not sd %}<div class="small"><a class="btn small primary" href="/reconciliation#to-match">Match it or create the demand on Reconciliation</a></div>{% endif %}
     <form method="post" action="/escalations/{{ e.id }}/resolve" class="stack">
       <label class="f">Reason
         <select name="reason" required>
@@ -78,7 +88,7 @@
       </label>
       <fieldset class="f radios"><legend>Action</legend>
         {% for a in actions %}
-          <label><input type="radio" name="action" value="{{ a.value }}" {{ 'checked' if loop.first }} required> {{ "I'll correct it and resubmit" if a.value == 'return' and is_owner else a.label }}</label>
+          <label><input type="radio" name="action" value="{{ a.value }}" {{ 'checked' if loop.first }} required> {{ "I'll correct it and resubmit" if a.value == 'return' and is_owner else "Not ours: ignore this requisition" if not sd else a.label }}</label>
         {% endfor %}
       </fieldset>
       <label class="f" id="extend-date"><span id="extend-label">New due date</span><input type="date" name="extend_to"></label>

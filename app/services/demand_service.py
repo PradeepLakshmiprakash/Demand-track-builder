@@ -122,7 +122,8 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
                 Escalation.status == EscalationStatus.OPEN.value,
             )
         ):
-            escs.setdefault(e.demand_id, []).append(e)
+            if e.demand_id is not None:
+                escs.setdefault(e.demand_id, []).append(e)
 
     from app.services.escalation_service import current_doj  # it imports this module
     from app.services.margin_service import notes as offer_notes  # margin_service imports this module too

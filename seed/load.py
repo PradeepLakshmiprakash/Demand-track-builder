@@ -113,7 +113,8 @@ def load(db: Session, now: datetime | None = None) -> None:
         due = now + timedelta(days=-abs(due_in) if esc_level == 2 else due_in)
         opened = due - timedelta(days=account.l1_sla_days + (account.l2_sla_days if esc_level == 2 else 0))
         esc = Escalation(
-            demand_id=demands[ref].id, type=etype, level=esc_level, status="open", detail=detail,
+            account_id=account.id, demand_id=demands[ref].id,
+            type=etype, level=esc_level, status="open", detail=detail,
             opened_at=opened, due_at=due, notified_level=esc_level,  # seeded as already mailed
             severity=DEFAULT_RULES[etype][1].value, responsible=DEFAULT_RULES[etype][0].value,
         )  # fmt: skip

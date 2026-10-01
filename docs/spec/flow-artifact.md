@@ -1,8 +1,8 @@
 # Demand Tracker — Application Flows
 
-Version 1.5 · 1 Oct 2026 — Phase 8 plus the 1 Oct review changes: see §17, which supersedes §9 (escalations) and the role names used above.
+Version 1.6 · 1 Oct 2026 — Phase 8 plus the 1 Oct review changes: see §17–§18, which supersede §9 (escalations) and the role names used above.
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D68 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D75 in `docs/decisions.md`.
 
 ---
 
@@ -446,3 +446,43 @@ calculator gives the GTD team admin and leadership a what-if per supply channel.
 
 **Non-billable positions** are capped per business unit by the GTD team admin; leadership sees used
 against agreed.
+
+## 18. Changes in 1.6 (second round of 1 Oct)
+
+Where this section differs from the text above, this section is what is built. "DP sheet" above reads
+"BCM sheet".
+
+**Stages.** Five main stages, each with sub-stages (replaces §6.3 and §11.1):
+
+| Main stage | Sub-stage | Set by |
+|---|---|---|
+| Coverage Required | Draft | Demand owner |
+| | GTD creation pending | Submitted; in the morning reminder until created on GTD |
+| | Correction required | Sent back to the owner |
+| | GTD approval pending | GTD admin team links the requisition ID |
+| | GTD approval overdue | Not in the BCM sheet after the grace period |
+| | Removed from sheet | Was in the sheet, gone from the latest |
+| | Marked incorrect | BCM sheet |
+| | GTD approved | In the BCM sheet with a status that isn't mapped |
+| | Sourcing profiles | BCM sheet |
+| Selection In Progress | Panel interview | App: a candidate is in the panel |
+| | Panel selected | App: selected, client interview next |
+| | Client interview | BCM sheet |
+| Allocation Pending | Offer approval pending | BCM sheet, or the app when the panel's decision is final |
+| | Offer made, joining awaited | The owner records the joining date, or the BCM sheet |
+| Allocation Completed | Joined | BCM sheet |
+| Abandoned | Cancelled in sheet | BCM sheet |
+| | Closed by owner or GTD team | An escalation closed with "close demand" |
+
+**Offer approval.** At or above the margin cut-off the demand owner approves (GTD team admin
+notified); below it leadership decides. Owners see bill rate, cost and margin on their own demands and
+have the margin calculator.
+
+**After approval.** Staffing makes the offer. When it is accepted the demand owner records the expected
+date of joining; the BCM sheet's date replaces it later.
+
+**Reconciliation.** Automatic: by requisition ID, by a `[DM-…]` prefix if the name carries one, or by
+one clear match (same originator, very close name). Any other row in the BCM sheet that isn't in the
+app is escalated to the GTD admin team with the demand owner copied.
+
+**Accounts** are added by the Administrator.

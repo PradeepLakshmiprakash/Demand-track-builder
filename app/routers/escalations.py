@@ -34,6 +34,7 @@ CHIPS = {
     EscalationType.AGING: "blue",
     EscalationType.REJECTION_LIMIT: "gray",
     EscalationType.PANEL_SLA: "gray",
+    EscalationType.UNLINKED_ROW: "esc",
 }
 
 
@@ -89,7 +90,7 @@ def escalations_page(
             "can_resolve": svc.can_resolve(actor, esc, d),
             "who_acts": svc.who_acts(esc),
             "steps": account.settings.rule_for(esc.type).steps,
-            "is_owner": actor.id == d.owner_id,
+            "is_owner": d is not None and actor.id == d.owner_id,
             "reasons": account.settings.resolution_reasons,
             "names": names,
             "action_labels": {a.value: a.label for a in ResolutionAction},

@@ -33,7 +33,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from html import escape
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core import mail
@@ -157,11 +157,80 @@ def open_escalation(
         notified_level=0,
         severity=severity.value,
         responsible=rule.responsible.value,
+        account_id=account.id,
     )
     db.add(esc)
     db.flush()
     _event(db, esc, EscalationEventKind.OPENED, note=detail, at=now)
     return esc
+
+
+def open_row_escalation(
+    db: Session,
+    account: Account,
+    *,
+    req_id: str,
+    name: str | None,
+    owner_id: int | None,
+    detail: str,
+    now: datetime,
+) -> Escalation | None:
+    """A BCM sheet row whose requisition no demand is linked to. None when the trigger is off, one is
+    already open for this requisition, or a person already said to ignore it."""
+    type_ = EscalationType.UNLINKED_ROW
+    rule = account.settings.rule_for(type_.value)
+    if not rule.enabled:
+        return None
+    seen = db.scalars(
+        select(Escalation).where(
+            Escalation.account_id == account.id,
+            Escalation.type == type_.value,
+            Escalation.sheet_req_id == req_id,
+        )
+    ).all()
+    if any(e.status == EscalationStatus.OPEN.value or e.resolved_by is not None for e in seen):
+        return None  # open already, or closed by a person as "not ours"
+    esc = Escalation(
+        account_id=account.id,
+        demand_id=None,
+        sheet_req_id=req_id,
+        sheet_name=name,
+        sheet_owner_id=owner_id,
+        type=type_.value,
+        level=1,
+        status=EscalationStatus.OPEN.value,
+        detail=detail,
+        opened_at=now,
+        due_at=due_at(account, now, rule.severity.value),
+        notified_level=0,
+        severity=rule.severity.value,
+        responsible=rule.responsible.value,
+    )
+    db.add(esc)
+    db.flush()
+    _event(db, esc, EscalationEventKind.OPENED, note=detail, at=now)
+    return esc
+
+
+def close_linked_rows(
+    db: Session, account: Account, linked: set[str], in_sheet: set[str], now: datetime
+) -> int:
+    """Row escalations answer themselves once the requisition is linked, or it leaves the sheet."""
+    n = 0
+    for esc in db.scalars(
+        select(Escalation).where(
+            Escalation.account_id == account.id,
+            Escalation.type == EscalationType.UNLINKED_ROW.value,
+            Escalation.status == EscalationStatus.OPEN.value,
+        )
+    ):
+        if esc.sheet_req_id in linked:
+            _close(db, esc, None, "Linked to a demand", ResolutionAction.NO_ACTION, None, now)
+            n += 1
+        elif esc.sheet_req_id not in in_sheet:
+            _close(db, esc, None, "No longer in the BCM sheet", ResolutionAction.NO_ACTION, None, now)
+            n += 1
+    return n
 
 
 def open_for(db: Session, demand_ids: list[int]) -> dict[int, list[Escalation]]:
@@ -172,7 +241,8 @@ def open_for(db: Session, demand_ids: list[int]) -> dict[int, list[Escalation]]:
                 Escalation.demand_id.in_(demand_ids), Escalation.status == EscalationStatus.OPEN.value
             )
         ):
-            out.setdefault(e.demand_id, []).append(e)
+            if e.demand_id is not None:
+                out.setdefault(e.demand_id, []).append(e)
     return out
 
 
@@ -277,9 +347,14 @@ def _past_start(d: Demand, doj: date | None, today: date) -> bool:
     )
 
 
-def is_cleared(db: Session, account: Account, esc: Escalation, demand: Demand, now: datetime) -> bool:
+def is_cleared(db: Session, account: Account, esc: Escalation, demand: Demand | None, now: datetime) -> bool:
     """Has the reason for this escalation gone away? Then "no further action" is allowed."""
     t = esc.type_enum
+    if demand is None:  # a sheet row: cleared once a demand is linked to that requisition
+        return (
+            db.scalar(select(GtdSubmission.id).where(GtdSubmission.gtd_req_id == esc.sheet_req_id))
+            is not None
+        )
     s = demand.status_enum
     if t is EscalationType.NOT_SUBMITTED:
         return s not in (DemandStatus.SUBMITTED, DemandStatus.NOTIFIED)
@@ -383,9 +458,8 @@ def promote_overdue(db: Session, account: Account, now: datetime, result: SweepR
     """No response by the due date: it becomes L2. The responsible person keeps the action."""
     overdue = db.scalars(
         select(Escalation)
-        .join(Demand)
         .where(
-            Demand.account_id == account.id,
+            Escalation.account_id == account.id,
             Escalation.status == EscalationStatus.OPEN.value,
             Escalation.level == 1,
             Escalation.due_at < now,
@@ -395,8 +469,8 @@ def promote_overdue(db: Session, account: Account, now: datetime, result: SweepR
     for esc in overdue:
         esc.level = 2
         _event(db, esc, EscalationEventKind.PROMOTED, note="No response by the due date", at=now)
-        d = db.get_one(Demand, esc.demand_id)
-        result.promoted.append(f"{d.app_ref} {esc.type_enum.label.lower()}")
+        d = db.get(Demand, esc.demand_id) if esc.demand_id else None
+        result.promoted.append(f"{d.app_ref if d else esc.sheet_req_id} {esc.type_enum.label.lower()}")
 
 
 def close_cleared_feedback(db: Session, account: Account, now: datetime) -> int:
@@ -445,13 +519,16 @@ def _users(db: Session, account_id: int, *roles: Role) -> list[User]:
     return list(db.scalars(select(User).where(member_of(account_id, *roles))))
 
 
-def responsible_people(db: Session, account: Account, esc: Escalation, demand: Demand) -> list[User]:
+def responsible_people(db: Session, account: Account, esc: Escalation, demand: Demand | None) -> list[User]:
     """The people who have to act on this escalation."""
     who = esc.responsible_enum
-    if who is Responsible.DEMAND_OWNER:
+    people: list[User] = []
+    if demand is None or who is Responsible.GTD_TEAM:  # a sheet row has no owner yet: the GTD team's
+        people = _users(db, account.id, *GTD_TEAM_ROLES)
+    elif who is Responsible.DEMAND_OWNER:
         owner = db.get_one(User, demand.owner_id)
         people = [owner] if owner.active else []
-    elif who is Responsible.INTERVIEWER:
+    else:
         ids = db.scalars(
             select(Interview.interviewer_id).where(
                 Interview.demand_id == demand.id,
@@ -460,21 +537,22 @@ def responsible_people(db: Session, account: Account, esc: Escalation, demand: D
             )
         )
         people = list(db.scalars(select(User).where(User.id.in_(set(ids)), User.active)))
-    else:
-        people = _users(db, account.id, *GTD_TEAM_ROLES)
     # Nobody to act (owner left, interviewer not assigned): it falls to the GTD team admin.
     return people or _users(db, account.id, Role.ADMIN)
 
 
-def audience(db: Session, account: Account, esc: Escalation, demand: Demand) -> Audience:
+def audience(db: Session, account: Account, esc: Escalation, demand: Demand | None) -> Audience:
     cfg = account.settings
-    bu = db.get_one(BusinessUnit, demand.bu_id)
-    owner = db.get_one(User, demand.owner_id)
+    bu = db.get_one(BusinessUnit, demand.bu_id) if demand else None
+    # The demand's owner; for a sheet row, the sheet's originator when they are a known owner.
+    owner_id = demand.owner_id if demand else esc.sheet_owner_id
+    owner = db.get(User, owner_id) if owner_id else None
     people = responsible_people(db, account, esc, demand)
     to = [u.email for u in people]
-    acts = f"{esc.responsible_enum.label} ({', '.join(u.name for u in people)})"
+    label = esc.responsible_enum.label if demand else Responsible.GTD_TEAM.label
+    acts = f"{label} ({', '.join(u.name for u in people)})"
     informed, cc = [], []
-    if owner.active and owner.email not in to:
+    if owner is not None and owner.active and owner.email not in to:
         informed.append("demand owner")
         cc.append(owner.email)
     team_admin = [u.email for u in _users(db, account.id, Role.ADMIN) if u.email not in to]
@@ -485,7 +563,7 @@ def audience(db: Session, account: Account, esc: Escalation, demand: Demand) -> 
         if cfg.l2_inform_leadership:
             informed.append(cfg.escalation_owners.get("L2", "leadership"))
             cc += [u.email for u in _users(db, account.id, Role.LEADERSHIP)]
-        if cfg.l2_inform_delivery_head and bu.delivery_head_email:
+        if cfg.l2_inform_delivery_head and bu is not None and bu.delivery_head_email:
             head = cfg.escalation_owners.get("L1", "delivery head")
             informed.append(f"{head} ({bu.delivery_head_name})" if bu.delivery_head_name else head)
             cc.append(bu.delivery_head_email)
@@ -500,9 +578,8 @@ def notify_pending(db: Session, account: Account, now: datetime) -> int:
     pending = list(
         db.scalars(
             select(Escalation)
-            .join(Demand)
             .where(
-                Demand.account_id == account.id,
+                Escalation.account_id == account.id,
                 Escalation.status == EscalationStatus.OPEN.value,
                 Escalation.notified_level < Escalation.level,
             )
@@ -525,9 +602,8 @@ def remind_overdue(db: Session, account: Account, now: datetime) -> int:
         esc
         for esc in db.scalars(
             select(Escalation)
-            .join(Demand)
             .where(
-                Demand.account_id == account.id,
+                Escalation.account_id == account.id,
                 Escalation.status == EscalationStatus.OPEN.value,
                 Escalation.level == 2,
                 Escalation.notified_level >= 2,
@@ -547,9 +623,11 @@ def remind_overdue(db: Session, account: Account, now: datetime) -> int:
 def _mail_groups(
     db: Session, account: Account, escalations: list[Escalation], now: datetime, *, reminder: bool
 ) -> int:
-    groups: dict[tuple[int, tuple[str, ...]], list[tuple[Escalation, Demand, Audience]]] = defaultdict(list)
+    groups: dict[tuple[int, tuple[str, ...]], list[tuple[Escalation, Demand | None, Audience]]] = defaultdict(
+        list
+    )
     for esc in escalations:
-        d = db.get_one(Demand, esc.demand_id)
+        d = db.get(Demand, esc.demand_id) if esc.demand_id else None
         a = audience(db, account, esc, d)
         groups[(esc.level, tuple(sorted(a.to)))].append((esc, d, a))
     sent = 0
@@ -570,7 +648,7 @@ def _mail_groups(
 def _compose(
     account: Account,
     level: int,
-    items: list[tuple[Escalation, Demand, Audience]],
+    items: list[tuple[Escalation, Demand | None, Audience]],
     to: list[str],
     cc: list[str],
     *,
@@ -600,7 +678,7 @@ def _compose(
         when = f"Respond by {due:%d %b}" if level == 1 else f"Was due {due:%d %b}"
         text += [
             f"{esc.type_enum.label} · {esc.severity_enum.label} severity",
-            f"  Demand: {d.app_ref} {d.gtd_req_id or ''} {d.name}",
+            f"  Demand: {d.app_ref} {d.gtd_req_id or ''} {d.name}" if d else f"  Sheet row: {esc.subject}",
             f"  What happened: {esc.detail or ''}",
             f"  Who acts: {a.acts}",
             f"  Steps: {steps}",
@@ -610,8 +688,10 @@ def _compose(
         rows.append(
             f"<tr><td style='padding:8px 10px;vertical-align:top'><b>{escape(esc.type_enum.label)}</b><br>"
             f"{escape(esc.severity_enum.label)} severity</td>"
-            f"<td style='padding:8px 10px'><span style='font-family:monospace'>{escape(d.app_ref)}</span> "
-            f"{escape(d.name)}<br><span style='color:#5E5A50'>{escape(esc.detail or '')}</span><br>"
+            f"<td style='padding:8px 10px'><span style='font-family:monospace'>"
+            f"{escape(d.app_ref if d else esc.sheet_req_id or '')}</span> "
+            f"{escape(d.name if d else esc.sheet_name or '')}<br>"
+            f"<span style='color:#5E5A50'>{escape(esc.detail or '')}</span><br>"
             f"<b>Who acts:</b> {escape(a.acts)}<br><b>Steps:</b> {escape(steps)}</td>"
             f"<td style='padding:8px 10px;vertical-align:top'>{escape(when)}</td></tr>"
         )
@@ -629,25 +709,31 @@ def _compose(
 # --- Resolving ---------------------------------------------------------------------------------------
 
 
-def can_resolve(actor: Actor, esc: Escalation, demand: Demand) -> bool:
+def can_resolve(actor: Actor, esc: Escalation, demand: Demand | None) -> bool:
     """Only the responsible party responds: the GTD admin team (and its admin) for what is theirs to
     do, the demand owner for their own demand. Late feedback is answered by the interviewer giving it;
     the GTD team may also close it (e.g. after reassigning the interview). Leadership never acts."""
     if esc.status != EscalationStatus.OPEN.value:
         return False
-    if esc.responsible_enum is Responsible.DEMAND_OWNER:
+    if demand is not None and esc.responsible_enum is Responsible.DEMAND_OWNER:
         return actor.id == demand.owner_id
     return actor.role in GTD_TEAM_ROLES
 
 
 def who_acts(esc: Escalation) -> str:
     who = esc.responsible_enum
+    if esc.demand_id is None:
+        return "the GTD admin team"
     if who is Responsible.DEMAND_OWNER:
         return "the demand owner"
     return "the GTD admin team" if who is Responsible.GTD_TEAM else "the interviewer (by giving feedback)"
 
 
-def allowed_actions(db: Session, account: Account, esc: Escalation, demand: Demand) -> list[ResolutionAction]:
+def allowed_actions(
+    db: Session, account: Account, esc: Escalation, demand: Demand | None
+) -> list[ResolutionAction]:
+    if demand is None:  # a sheet row: matched on the Reconciliation page, or declared not ours here
+        return [ResolutionAction.NO_ACTION]
     actions = [ResolutionAction.EXTEND, ResolutionAction.CLOSE]
     if esc.type_enum is EscalationType.PAST_START:
         actions.insert(0, ResolutionAction.NEW_START)
@@ -672,8 +758,8 @@ def resolve(
 ) -> Escalation:
     now = now or datetime.now(UTC)
     esc = db.get(Escalation, esc_id)
-    demand = db.get(Demand, esc.demand_id) if esc else None
-    if esc is None or demand is None or demand.account_id != actor.account_id:
+    demand = db.get(Demand, esc.demand_id) if esc and esc.demand_id else None
+    if esc is None or esc.account_id != actor.account_id:
         raise EscalationError("Escalation not found.")
     if esc.status != EscalationStatus.OPEN.value:
         raise EscalationError("This escalation is already resolved.")
@@ -690,6 +776,10 @@ def resolve(
         raise EscalationError(f"'{act.label}' isn't available for this escalation.")
     comment = (comment or "").strip() or None
     note = f"{reason}" + (f": {comment}" if comment else "")
+    if demand is None:  # a sheet row declared not ours: closed, and not raised again for this requisition
+        _close(db, esc, actor.id, reason, act, comment, now)
+        db.commit()
+        return esc
 
     if act is ResolutionAction.EXTEND:
         today = now.astimezone(_tz(account)).date()
@@ -781,12 +871,12 @@ def listing(
     level: int | None = None,
     type_: str | None = None,
     owner_id: int | None = None,
-) -> list[tuple[Escalation, Demand]]:
+) -> list[tuple[Escalation, Demand | None]]:
     """Escalations of the account; for a demand owner (owner_id), only those on their own demands."""
     stmt = (
         select(Escalation, Demand)
-        .join(Demand)
-        .where(Demand.account_id == account_id)
+        .outerjoin(Demand, Demand.id == Escalation.demand_id)
+        .where(Escalation.account_id == account_id)
         .options(
             selectinload(Demand.submissions), selectinload(Demand.owner), selectinload(Demand.business_unit)
         )
@@ -797,7 +887,7 @@ def listing(
         stmt = stmt.where(Escalation.level == level)
     if type_:
         stmt = stmt.where(Escalation.type == type_)
-    if owner_id is not None:
-        stmt = stmt.where(Demand.owner_id == owner_id)
+    if owner_id is not None:  # their own demands, and sheet rows that name them as the originator
+        stmt = stmt.where(or_(Demand.owner_id == owner_id, Escalation.sheet_owner_id == owner_id))
     order = (Escalation.due_at,) if status == "open" else (Escalation.resolved_at.desc(),)
     return [(e, d) for e, d in db.execute(stmt.order_by(*order, Escalation.id)).all()]

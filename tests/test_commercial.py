@@ -321,8 +321,9 @@ def test_phase5_exit_leadership_numbers_match_manual_calculation(client: Client,
     assert pipeline == {"coverage": 8, "selection": 3, "alloc_pending": 4, "alloc_done": 1, "abandoned": 1}
     # ... and the sub-stages inside each main stage
     assert dict(o.subs["selection"]) == {"Panel interview": 1, "Client interview": 2}
-    assert dict(o.subs["coverage"])["Sourcing profiles"] == 3 and sum(dict(o.subs["coverage"]).values()) == 8
-    assert (o.open, o.live, o.need_coverage, o.missing_rates) == (15, 17, 3, 0)
+    # DM-000151 was waiting for its GTD ID; the sheet's W3NX5A row is clearly it, so it links itself.
+    assert dict(o.subs["coverage"])["Sourcing profiles"] == 4 and sum(dict(o.subs["coverage"]).values()) == 8
+    assert (o.open, o.live, o.need_coverage, o.missing_rates) == (15, 17, 4, 0)
 
     cca = next(s for s in o.by_practice if s.name == "CCA-FS")
     assert cca.total == 9
