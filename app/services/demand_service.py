@@ -69,6 +69,7 @@ class DemandRow:
     attention: bool
     read_only: bool
     open_escalations: list[Escalation]
+    doj: date | None = None  # from the BCM sheet, or the owner's expected date
 
     @property
     def main(self) -> MainStage:
@@ -123,9 +124,11 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
         ):
             escs.setdefault(e.demand_id, []).append(e)
 
+    from app.services.escalation_service import current_doj  # it imports this module
     from app.services.margin_service import notes as offer_notes  # margin_service imports this module too
     from app.services.pipeline_service import notes as panel_notes  # pipeline_service imports this module
 
+    joining = current_doj(db, actor.account_id)
     progress = panel_notes(db, demands) | offer_notes(db, demands)
     rows = []
     for d in demands:
@@ -144,6 +147,7 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
                 attention=attention,
                 read_only=not can_edit(actor, d),
                 open_escalations=escs.get(d.id, []),
+                doj=joining.get(d.id),
             )
         )
     return rows

@@ -132,21 +132,20 @@ def apply_for(db: Session, demand_id: int | None, actor_id: int | None) -> None:
 
 
 def sheet_yields(db: Session, demand: Demand, sheet_stage: DemandStatus | None) -> bool:
-    """True when the BCM sheet's stage is behind the panel progress the app already recorded."""
-    if sheet_stage not in (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED):
-        return False
+    """True when the BCM sheet's stage is behind progress the app already recorded: panel progress,
+    or an offer the owner marked as accepted. A sheet stage further on always wins."""
     cur = demand.status_enum
+    if sheet_stage not in PROGRESS_ORDER or cur not in PROGRESS_ORDER or _rank(sheet_stage) >= _rank(cur):
+        return False
     if cur in APP_PROGRESS:
         return True
-    if cur is DemandStatus.OFFER_IN_PROCESS:  # set by the app when the panel's decision was final
-        last = db.scalar(
-            select(StageEvent.origin)
-            .where(StageEvent.demand_id == demand.id)
-            .order_by(StageEvent.at.desc(), StageEvent.id.desc())
-            .limit(1)
-        )
-        return last == StageOrigin.APP.value
-    return False
+    last = db.scalar(
+        select(StageEvent.origin)
+        .where(StageEvent.demand_id == demand.id)
+        .order_by(StageEvent.at.desc(), StageEvent.id.desc())
+        .limit(1)
+    )
+    return last == StageOrigin.APP.value
 
 
 def notes(db: Session, demands: list[Demand]) -> dict[int, str]:

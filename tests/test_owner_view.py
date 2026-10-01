@@ -88,3 +88,45 @@ def test_only_the_owner_asks_and_only_for_a_selected_candidate(client: Client, d
         in neha.post("/demands/DM-000146/offers", data={**form, "candidate_id": "999"}).headers["location"]
     )
     assert db.scalar(select(OfferApproval).where(OfferApproval.candidate_id == cid)) is None
+
+
+def test_owner_records_the_joining_date_after_approval(client: Client, db: Session) -> None:
+    from datetime import date, timedelta
+
+    from seed import sample_sheet
+
+    cid = _select(db, "DM-000146", "Asked For")
+    neha = client.as_user("neha")
+    when = (date.today() + timedelta(days=50)).isoformat()
+    # not before an offer is approved
+    assert (
+        "err="
+        in neha.post("/demands/DM-000146/joining-date", data={"expected_doj": when}).headers["location"]
+    )
+    assert "Record joining date" not in neha.get("/demands/DM-000146").text
+
+    neha.post("/demands/DM-000146/offers", data={"candidate_id": str(cid), "channel": "sogeti"})
+    offer = db.scalars(select(OfferApproval).where(OfferApproval.candidate_id == cid)).one()
+    neha.post(f"/approvals/{offer.id}/decide", data={"decision": "approved", "comment": ""})
+    page = neha.get("/demands/DM-000146").text
+    assert "Offer accepted?" in page and "Not known yet" in page
+    for who in ("kavya", "farah"):  # only the owner records it
+        r = client.as_user(who).post("/demands/DM-000146/joining-date", data={"expected_doj": when})
+        assert "err=" in r.headers["location"]
+
+    mail.sent.clear()
+    r = client.as_user("neha").post("/demands/DM-000146/joining-date", data={"expected_doj": when})
+    assert "msg=" in r.headers["location"]
+    d = demand(db, "DM-000146")
+    assert d.expected_doj is not None and d.status == "offer_in_market"  # Allocation Pending · offer made
+    [m] = mail.sent
+    assert m.to == ["kavya.r@example.com"] and "Offer accepted, joining" in m.subject
+    page = client.get("/demands/DM-000146").text
+    assert "expected, entered by the demand owner" in page and "Allocation Pending" in page
+    row = next(x for x in client.get("/api/demands").json() if x["app_ref"] == "DM-000146")
+    assert row["joining_date"] == when and row["main_stage"] == "Allocation Pending"
+
+    # The next BCM sheet still says "Coverage Required" for it: the owner's progress isn't undone.
+    files = {"file": ("dp.xlsx", sample_sheet.build(), "application/octet-stream")}
+    client.as_user("farah").post("/imports", data={"sheet_date": date.today().isoformat()}, files=files)
+    assert demand(db, "DM-000146").status == "offer_in_market"

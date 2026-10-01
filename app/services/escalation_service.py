@@ -191,7 +191,16 @@ def last_stage_change(db: Session, demand_ids: list[int]) -> dict[int, datetime]
 
 
 def current_doj(db: Session, account_id: int) -> dict[int, date | None]:
-    """DOJ per demand from the latest BCM sheet, read from the row of the demand's current requisition."""
+    """Date of joining per demand: from the latest BCM sheet (the row of the demand's current
+    requisition) when it has one, otherwise the expected date the demand owner recorded."""
+    out: dict[int, date | None] = {
+        demand_id: doj
+        for demand_id, doj in db.execute(
+            select(Demand.id, Demand.expected_doj).where(
+                Demand.account_id == account_id, Demand.expected_doj.is_not(None)
+            )
+        )
+    }
     latest = db.scalar(
         select(ExcelImport.id)
         .where(ExcelImport.account_id == account_id)
@@ -199,13 +208,16 @@ def current_doj(db: Session, account_id: int) -> dict[int, date | None]:
         .limit(1)
     )
     if latest is None:
-        return {}
+        return out
     rows = db.execute(
         select(GtdSubmission.demand_id, ExcelRow.doj)
         .join(ExcelRow, ExcelRow.submission_id == GtdSubmission.id)
         .where(ExcelRow.import_id == latest)
     ).all()
-    return {demand_id: doj for demand_id, doj in rows}
+    for demand_id, doj in rows:
+        if doj is not None or demand_id not in out:
+            out[demand_id] = doj
+    return out
 
 
 def notified_at(db: Session, demand_ids: list[int]) -> dict[int, datetime]:

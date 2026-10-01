@@ -21,10 +21,11 @@ from sqlalchemy.orm import Session
 from app.core import mail
 from app.core.account_config import AccountConfig
 from app.core.config import get_settings
-from app.core.enums import ApprovalRoute, Decision, DemandStatus, Role
+from app.core.enums import FINISHED, PROGRESS_ORDER, ApprovalRoute, Decision, DemandStatus, Role, StageOrigin
 from app.core.security import Actor
 from app.models import Account, Candidate, Demand, OfferApproval, User, member_of
 from app.services import interview_service, notify_service, rate_card_service
+from app.services.demand_service import record_stage
 
 OFFER_STAGES = (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)
 
@@ -399,6 +400,57 @@ def board(db: Session, actor: Actor) -> Board:
         ]
     )
     return b
+
+
+# --- After approval: offer accepted, joining date --------------------------------------------------
+
+
+def can_set_joining(db: Session, actor: Actor, demand: Demand) -> bool:
+    """The demand's owner, once an offer on it has been approved and it isn't finished."""
+    if actor.id != demand.owner_id or demand.status_enum in (*FINISHED, DemandStatus.DRAFT):
+        return False
+    return (
+        db.scalar(
+            select(OfferApproval.id).where(
+                OfferApproval.demand_id == demand.id, OfferApproval.decision == Decision.APPROVED.value
+            )
+        )
+        is not None
+    )
+
+
+def set_joining_date(db: Session, actor: Actor, demand: Demand, when: date | None) -> None:
+    """The offer was accepted: the owner records the expected date of joining. The demand moves to
+    "offer made, joining awaited" now; the BCM sheet's date replaces this one when it arrives."""
+    if not can_set_joining(db, actor, demand):
+        raise ApprovalError("The demand's owner records the joining date, once an offer is approved.")
+    if when is None:
+        raise ApprovalError("Enter the expected date of joining.")
+    demand.expected_doj = when
+    if demand.status_enum in PROGRESS_ORDER and PROGRESS_ORDER.index(
+        demand.status_enum
+    ) < PROGRESS_ORDER.index(DemandStatus.OFFER_IN_MARKET):
+        record_stage(db, demand, DemandStatus.OFFER_IN_MARKET, actor.id, StageOrigin.APP)
+    account = db.get_one(Account, demand.account_id)
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    late = ""
+    if demand.start_date and when > demand.start_date:
+        late = f" That is {(when - demand.start_date).days} days after the requested start."
+    notify_service.safely(
+        mail.send,
+        mail.Mail(
+            to=_team_admins(db, account.id),
+            cc=[actor.email],
+            subject=f"[{ref}] Offer accepted, joining {when:%d %b %Y}",
+            text=(
+                f"{actor.name} recorded that the offer on {demand.app_ref} ({demand.name}) was accepted, "
+                f"with an expected date of joining of {when:%d %b %Y}.{late}\n"
+                "The BCM sheet's date of joining replaces this one when it arrives.\n\n"
+                f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+            ),
+        ),
+    )
+    db.commit()
 
 
 # --- Margin calculator (what-if) ------------------------------------------------------------------------

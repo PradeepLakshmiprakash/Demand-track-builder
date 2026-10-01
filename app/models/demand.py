@@ -70,6 +70,8 @@ class Demand(Base):
     exp_max: Mapped[int | None] = mapped_column(Integer)
     client_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))  # hourly bill rate
     start_date: Mapped[date | None] = mapped_column(Date)
+    # Entered by the demand owner once the offer is accepted. The BCM sheet's DOJ overrides it.
+    expected_doj: Mapped[date | None] = mapped_column(Date)
     region: Mapped[str | None] = mapped_column(String(10))
     location: Mapped[str | None] = mapped_column(String(80))
     work_mode: Mapped[str | None] = mapped_column(String(20))

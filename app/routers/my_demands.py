@@ -1,5 +1,6 @@
 """Demands list: "My demands" for demand owners, "All demands" for full-account roles."""
 
+from datetime import date
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
@@ -89,6 +90,7 @@ def demands_json(
             "practice": d.practice,
             "grade": d.grade,
             "start_date": d.start_date,
+            "joining_date": r.doj,
             "status": d.status,
             "main_stage": r.main.label,
             "status_label": r.status_label,
@@ -142,11 +144,30 @@ def demand_page(
         doj=current_doj(db, actor.account_id).get(demand.id),
         offers=margin_service.for_demand(db, demand.id),
         sees_rates=actor.sees_rates(demand.owner_id),
+        can_set_joining=margin_service.can_set_joining(db, actor, demand),
+        doj_from_sheet=_sheet_doj(db, demand),
         # The owner follows the money on their own demand; so do the roles that see rates.
         loss=_loss(db, actor, demand),
         askable=margin_service.askable(db, demand) if actor.id == demand.owner_id else [],
         channels={c.key: c.label for c in get_account(db, actor.account_id).settings.supply_channels},
     )
+
+
+@router.post("/demands/{ref}/joining-date")
+async def record_joining_date(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """Offer accepted: the demand owner records the expected date of joining."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    raw = str((await request.form()).get("expected_doj") or "")
+    try:
+        margin_service.set_joining_date(db, actor, demand, date.fromisoformat(raw) if raw else None)
+    except (ApprovalError, ValueError) as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#offers", status_code=303)
+    return RedirectResponse(f"/demands/{ref}?msg=Joining+date+recorded#offers", status_code=303)
 
 
 @router.post("/demands/{ref}/offers")
@@ -243,3 +264,11 @@ def _my_loss(db: Session, actor: Actor) -> dict[str, Any] | None:
     ]
     known = [x.lost for x in mine if x.lost is not None]
     return {"total": sum(known, Decimal(0)), "late": len(mine), "unknown": len(mine) - len(known)}
+
+
+def _sheet_doj(db: Session, demand: Demand) -> bool:
+    """Is the joining date shown the BCM sheet's (True), or the owner's expected date (False)?"""
+    return (
+        current_doj(db, demand.account_id).get(demand.id) != demand.expected_doj
+        or demand.expected_doj is None
+    )

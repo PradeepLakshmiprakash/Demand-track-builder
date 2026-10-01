@@ -48,7 +48,7 @@
         {% if sees_rates %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
         {{ field('Requested start date', d.start_date | d) }}
         {% if loss %}{{ field('Revenue lost to date', (loss.lost | money if loss.lost is not none else 'bill rate missing') ~ ' · ' ~ loss.working_days_late ~ ' working days unfilled since ' ~ (d.loss_from | d)) }}{% endif %}
-        {% if doj %}{{ field('Date of joining', (doj | d) ~ (' · %d days after the requested start' % (doj - d.start_date).days if d.start_date and doj > d.start_date else '')) }}{% endif %}
+        {{ field('Date of joining', ((doj | d) ~ (' · %d days after the requested start' % (doj - d.start_date).days if d.start_date and doj > d.start_date else '') ~ (' · from the BCM sheet' if doj_from_sheet else ' · expected, entered by the demand owner')) if doj else 'Not known yet') }}
         {{ field('Region', d.region) }}{{ field('Location', d.location) }}{{ field('Work mode', d.work_mode) }}
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
@@ -56,6 +56,13 @@
     {% if offers or askable %}
     <section class="panel panel-body" id="offers">
       <h2>Offer approval</h2>
+      {% if can_set_joining %}
+        <form method="post" action="/demands/{{ d.app_ref }}/joining-date" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
+          <div class="title" style="flex:1 1 220px">Offer accepted? <span class="small muted">Record the expected date of joining. The BCM sheet's date replaces it when it arrives.</span></div>
+          <input type="date" name="expected_doj" value="{{ d.expected_doj or '' }}" required aria-label="Expected date of joining" style="width:auto;min-height:38px">
+          <button class="btn small primary">{{ 'Update joining date' if d.expected_doj else 'Record joining date' }}</button>
+        </form>
+      {% endif %}
       {% for c in askable %}
         <form method="post" action="/demands/{{ d.app_ref }}/offers" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
           <input type="hidden" name="candidate_id" value="{{ c.id }}">

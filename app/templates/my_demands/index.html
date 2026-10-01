@@ -43,7 +43,7 @@
   </div>
   <div class="tbl demands {{ 'with-owner' if show_owner }}" role="table" aria-label="{{ title }}">
     <div class="tr th" role="row">
-      <div>App ref</div><div>GTD req</div><div>Demand</div>{% if show_owner %}<div>Owner · BU</div>{% endif %}<div>Practice</div><div>Grade</div><div>Start date</div><div>Status</div>
+      <div>App ref</div><div>GTD req</div><div>Demand</div>{% if show_owner %}<div>Owner · BU</div>{% endif %}<div>Practice</div><div>Grade</div><div>Start · joining</div><div>Stage</div>
     </div>
     {% for r in rows %}
     {% set d = r.demand %}
@@ -59,7 +59,7 @@
       {% endif %}
       <div>{{ d.practice }}</div>
       <div>{{ d.grade }}</div>
-      <div>{{ d.start_date | d }}</div>
+      <div>{{ d.start_date | d }}{% if r.doj %}<div class="note">Joining {{ r.doj | d }}</div>{% endif %}</div>
       <div><span class="chip {{ r.chip if r.chip in ('esc', 'risk') else r.main.chip }}">{{ r.main.label }}</span><div class="note">{{ r.status_label }}</div></div>
     </a>
     {% else %}
