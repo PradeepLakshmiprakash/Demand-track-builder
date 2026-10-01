@@ -23,7 +23,7 @@ from app.core.account_config import AccountConfig
 from app.core.config import get_settings
 from app.core.enums import ApprovalRoute, Decision, DemandStatus, Role
 from app.core.security import Actor
-from app.models import Account, Candidate, Demand, OfferApproval, User
+from app.models import Account, Candidate, Demand, OfferApproval, User, member_of
 from app.services import interview_service, rate_card_service
 
 OFFER_STAGES = (DemandStatus.OFFER_IN_PROCESS, DemandStatus.OFFER_IN_MARKET)
@@ -118,6 +118,61 @@ def request(db: Session, actor: Actor, demand_id: int, candidate_name: str, chan
     approval = ensure_offer(db, account, demand, candidate_name, channel)
     if approval is None:
         raise ApprovalError("Enter the candidate's name (an approval for that candidate already exists?).")
+    db.commit()
+    return approval
+
+
+# Where a candidate can be put forward for an offer: the panel has selected, or the client has.
+ASK_STAGES = (
+    DemandStatus.PANEL_SELECTED,
+    DemandStatus.PROFILES_WITH_CLIENT,
+    DemandStatus.OFFER_IN_PROCESS,
+    DemandStatus.OFFER_IN_MARKET,
+)
+
+
+def askable(db: Session, demand: Demand) -> list[Candidate]:
+    """Candidates the panel selected on this demand who have no offer approval yet."""
+    if demand.status_enum not in ASK_STAGES:
+        return []
+    have = set(db.scalars(select(OfferApproval.candidate_id).where(OfferApproval.demand_id == demand.id)))
+    out = []
+    for c, ivs in interview_service.for_demand(db, demand.id):
+        if c.id not in have and any(iv.outcome == "select" for iv in ivs):
+            out.append(c)
+    return out
+
+
+def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: str) -> OfferApproval:
+    """The demand owner raises the offer approval for a selected candidate, instead of waiting for
+    the DP sheet to show the offer. It is priced and routed like any other; the deciders are mailed."""
+    if demand.account_id != actor.account_id or actor.id != demand.owner_id:
+        raise ApprovalError("Only the demand's owner asks for its offer approval.")
+    cand = next((c for c in askable(db, demand) if c.id == candidate_id), None)
+    if cand is None:
+        raise ApprovalError("Pick a candidate the panel has selected, with no approval yet.")
+    account = db.get_one(Account, actor.account_id)
+    if channel not in {c.key for c in account.settings.supply_channels}:
+        raise ApprovalError("Choose the supply channel the candidate comes through.")
+    approval = ensure_offer(db, account, demand, cand.name, channel)
+    if approval is None:
+        raise ApprovalError("An approval for this candidate already exists.")
+    roles = DECIDERS.get(approval.route or "", (Role.ADMIN,))  # unpriced: the GTD team admin completes it
+    to = [u.email for u in db.scalars(select(User).where(member_of(account.id, *roles)))]
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    mail.send(
+        mail.Mail(
+            to=to,
+            cc=[actor.email],
+            subject=f"[{ref}] Offer approval requested for {cand.name}",
+            text=(
+                f"{actor.name} asks for the offer approval for {cand.name}\n"
+                f"on {demand.app_ref} ({demand.name}).\n\n"
+                "Steps: open Offer approvals, check the margin, then approve or decline:\n"
+                f"{get_settings().app_base_url}/approvals"
+            ),
+        )
+    )
     db.commit()
     return approval
 

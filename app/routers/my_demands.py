@@ -1,5 +1,6 @@
 """Demands list: "My demands" for demand owners, "All demands" for full-account roles."""
 
+from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
@@ -14,9 +15,11 @@ from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
-from app.services import interview_service, margin_service
+from app.services import interview_service, loss_service, margin_service
+from app.services.account_service import get_account
 from app.services.demand_service import (
     FILTERS,
+    account_today,
     can_change,
     can_edit,
     demand_rows,
@@ -27,6 +30,7 @@ from app.services.demand_service import (
     summary,
 )
 from app.services.escalation_service import current_doj
+from app.services.margin_service import ApprovalError
 
 router = APIRouter(tags=["demands"])
 guard = require_screen("demands")
@@ -64,6 +68,7 @@ def demands_page(
         bus=bus,
         active_bu=bu,
         stats=summary(all_rows),
+        my_loss=_my_loss(db, actor),
         title="My demands" if actor.scope is not Scope.FULL else "All demands",
     )
 
@@ -135,7 +140,29 @@ def demand_page(
         returned=_returned(db, demand),
         doj=current_doj(db, actor.account_id).get(demand.id),
         offers=margin_service.for_demand(db, demand.id),
+        # The owner follows the money on their own demand; so do the roles that see rates.
+        loss=_loss(db, actor, demand),
+        askable=margin_service.askable(db, demand) if actor.id == demand.owner_id else [],
+        channels={c.key: c.label for c in get_account(db, actor.account_id).settings.supply_channels},
     )
+
+
+@router.post("/demands/{ref}/offers")
+async def ask_for_offer_approval(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    f = await request.form()
+    try:
+        cid = int(str(f.get("candidate_id") or 0))
+        margin_service.ask(db, actor, demand, cid, str(f.get("channel") or ""))
+    except (ApprovalError, ValueError) as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#offers", status_code=303)
+    msg = "Offer approval requested; you'll be emailed the decision"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#offers", status_code=303)
 
 
 @router.get("/demands/{ref}/jd")
@@ -190,3 +217,27 @@ def _returned(db: Session, demand: Demand) -> dict[str, Any] | None:
         "at": esc.resolved_at,
         "by": who.name if who else "the admin",
     }
+
+
+def _loss(db: Session, actor: Actor, demand: Demand) -> loss_service.Loss | None:
+    """Revenue lost on this demand so far, for its owner and for the roles that see rates."""
+    if actor.id != demand.owner_id and not actor.can_see_bill_rate:
+        return None
+    today = account_today(db, actor.account_id)
+    return next(
+        (x for x in loss_service.losses(db, actor.account_id, today) if x.demand.id == demand.id), None
+    )
+
+
+def _my_loss(db: Session, actor: Actor) -> dict[str, Any] | None:
+    """A demand owner's total: revenue lost so far on their own unfilled demands."""
+    if actor.role is not Role.DEMAND_OWNER:
+        return None
+    today = account_today(db, actor.account_id)
+    mine = [
+        x
+        for x in loss_service.losses(db, actor.account_id, today)
+        if x.demand.owner_id == actor.id and not x.filled
+    ]
+    known = [x.lost for x in mine if x.lost is not None]
+    return {"total": sum(known, Decimal(0)), "late": len(mine), "unknown": len(mine) - len(known)}

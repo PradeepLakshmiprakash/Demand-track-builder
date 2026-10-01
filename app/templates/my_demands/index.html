@@ -12,11 +12,12 @@
   {% endif %}
 </div>
 
-<div class="cards">
+<div class="cards" {% if my_loss is not none %}style="grid-template-columns:repeat(5,minmax(0,1fr))"{% endif %}>
   <div class="card"><div class="k">Open demands</div><div class="v">{{ stats.open }}</div></div>
   <div class="card"><div class="k">Before GTD</div><div class="v">{{ stats.before_gtd }}</div><div class="s">Draft or waiting for admin</div></div>
   <div class="card"><div class="k">In coverage or offer</div><div class="v">{{ stats.in_coverage }}</div></div>
   <div class="card warn"><div class="k">Needs attention</div><div class="v">{{ stats.attention }}</div><div class="s">Missing, escalated or past start</div></div>
+  {% if my_loss is not none %}<div class="card {{ 'warn' if my_loss.late }}"><div class="k">Revenue lost to date</div><div class="v">{{ my_loss.total | money }}</div><div class="s">{{ my_loss.late }} of my demands unfilled past their start{% if my_loss.unknown %} · {{ my_loss.unknown }} without a bill rate{% endif %}</div></div>{% endif %}
 </div>
 
 <div class="panel">
