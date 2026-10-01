@@ -35,9 +35,7 @@ def _build(mail: Mail) -> EmailMessage:
         # One inbox receives everything for now; say who each mail was really for.
         meant = "To: " + ", ".join(mail.to) + (f" | Cc: {', '.join(mail.cc)}" if mail.cc else "")
         msg["To"] = s.mail_redirect_to
-        text = f"[Meant for {meant}]
-
-{text}"
+        text = f"[Meant for {meant}]\n\n{text}"
         if html:
             html = f'<p style="color:#666;font-size:12px">[Meant for {escape(meant)}]</p>{html}'
     else:
