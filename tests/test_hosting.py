@@ -62,3 +62,17 @@ def test_hosted_postgres_urls_get_the_driver(url: str) -> None:
 def test_demo_requires_a_password() -> None:
     with pytest.raises(ValueError, match="DEMO_PASSWORD"):
         Settings(env="demo", demo_password=None)
+
+
+def test_all_mail_can_go_to_one_inbox() -> None:
+    from app.core import mail
+
+    s = get_settings()
+    before = s.mail_redirect_to
+    s.mail_redirect_to = "inbox@example.com"
+    try:
+        msg = mail._build(mail.Mail(to=["a@example.com"], cc=["b@example.com"], subject="Hi", text="Body"))
+    finally:
+        s.mail_redirect_to = before
+    assert msg["To"] == "inbox@example.com" and msg["Cc"] is None
+    assert "[Meant for To: a@example.com | Cc: b@example.com]" in msg.get_content()

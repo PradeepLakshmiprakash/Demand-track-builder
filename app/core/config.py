@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     mail_backend: Literal["console", "smtp", "ses"] = "console"
     mail_from: str = "Demand Tracker <demand-tracker@localhost>"
     mail_dir: str = "var/mail"
+    # While people's real addresses aren't in use: deliver every mail to this one inbox instead. The
+    # mail says who it was meant for.
+    mail_redirect_to: str | None = None
     smtp_host: str = "localhost"
     smtp_port: int = 587
     smtp_user: str | None = None

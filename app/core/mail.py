@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from email.utils import make_msgid
+from html import escape
 
 from app.core.config import get_settings
 
@@ -29,14 +30,25 @@ def _build(mail: Mail) -> EmailMessage:
     s = get_settings()
     msg = EmailMessage()
     msg["From"] = s.mail_from
-    msg["To"] = ", ".join(mail.to)
-    if mail.cc:
-        msg["Cc"] = ", ".join(mail.cc)
+    text, html = mail.text, mail.html
+    if s.mail_redirect_to:
+        # One inbox receives everything for now; say who each mail was really for.
+        meant = "To: " + ", ".join(mail.to) + (f" | Cc: {', '.join(mail.cc)}" if mail.cc else "")
+        msg["To"] = s.mail_redirect_to
+        text = f"[Meant for {meant}]
+
+{text}"
+        if html:
+            html = f'<p style="color:#666;font-size:12px">[Meant for {escape(meant)}]</p>{html}'
+    else:
+        msg["To"] = ", ".join(mail.to)
+        if mail.cc:
+            msg["Cc"] = ", ".join(mail.cc)
     msg["Subject"] = mail.subject
     msg["Message-ID"] = make_msgid(domain="demand-tracker")
-    msg.set_content(mail.text)
-    if mail.html:
-        msg.add_alternative(mail.html, subtype="html")
+    msg.set_content(text)
+    if html:
+        msg.add_alternative(html, subtype="html")
     return msg
 
 
