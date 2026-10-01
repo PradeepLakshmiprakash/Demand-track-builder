@@ -183,7 +183,7 @@ def update_supply_channels(db: Session, account_id: int, rows: list[dict[str, st
 
 
 def update_dp_columns(db: Session, account_id: int, headers: dict[str, str], blanks: list[str]) -> None:
-    """Which DP sheet header holds each field. Required fields can't be left blank."""
+    """Which BCM sheet header holds each field. Required fields can't be left blank."""
     columns = {}
     for f, (default, required) in DP_FIELDS.items():
         value = " ".join((headers.get(f) or "").split())

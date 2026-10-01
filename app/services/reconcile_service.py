@@ -1,6 +1,6 @@
-"""Reconciliation: what the DP sheet says about every demand sent to GTD (flow-artifact §5).
+"""Reconciliation: what the BCM sheet says about every demand sent to GTD (flow-artifact §5).
 
-After submission the app can't see GTD; the DP sheet is the only evidence. For each import:
+After submission the app can't see GTD; the BCM sheet is the only evidence. For each import:
 
 1. Match rows to demands, stopping at the first hit:
    tier 1  the row's requisition ID is linked to a demand;
@@ -197,7 +197,7 @@ def _resubmitting(db: Session, d: Demand) -> bool:
 def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None = None) -> Summary:
     latest = latest_import(db, imp.account_id)
     if latest is None or latest.id != imp.id:
-        raise ReconcileError("Only the latest DP sheet can be reconciled; older imports are history.")
+        raise ReconcileError("Only the latest BCM sheet can be reconciled; older imports are history.")
     now = now or datetime.now(UTC)
     account = db.get_one(Account, imp.account_id)
     cfg: AccountConfig = account.settings
@@ -315,7 +315,7 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
             _move(db, d, stage, actor_id, imp, summary)
         if stage is DemandStatus.INCORRECT:
             summary.incorrect.append(d.app_ref)
-            detail = f"DP sheet of {as_of:%d %b} marks {row.gtd_req_id} as '{row.status}'"
+            detail = f"BCM sheet of {as_of:%d %b} marks {row.gtd_req_id} as '{row.status}'"
             _escalate(db, account, d, EscalationType.INCORRECT, detail, now, summary)
         if row.candidate_name and d.status_enum in interview_service.INTERVIEW_STAGES:
             # The sheet says who is on this requisition: that's how candidates get mapped (§7).
@@ -349,7 +349,7 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
         summary.missing.append(d.app_ref)
         _move(db, d, DemandStatus.MISSING, actor_id, imp, summary)
         _escalate(db, account, d, EscalationType.MISSING,
-                  f"Linked to {d.gtd_req_id} on {linked_on:%d %b}; not in the DP sheet of {as_of:%d %b} "
+                  f"Linked to {d.gtd_req_id} on {linked_on:%d %b}; not in the BCM sheet of {as_of:%d %b} "
                   f"({account.grace_days} working days' grace)", now, summary)  # fmt: skip
 
     # 4. In the previous sheet, gone now, still open: dropped.
@@ -374,7 +374,7 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
                 summary.dropped.append(d.app_ref)
                 _move(db, d, DemandStatus.DROPPED, actor_id, imp, summary)
                 _escalate(db, account, d, EscalationType.DROPPED,
-                          f"{d.gtd_req_id} was in the DP sheet of {prev_date}, gone from {as_of:%d %b}",
+                          f"{d.gtd_req_id} was in the BCM sheet of {prev_date}, gone from {as_of:%d %b}",
                           now, summary)  # fmt: skip
 
     counts = [RowOutcome(r.outcome) for r in rows]
@@ -388,7 +388,7 @@ def reconcile(db: Session, imp: ExcelImport, actor_id: int, now: datetime | None
     if summary.unmapped_statuses:
         summary.warnings.append(
             "Statuses with no mapping (demands stay Linked): " + ", ".join(summary.unmapped_statuses)
-            + ". Add them under Account settings → DP sheet status mapping."
+            + ". Add them under Account settings → BCM sheet status mapping."
         )  # fmt: skip
     imp.summary = asdict(summary) | {"parse_warnings": summary_parse_warnings}
     db.commit()
@@ -432,7 +432,7 @@ def _actionable_row(db: Session, account_id: int, row_id: int) -> tuple[ExcelImp
         raise ReconcileError("Row not found.")
     latest = latest_import(db, account_id)
     if latest is None or latest.id != imp.id:
-        raise ReconcileError("That row belongs to an older DP sheet; only the latest can be changed.")
+        raise ReconcileError("That row belongs to an older BCM sheet; only the latest can be changed.")
     if not RowOutcome(row.outcome).needs_person:
         raise ReconcileError("That row is already matched.")
     if not row.gtd_req_id:

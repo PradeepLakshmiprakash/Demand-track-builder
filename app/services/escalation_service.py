@@ -2,9 +2,9 @@
 
 Triggers (§9.1):
   not submitted   in an admin mail, still no GTD requisition ID at the next working day's mail time
-  missing         sent to GTD, not in the DP sheet after the grace period   } opened by
-  dropped         in the previous DP sheet, gone from the latest            } reconciliation
-  incorrect       the DP sheet marks it "In Correct Demnad"                 }
+  missing         sent to GTD, not in the BCM sheet after the grace period   } opened by
+  dropped         in the previous BCM sheet, gone from the latest            } reconciliation
+  incorrect       the BCM sheet marks it "In Correct Demnad"                 }
   aging           no stage change for the account's aging days (linked demands)
   past start      requested start date has passed and there's no DOJ on or before it
   rejection limit panel rejections recorded in the app reach the account's limit (confirmed 24 Sep)
@@ -75,7 +75,7 @@ from app.services.demand_service import record_stage
 LINK_TYPES = frozenset(
     {EscalationType.NOT_SUBMITTED, EscalationType.MISSING, EscalationType.DROPPED, EscalationType.INCORRECT}
 )
-# Stages where the DP sheet is driving progress, so a long silence means the demand is stuck.
+# Stages where the BCM sheet is driving progress, so a long silence means the demand is stuck.
 AGING_STAGES = frozenset(
     {
         DemandStatus.LINKED,
@@ -191,7 +191,7 @@ def last_stage_change(db: Session, demand_ids: list[int]) -> dict[int, datetime]
 
 
 def current_doj(db: Session, account_id: int) -> dict[int, date | None]:
-    """DOJ per demand from the latest DP sheet, read from the row of the demand's current requisition."""
+    """DOJ per demand from the latest BCM sheet, read from the row of the demand's current requisition."""
     latest = db.scalar(
         select(ExcelImport.id)
         .where(ExcelImport.account_id == account_id)

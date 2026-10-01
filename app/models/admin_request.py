@@ -7,7 +7,7 @@ from app.core.db import Base
 
 KINDS = {
     "access": "User access (add, change or remove a person)",
-    "settings": "Account settings (lists, DP sheet format, thresholds, escalation rules)",
+    "settings": "Account settings (lists, BCM sheet format, thresholds, escalation rules)",
     "rate_card": "Rate card (vendor cost rates)",
     "other": "Something else",
 }

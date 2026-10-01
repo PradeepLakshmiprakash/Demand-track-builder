@@ -2,7 +2,7 @@
 
 The app has no view into GTD. The GTD team admin or the GTD admin team enters each demand there by
 hand (the plain demand name) and pastes the requisition ID back. That link is the key the
-DP sheet reconciles on, so an ID can be linked only once, ever.
+BCM sheet reconciles on, so an ID can be linked only once, ever.
 """
 
 import csv

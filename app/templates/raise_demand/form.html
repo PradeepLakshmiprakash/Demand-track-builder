@@ -113,9 +113,9 @@
     <ol>
       <li>Your demand goes into the admin mail, sent daily at {{ account.mail_time.strftime('%H:%M') }} ({{ cfg.timezone.split('/')[-1].replace('_', ' ') }} time).</li>
       <li>The GTD admin team enters it on GTD. The GTD requisition ID is linked to your demand.</li>
-      <li>Once GTD staffing approves it, it appears in the DP sheet and coverage begins.</li>
+      <li>Once GTD staffing approves it, it appears in the BCM sheet and coverage begins.</li>
     </ol>
-    <p class="note">If it isn't in the DP sheet within {{ account.grace_days }} working days, an escalation opens automatically and you're copied.</p>
+    <p class="note">If it isn't in the BCM sheet within {{ account.grace_days }} working days, an escalation opens automatically and you're copied.</p>
   </aside>
 </div>
 <script>

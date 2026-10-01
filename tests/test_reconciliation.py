@@ -1,4 +1,4 @@
-"""Flow 3: DP sheet import and reconciliation. Includes the Phase 3 exit check."""
+"""Flow 3: BCM sheet import and reconciliation. Includes the Phase 3 exit check."""
 
 from datetime import date, timedelta
 

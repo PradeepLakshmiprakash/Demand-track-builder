@@ -89,7 +89,7 @@ def test_aging_opens_after_quiet_period(db: Session) -> None:
 def test_past_start_without_doj(db: Session) -> None:
     resolve_all_seeded(db)
     svc.sweep(db, 1, NOW)
-    esc = open_esc(db, "DM-000117", "past_start")  # started 1 Sep, offer in market, no DP sheet yet
+    esc = open_esc(db, "DM-000117", "past_start")  # started 1 Sep, offer in market, no BCM sheet yet
     assert esc is not None and "no DOJ" in (esc.detail or "")
     assert open_esc(db, "DM-000116", "past_start") is None  # staffed
     assert open_esc(db, "DM-000150", "past_start") is None  # draft

@@ -1,4 +1,4 @@
-"""Admin: per-account thresholds, BU list, practices/grades, supply channels and DP sheet status mapping."""
+"""Admin: per-account thresholds, BU list, practices/grades, supply channels and BCM sheet status mapping."""
 
 from collections.abc import Callable
 from urllib.parse import quote

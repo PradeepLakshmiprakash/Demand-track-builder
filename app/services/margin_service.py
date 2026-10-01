@@ -35,7 +35,7 @@ class ApprovalError(ValueError):
 
 
 def channel_for_source(cfg: AccountConfig, source: str | None) -> str | None:
-    """Map the DP sheet's Source cell (e.g. 'VMS', 'Sogeti') to a supply channel key."""
+    """Map the BCM sheet's Source cell (e.g. 'VMS', 'Sogeti') to a supply channel key."""
     s = (source or "").strip().casefold()
     if not s:
         return None
@@ -106,7 +106,7 @@ def ensure_offer(
 
 
 def request(db: Session, actor: Actor, demand_id: int, candidate_name: str, channel: str) -> OfferApproval:
-    """The admin raises an approval by hand (e.g. the DP sheet row had no candidate name)."""
+    """The admin raises an approval by hand (e.g. the BCM sheet row had no candidate name)."""
     demand = db.get(Demand, demand_id)
     if demand is None or demand.account_id != actor.account_id:
         raise ApprovalError("Demand not found.")
@@ -145,7 +145,7 @@ def askable(db: Session, demand: Demand) -> list[Candidate]:
 
 def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: str) -> OfferApproval:
     """The demand owner raises the offer approval for a selected candidate, instead of waiting for
-    the DP sheet to show the offer. It is priced and routed like any other; the deciders are mailed."""
+    the BCM sheet to show the offer. It is priced and routed like any other; the deciders are mailed."""
     if demand.account_id != actor.account_id or actor.id != demand.owner_id:
         raise ApprovalError("Only the demand's owner asks for its offer approval.")
     cand = next((c for c in askable(db, demand) if c.id == candidate_id), None)
@@ -257,7 +257,7 @@ def _mail_owner(db: Session, demand: Demand, cand: Candidate, approval: OfferApp
     by = actor.name.rstrip(".")
     text = f"The offer for {cand.name} on {demand.app_ref} ({demand.name}) was {word} by {by}.\n"
     text += (
-        "Staffing can now make the offer; the DP sheet will show it in market with a date of joining.\n"
+        "Staffing can now make the offer; the BCM sheet will show it in market with a date of joining.\n"
         if approved
         else f"Reason: {approval.comment}\nStaffing goes back to the other candidates.\n"
     )

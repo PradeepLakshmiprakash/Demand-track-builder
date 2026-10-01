@@ -1,7 +1,7 @@
 """The app's fixed vocabulary.
 
 These are the concepts the code reasons about. Anything that differs by client (BU names, practices,
-how a DP sheet status maps to a stage) is account configuration instead, see `Account.config`.
+how a BCM sheet status maps to a stage) is account configuration instead, see `Account.config`.
 """
 
 from enum import StrEnum
@@ -10,7 +10,7 @@ from enum import StrEnum
 class Role(StrEnum):
     DEMAND_OWNER = "demand_owner"
     ADMIN = "admin"  # "GTD team admin" in the UI: heads the GTD admin team
-    ADMIN_TEAM = "admin_team"  # "GTD admin team": the manual GTD and DP sheet work
+    ADMIN_TEAM = "admin_team"  # "GTD admin team": the manual GTD and BCM sheet work
     LEADERSHIP = "leadership"
     INTERVIEWER = "interviewer"
     # Runs the app's controls (settings, access, rate card) on request. Sees no demands.
@@ -81,9 +81,9 @@ class DemandStatus(StrEnum):
     MISSING = "missing"
     DROPPED = "dropped"
     INCORRECT = "incorrect"
-    # Coverage (DP sheet status, mapped through account config)
+    # Coverage (BCM sheet status, mapped through account config)
     COVERAGE_REQUIRED = "coverage_required"
-    # Interview progress, set by the app from panel records (the DP sheet lags; see pipeline_service)
+    # Interview progress, set by the app from panel records (the BCM sheet lags; see pipeline_service)
     INTERVIEWING = "interviewing"
     PANEL_SELECTED = "panel_selected"
     PROFILES_WITH_CLIENT = "profiles_with_client"
@@ -135,7 +135,7 @@ LINK_PROBLEMS = frozenset({DemandStatus.MISSING, DemandStatus.DROPPED, DemandSta
 FINISHED = frozenset({DemandStatus.STAFFED, DemandStatus.CANCELLED, DemandStatus.CLOSED})
 
 # Coverage stages in the order a demand moves through them. The app may move a demand forward on
-# interview evidence; the DP sheet may move it anywhere (pipeline_service decides who wins).
+# interview evidence; the BCM sheet may move it anywhere (pipeline_service decides who wins).
 PROGRESS_ORDER: tuple[DemandStatus, ...] = (
     DemandStatus.LINKED,
     DemandStatus.COVERAGE_REQUIRED,
@@ -148,7 +148,7 @@ PROGRESS_ORDER: tuple[DemandStatus, ...] = (
 )
 APP_PROGRESS = frozenset({DemandStatus.INTERVIEWING, DemandStatus.PANEL_SELECTED})
 
-# Stages a DP sheet status may map to (account settings → status mapping).
+# Stages a BCM sheet status may map to (account settings → status mapping).
 SHEET_STAGES: tuple[DemandStatus, ...] = (
     DemandStatus.COVERAGE_REQUIRED,
     DemandStatus.PROFILES_WITH_CLIENT,
@@ -261,7 +261,7 @@ class StageOrigin(StrEnum):
 
 
 class RowOutcome(StrEnum):
-    """What reconciliation made of one DP sheet row."""
+    """What reconciliation made of one BCM sheet row."""
 
     MATCHED = "matched"  # tier 1: its requisition ID is linked to a demand
     PREFIX = "prefix"  # tier 2: [DM-…] in the name; linked automatically
@@ -318,7 +318,7 @@ class InterviewSource(StrEnum):
 
 
 class CandidateSource(StrEnum):
-    SHEET = "sheet"  # the DP sheet's candidate name on the requisition's row
+    SHEET = "sheet"  # the BCM sheet's candidate name on the requisition's row
     MANUAL = "manual"  # added by the GTD admin team or a panelist
     KARAT = "karat"
 

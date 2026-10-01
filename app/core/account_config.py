@@ -13,7 +13,7 @@ from app.core.enums import SHEET_STAGES, DemandStatus, Responsible, Severity
 class SupplyChannel(BaseModel):
     key: str
     label: str
-    sheet_marker: str = Field(description="Text in the DP sheet that identifies this channel")
+    sheet_marker: str = Field(description="Text in the BCM sheet that identifies this channel")
     needs_sourcing_req: bool = Field(False, description="Needs a GetTalent requisition and a sourcer")
 
 
@@ -26,7 +26,7 @@ class StatusMapping(BaseModel):
     @classmethod
     def _sheet_stage_only(cls, v: DemandStatus) -> DemandStatus:
         if v not in SHEET_STAGES:
-            raise ValueError(f"{v.label} can't be set from the DP sheet")
+            raise ValueError(f"{v.label} can't be set from the BCM sheet")
         return v
 
 
@@ -91,7 +91,7 @@ def _default_rules() -> dict[str, EscalationRule]:
     return {k: EscalationRule(responsible=r, severity=s, steps=t) for k, (r, s, t) in DEFAULT_RULES.items()}
 
 
-# DP sheet columns the app reads: field → (default header in the Discover sheet, required?).
+# BCM sheet columns the app reads: field → (default header in the Discover sheet, required?).
 DP_FIELDS: dict[str, tuple[str, bool]] = {
     "req_id": ("Code Requisition", True),
     "demand_request_name": ("Demand Request Name", True),
@@ -154,7 +154,7 @@ class AccountConfig(BaseModel):
     # Revenue lost = hourly bill rate × these hours × working days late (flow-artifact §10).
     billable_hours_per_day: float = Field(8.0, gt=0, le=24)
     dp_columns: dict[str, str] = Field(default_factory=_default_dp_columns)
-    # Cell values the DP sheet uses for "empty".
+    # Cell values the BCM sheet uses for "empty".
     dp_blank_values: list[str] = ["0", "-"]
     resolution_reasons: list[str] = [
         "Failed GTD basic checks",
@@ -166,7 +166,7 @@ class AccountConfig(BaseModel):
     ]
 
     def stage_for(self, status_group: str | None, status: str | None) -> DemandStatus | None:
-        """Map a DP sheet row's status to an app stage. Exact status match wins; group is a tiebreak."""
+        """Map a BCM sheet row's status to an app stage. Exact status match wins; group is a tiebreak."""
         s = (status or "").strip().casefold()
         g = (status_group or "").strip().casefold()
         hits = [m for m in self.status_mapping if m.status.strip().casefold() == s]

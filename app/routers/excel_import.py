@@ -1,4 +1,4 @@
-"""GTD team admin and GTD admin team: upload the DP sheet, see past imports."""
+"""GTD team admin and GTD admin team: upload the BCM sheet, see past imports."""
 
 from datetime import date
 from urllib.parse import quote
@@ -54,7 +54,7 @@ async def upload(
     file = form.get("file")
     raw_date = str(form.get("sheet_date") or "")
     if not isinstance(file, UploadFile) or not file.filename:
-        return _page(request, actor, db, error="Choose the DP sheet file.", sheet_date=raw_date)
+        return _page(request, actor, db, error="Choose the BCM sheet file.", sheet_date=raw_date)
     filename = file.filename
     try:
         sheet_date = date.fromisoformat(raw_date) if raw_date else None

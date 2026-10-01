@@ -1,6 +1,6 @@
-"""Interview progress moves the demand; the DP sheet doesn't pull it back while it lags.
+"""Interview progress moves the demand; the BCM sheet doesn't pull it back while it lags.
 
-The DP sheet arrives about weekly, but panel feedback is recorded in the app the day it happens. So:
+The BCM sheet arrives about weekly, but panel feedback is recorded in the app the day it happens. So:
 
 - A demand with a candidate in the panel (an interview recorded, scheduled or asked for, and not
   rejected) is **Interviewing**.
@@ -10,7 +10,7 @@ The DP sheet arrives about weekly, but panel feedback is recorded in the app the
   the offer approval is raised and the demand owner is told.
 - If every candidate is rejected, an app-set stage falls back to **Coverage required**.
 
-The DP sheet still wins when it's ahead or final (profiles with client, offers, staffed, cancelled,
+The BCM sheet still wins when it's ahead or final (profiles with client, offers, staffed, cancelled,
 incorrect). A sheet still saying Coverage required doesn't undo newer panel progress (`sheet_yields`).
 Every change is a stage event, so interview progress also counts as progress for aging.
 """
@@ -35,7 +35,7 @@ from app.services import margin_service
 from app.services.demand_service import record_stage
 
 PENDING = {InterviewStatus.REQUESTED.value, InterviewStatus.OPEN.value, InterviewStatus.SCHEDULED.value}
-# Stages the app may change on interview evidence. Anything later belongs to the DP sheet.
+# Stages the app may change on interview evidence. Anything later belongs to the BCM sheet.
 APPLIES_FROM = frozenset(
     {DemandStatus.SENT_TO_GTD, DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED} | APP_PROGRESS
 )
@@ -132,7 +132,7 @@ def apply_for(db: Session, demand_id: int | None, actor_id: int | None) -> None:
 
 
 def sheet_yields(db: Session, demand: Demand, sheet_stage: DemandStatus | None) -> bool:
-    """True when the DP sheet's stage is behind the panel progress the app already recorded."""
+    """True when the BCM sheet's stage is behind the panel progress the app already recorded."""
     if sheet_stage not in (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED):
         return False
     cur = demand.status_enum

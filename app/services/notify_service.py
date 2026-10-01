@@ -230,7 +230,7 @@ def send_created(db: Session, demand: Demand, req_id: str, by: str) -> None:
             subject=f"[{account.name}] Created on GTD: {demand.app_ref} is {req_id}",
             text=(
                 f"Done: {by} created this demand on GTD. Its requisition ID is {req_id}.\n\n"
-                f"{_facts(demand)}\n\nNext: once GTD staffing approves it, it appears in the DP sheet and "
+                f"{_facts(demand)}\n\nNext: once GTD staffing approves it, it appears in the BCM sheet and "
                 f"coverage begins.\n{link}"
             ),
         )

@@ -1,6 +1,6 @@
 """Phase 8: a second account runs with no client-specific code.
 
-- Acme Insurance (seeded) keeps its data apart from Discover NA, reads its own DP sheet format, prices
+- Acme Insurance (seeded) keeps its data apart from Discover NA, reads its own BCM sheet format, prices
   offers from its own rate card and routes them with its own margin cut-off.
 - People who work in both accounts have one login, a role per account and an account switcher.
 - Exit: an Administrator creates a third account (Globex Retail) and its admin sets it up entirely

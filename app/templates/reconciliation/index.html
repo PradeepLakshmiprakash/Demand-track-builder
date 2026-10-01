@@ -6,7 +6,7 @@
   <div>
     <div class="eyebrow">{{ actor.role.label }} · all BUs</div>
     <h1>Reconciliation</h1>
-    {% if imp %}<div class="lede">DP sheet of {{ imp.sheet_date | d }} ({{ imp.file_name }}), {{ imp.row_count }} rows. Submitted requisition IDs compared with the sheet.</div>{% endif %}
+    {% if imp %}<div class="lede">BCM sheet of {{ imp.sheet_date | d }} ({{ imp.file_name }}), {{ imp.row_count }} rows. Submitted requisition IDs compared with the sheet.</div>{% endif %}
   </div>
   <div class="row">
     {% if imports | length > 1 %}
@@ -20,12 +20,12 @@
       </form>
     {% endif %}
     {% if imp and is_latest %}<form method="post" action="/imports/{{ imp.id }}/rerun"><button class="btn">Re-run reconciliation</button></form>{% endif %}
-    <a class="btn primary" href="/imports">Upload DP sheet</a>
+    <a class="btn primary" href="/imports">Upload BCM sheet</a>
   </div>
 </div>
 
 {% if not imp %}
-  <section class="panel panel-body"><p style="margin:0">No DP sheet imported yet. <a href="/imports">Upload the first one.</a></p></section>
+  <section class="panel panel-body"><p style="margin:0">No BCM sheet imported yet. <a href="/imports">Upload the first one.</a></p></section>
 {% else %}
 {% if not is_latest %}<div class="flash bad" role="status">This is an older sheet, shown as it was. Only the latest sheet can be matched or changed.</div>{% endif %}
 {% for w in s.get('warnings', []) %}<div class="flash bad" role="status">{{ w }}{% if 'mapping' in w %} <a href="/requests">Ask the Administrator to map it</a>{% endif %}</div>{% endfor %}

@@ -1,4 +1,4 @@
-"""DP sheet upload: validate, keep the file, snapshot every row, then reconcile.
+"""BCM sheet upload: validate, keep the file, snapshot every row, then reconcile.
 
 Every upload must be the full sheet (a filtered export would make demands look dropped). An older
 sheet than the latest is refused unless the uploader confirms, and the exact same file can't be
@@ -61,7 +61,7 @@ def import_sheet(
     try:
         storage.check(filename, data, SHEET_EXTENSIONS)
     except storage.StorageError as e:
-        raise SheetImportError(f"DP sheet not imported: {e}.") from e
+        raise SheetImportError(f"BCM sheet not imported: {e}.") from e
     account = db.get_one(Account, actor.account_id)
     try:
         parsed = excel_parser.parse(data, account.settings)

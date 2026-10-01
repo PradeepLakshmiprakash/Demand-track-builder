@@ -1,7 +1,7 @@
 """Two wiring fixes (24 Sep):
 1. An incorrect demand goes back to its owner to correct, and an old requisition ID left in the DP
    sheet no longer drives the demand.
-2. Panel feedback moves the demand's stage the day it's recorded; a lagging DP sheet doesn't undo it."""
+2. Panel feedback moves the demand's stage the day it's recorded; a lagging BCM sheet doesn't undo it."""
 
 from datetime import UTC, date, datetime, timedelta
 

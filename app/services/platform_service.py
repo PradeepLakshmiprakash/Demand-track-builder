@@ -2,7 +2,7 @@
 deactivate it. Everything else about the client is set by that admin in the account's own settings.
 
 A new account starts either blank (defaults only) or with a copy of another account's settings: lists,
-channels, DP sheet columns and status mapping, and thresholds. Business units, people, rate card and
+channels, BCM sheet columns and status mapping, and thresholds. Business units, people, rate card and
 demands are never copied: they belong to the client.
 """
 

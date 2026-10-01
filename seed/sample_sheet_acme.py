@@ -1,4 +1,4 @@
-"""A made-up DP sheet in Acme Insurance's own format, to prove the import reads any layout through the
+"""A made-up BCM sheet in Acme Insurance's own format, to prove the import reads any layout through the
 account's column settings: different header names, a different column order, no title row, and "N/A"
 for empty cells. `build_sheet` works for any account's columns (the Phase 8 exit test uses it too).
 

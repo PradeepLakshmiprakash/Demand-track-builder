@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}DP sheet import{% endblock %}
+{% block title %}BCM sheet import{% endblock %}
 {% block main %}
 <div class="head">
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
-    <h1>DP sheet import</h1>
+    <h1>BCM sheet import</h1>
     <div class="lede">Upload the full DP coverage sheet each time, never a filtered one: requisitions missing from it are flagged as dropped. Each upload is kept as a snapshot and reconciled straight away.</div>
   </div>
   {% if latest %}<a class="btn" href="/reconciliation">Latest reconciliation</a>{% endif %}
@@ -12,10 +12,10 @@
 
 <section class="panel panel-body" style="max-width:760px">
   <form method="post" action="/imports" enctype="multipart/form-data" class="stack">
-    <h2>Upload a DP sheet</h2>
+    <h2>Upload a BCM sheet</h2>
     {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
     <div class="grid2">
-      <label class="f">DP sheet (.xlsx)<input type="file" name="file" accept=".xlsx" required></label>
+      <label class="f">BCM sheet (.xlsx)<input type="file" name="file" accept=".xlsx" required></label>
       <label class="f">Sheet date<input type="date" name="sheet_date" value="{{ sheet_date }}"><span class="hint">Read from the file name when it has one, e.g. …9-Sep-2026.xlsx</span></label>
     </div>
     {% if needs_confirm %}
@@ -40,7 +40,7 @@
         <div><a class="btn small" href="/reconciliation?import={{ imp.id }}">Open</a></div>
       </div>
     {% else %}
-      <div class="empty">No DP sheets imported yet.</div>
+      <div class="empty">No BCM sheets imported yet.</div>
     {% endfor %}
   </div>
 </section>

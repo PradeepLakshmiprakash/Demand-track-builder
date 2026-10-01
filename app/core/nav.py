@@ -34,7 +34,7 @@ NAV: tuple[NavItem, ...] = (
     ),
     NavItem("raise", "/demands/new", _same("Raise demand", DO, AD), phase=2, ready=True),
     NavItem("gtd_queue", "/gtd-queue", _same("GTD queue", AD, AT), phase=2, ready=True),
-    NavItem("import", "/imports", _same("DP sheet import", AD, AT), phase=3, ready=True),
+    NavItem("import", "/imports", _same("BCM sheet import", AD, AT), phase=3, ready=True),
     NavItem("reconciliation", "/reconciliation", _same("Reconciliation", AD, AT), phase=3, ready=True),
     NavItem(
         "escalations",

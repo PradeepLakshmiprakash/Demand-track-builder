@@ -5,7 +5,7 @@
   <div>
     <div class="eyebrow">Administrator</div>
     <h1>Accounts</h1>
-    <div class="lede">One account per client. Create it and name its GTD team admin. You become its Administrator and set up everything else (business units, lists, channels, DP sheet format, thresholds, people, rate card) in that account's settings (switch to it in the sidebar).</div>
+    <div class="lede">One account per client. Create it and name its GTD team admin. You become its Administrator and set up everything else (business units, lists, channels, BCM sheet format, thresholds, people, rate card) in that account's settings (switch to it in the sidebar).</div>
   </div>
 </div>
 
@@ -43,7 +43,7 @@
           <option value="">Blank settings</option>
           {% for a in templates %}<option value="{{ a.id }}">Copy settings from {{ a.name }}</option>{% endfor %}
         </select>
-        <span class="hint">Copies lists, supply channels, DP sheet columns and status mapping, and thresholds. Never business units, people, rates or demands.</span>
+        <span class="hint">Copies lists, supply channels, BCM sheet columns and status mapping, and thresholds. Never business units, people, rates or demands.</span>
       </label>
     </div>
     <div class="grid2">

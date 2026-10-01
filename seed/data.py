@@ -1,7 +1,7 @@
 """Dummy data: one account (Discover NA), its four BUs, a user for every role, demands in every phase.
 
 Names and candidates are placeholders. Requisition codes and titles mirror the prototype; nothing
-here comes from a real DP sheet (those carry candidate personal data and are never committed).
+here comes from a real BCM sheet (those carry candidate personal data and are never committed).
 """
 
 from datetime import date
@@ -357,12 +357,12 @@ DEFAULTS = {
 
 # demand ref, type, level, days until due (negative = overdue), detail
 ESCALATIONS = [
-    ("DM-000139", "missing", 1, -1, "Sent to GTD, not in the DP sheet after the grace period"),
+    ("DM-000139", "missing", 1, -1, "Sent to GTD, not in the BCM sheet after the grace period"),
     ("DM-000149", "not_submitted", 1, 2, "In yesterday's mail, no requisition ID yet"),
     ("DM-000121", "past_start", 2, 3, "Start 03 Aug · offer in process · no DOJ"),
     ("DM-000118", "rejection_limit", 1, 1, "5 FTE candidates rejected before offer"),
     ("DM-000135", "aging", 1, 4, "Coverage required, no profile progressed in 2 weeks"),
-    ("DM-000133", "incorrect", 1, 2, "DP sheet status: In Correct Demnad"),
+    ("DM-000133", "incorrect", 1, 2, "BCM sheet status: In Correct Demnad"),
 ]
 
 # demand ref, candidate placeholder, round, interviewer key, scheduled (y, m, d, h, min) in UTC

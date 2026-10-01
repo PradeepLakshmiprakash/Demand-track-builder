@@ -2,7 +2,7 @@
 
 Staffing schedules interviews outside the app and CVs arrive by email, so the app's job is:
 
-1. Know which requisition each candidate belongs to. Candidates come from the DP sheet (the
+1. Know which requisition each candidate belongs to. Candidates come from the BCM sheet (the
    Candidate Name cell on the requisition's row) or are added by hand; one without a requisition
    waits for the GTD admin team or the panelist to map it.
 2. Capture the panelist's recommendation: ratings, select / reject / hold, comments, and optionally
@@ -73,7 +73,7 @@ def _progress(db: Session, demand_id: int | None, actor_id: int | None) -> None:
 
 
 def split_names(cell: str | None) -> list[str]:
-    """The DP sheet's Candidate Name cell can hold several people, one per line."""
+    """The BCM sheet's Candidate Name cell can hold several people, one per line."""
     names = []
     for line in (cell or "").splitlines():
         name = re.sub(r"^\s*(\d+[.)]|[-•*])\s*", "", line).strip()
@@ -117,7 +117,7 @@ def ensure_candidate(
 def candidates_from_sheet(
     db: Session, account_id: int, demand: Demand, cell: str | None, channel: str | None
 ) -> list[Candidate]:
-    """Candidates named on the requisition's DP sheet row, so each is known to be on that requisition."""
+    """Candidates named on the requisition's BCM sheet row, so each is known to be on that requisition."""
     return [ensure_candidate(db, account_id, demand, n, channel=channel) for n in split_names(cell)]
 
 

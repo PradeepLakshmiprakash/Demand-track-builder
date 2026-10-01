@@ -26,7 +26,7 @@ def test_admin_menu(client: Client) -> None:
     assert items[:2] == ["Account overview", "All demands"]
     for expected in (
         "GTD queue",
-        "DP sheet import",
+        "BCM sheet import",
         "Reconciliation",
         "Escalations",
         "Requests to administrator",
@@ -59,7 +59,7 @@ def test_admin_team_menu(client: Client) -> None:
     assert menu(client.as_user("farah")) == [
         "All demands",
         "GTD queue",
-        "DP sheet import",
+        "BCM sheet import",
         "Reconciliation",
         "Escalations",
         "Candidates",

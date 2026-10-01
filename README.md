@@ -1,7 +1,7 @@
 # Demand Tracker
 
 Tracks client positions (demands) from the moment a demand owner raises them until the candidate is
-onboarded and billing starts: GTD submission, DP sheet reconciliation, escalations, offer approvals and
+onboarded and billing starts: GTD submission, BCM sheet reconciliation, escalations, offer approvals and
 interviews. Built for Discover NA first; every client-specific rule is account configuration.
 
 Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
@@ -16,12 +16,12 @@ Specs: [`docs/spec/flow-artifact.md`](docs/spec/flow-artifact.md) (flows),
 | 0 | Decisions and setup | Repo, CI; open questions answered 24 Sep (`docs/decisions.md`) |
 | 1 | Foundation | **Done**: all tables + first migration, View-as switcher, User access, Account settings, demands list with scope filtering, seed |
 | 2 | Intake and GTD submission | **Done**: Raise demand (draft/submit, N positions, JD upload), demand page with history, GTD queue (link IDs, CSV for GTD entry), daily admin mail + scheduler |
-| 3 | DP sheet import and reconciliation | **Done**: upload with column mapping in settings, snapshot rows, exact / name-prefix / fuzzy matching, missing and dropped detection with escalations, match or create from row |
+| 3 | BCM sheet import and reconciliation | **Done**: upload with column mapping in settings, snapshot rows, exact / name-prefix / fuzzy matching, missing and dropped detection with escalations, match or create from row |
 | 4 | Escalation engine | **Done**: not submitted / aging / past start triggers, two-hourly sweep, L1 → L2 promotion, mails to the BU delivery head and leadership, Escalations screen with resolve (resubmit, extend, close, no further action) and audit trail |
-| 5 | Rate card, approvals, leadership view | **Done**: dated rate card, offers priced from the DP sheet and routed by the margin cut-off, revenue loss, leadership overview |
-| 6 | Interviews | **Done**: candidates mapped to requisitions (from the DP sheet, panelists, Karat stub), panelist recommendations, L2 requests approved by the demand owner, scheduling placeholders, invite + no-sign-in feedback link, CVs, interviewer alerts, rejection-limit and panel-SLA escalations |
+| 5 | Rate card, approvals, leadership view | **Done**: dated rate card, offers priced from the BCM sheet and routed by the margin cut-off, revenue loss, leadership overview |
+| 6 | Interviews | **Done**: candidates mapped to requisitions (from the BCM sheet, panelists, Karat stub), panelist recommendations, L2 requests approved by the demand owner, scheduling placeholders, invite + no-sign-in feedback link, CVs, interviewer alerts, rejection-limit and panel-SLA escalations |
 | 7 | Production readiness | Deferred to last (SSO, AWS, backups, UAT) |
-| 8 | Second account | **Done**: role per account membership, account switcher, platform Accounts screen (create from blank or a copy of another account's settings, deactivate), Acme Insurance seeded with its own DP sheet format; exit test onboards a third client through the screens only |
+| 8 | Second account | **Done**: role per account membership, account switcher, platform Accounts screen (create from blank or a copy of another account's settings, deactivate), Acme Insurance seeded with its own BCM sheet format; exit test onboards a third client through the screens only |
 
 ## Run locally (this machine)
 
@@ -67,7 +67,7 @@ app/routers/     view_switcher, my_demands, raise_demand, gtd_queue, excel_impor
                  user_access, account_settings
 app/templates/   base.html + one folder per screen
 migrations/      Alembic
-seed/            Discover NA + Acme Insurance dummy data (python -m seed); sample DP sheets
+seed/            Discover NA + Acme Insurance dummy data (python -m seed); sample BCM sheets
                  (python -m seed.sample_sheet, python -m seed.sample_sheet_acme)
 tests/
 ```
@@ -80,11 +80,11 @@ tests/
 | Demand owner | Rahul K. (CARDS) | Own + CARDS read-only |
 | Demand owner | Neha T., Meera S., Arjun D. | Own demands |
 | GTD team admin | Kavya R. | Full account; asks the Administrator for control changes |
-| GTD admin team | Farah Q., Deepak L. | Full account; GTD queue, DP sheet import, reconciliation, escalations |
+| GTD admin team | Farah Q., Deepak L. | Full account; GTD queue, BCM sheet import, reconciliation, escalations |
 | Leadership | Sanjay M. | Full account, read-only |
 | Interviewer | Vikram P., Anita G. | Demands with interviews assigned to them |
 | Administrator | Anil V. | App controls only: User access, Account settings, Rate card, Accounts (platform admin). No demands |
 
 **Acme Insurance** (second account): Grace H. (admin demand owner), Tomas R. (admin team), Lena W. (CLAIMS) and Marco B. (POLICY, own + BU read). Nadia K. is Acme's interviewer. Sanjay M. (leadership) works in both accounts and switches between them in the sidebar; an interviewer belongs to one account only. Rosa D. is Acme's Administrator; Anil V. is the **platform admin** (Accounts screen).
 
-All names are placeholders. Never commit a real DP sheet: it carries candidate personal data.
+All names are placeholders. Never commit a real BCM sheet: it carries candidate personal data.

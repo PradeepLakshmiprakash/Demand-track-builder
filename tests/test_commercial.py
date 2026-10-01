@@ -1,5 +1,5 @@
 """Flows 6 and 8: rate card, offer margin approvals, revenue loss, leadership overview.
-Phase 5 exit: leadership numbers match a manual calculation from the (sample) DP sheet."""
+Phase 5 exit: leadership numbers match a manual calculation from the (sample) BCM sheet."""
 
 from datetime import date, timedelta
 from decimal import Decimal

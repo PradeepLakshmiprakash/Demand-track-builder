@@ -1,7 +1,7 @@
 """A made-up second client, Acme Insurance, set up only with what Account settings can hold.
 
 It is deliberately unlike Discover NA: another time zone, other business units, practices, grade
-names, supply channels, DP sheet columns and statuses, rating dimensions and thresholds. Sanjay
+names, supply channels, BCM sheet columns and statuses, rating dimensions and thresholds. Sanjay
 (leadership) works in both accounts with one login; interviewers belong to one account only.
 All names are placeholders.
 

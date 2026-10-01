@@ -1,4 +1,4 @@
-"""Uploaded files (JDs now; CVs and DP sheets later). Local disk in v1, S3 in Phase 7.
+"""Uploaded files (JDs now; CVs and BCM sheets later). Local disk in v1, S3 in Phase 7.
 
 Stored paths are keys relative to the storage root, so switching backends doesn't rewrite rows.
 """

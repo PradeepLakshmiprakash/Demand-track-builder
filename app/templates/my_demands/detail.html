@@ -99,7 +99,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted small" style="margin:10px 0 0">No candidates yet. They come from the DP sheet's candidate names or from the panel.</p>
+        <p class="muted small" style="margin:10px 0 0">No candidates yet. They come from the BCM sheet's candidate names or from the panel.</p>
       {% endfor %}
     </section>
   </div>
@@ -137,7 +137,7 @@
       <ol class="timeline">
         {% for e in history %}
           <li><span class="title">{{ statuses.get(e.to_stage, e.to_stage) }}</span>
-            <span class="muted small">{{ e.at | at(tz) }}{% if e.origin == 'import' %} · from DP sheet{% endif %}</span></li>
+            <span class="muted small">{{ e.at | at(tz) }}{% if e.origin == 'import' %} · from BCM sheet{% endif %}</span></li>
         {% endfor %}
       </ol>
     </section>

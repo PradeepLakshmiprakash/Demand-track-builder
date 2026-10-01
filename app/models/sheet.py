@@ -21,7 +21,7 @@ from app.core.enums import RowOutcome, StageOrigin, check_in
 
 
 class ExcelImport(Base):
-    """One uploaded DP sheet. Rows are snapshots, never overwritten, so imports can be compared."""
+    """One uploaded BCM sheet. Rows are snapshots, never overwritten, so imports can be compared."""
 
     __tablename__ = "excel_imports"
 
@@ -39,7 +39,7 @@ class ExcelImport(Base):
 
 
 class ExcelRow(Base):
-    """One DP sheet row as it was in that import. Personal data (originator, candidates) stays here."""
+    """One BCM sheet row as it was in that import. Personal data (originator, candidates) stays here."""
 
     __tablename__ = "excel_rows"
     __table_args__ = (

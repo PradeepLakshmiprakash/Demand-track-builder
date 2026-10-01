@@ -68,7 +68,7 @@
 
 {% if b.without_request and is_admin %}
 <section class="panel">
-  <div class="panel-head"><div><h2>At offer stage, no approval yet</h2><div class="hint">The DP sheet had no candidate name for these. Raise the approval by hand.</div></div><span class="chip gray">{{ b.without_request | length }}</span></div>
+  <div class="panel-head"><div><h2>At offer stage, no approval yet</h2><div class="hint">The BCM sheet had no candidate name for these. Raise the approval by hand.</div></div><span class="chip gray">{{ b.without_request | length }}</span></div>
   {% for d in b.without_request %}
   <form method="post" action="/approvals/request" class="offer">
     <input type="hidden" name="demand_id" value="{{ d.id }}">

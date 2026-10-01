@@ -15,15 +15,15 @@
   <a class="pill" href="#lists">Practices and lists</a>
   <a class="pill" href="#escalation-rules">Escalation rules</a>
   <a class="pill" href="#supply-channels">Supply channels</a>
-  <a class="pill" href="#status-mapping">DP sheet status mapping</a>
-  <a class="pill" href="#dp-columns">DP sheet columns</a>
+  <a class="pill" href="#status-mapping">BCM sheet status mapping</a>
+  <a class="pill" href="#dp-columns">BCM sheet columns</a>
 </nav>
 
 <section id="thresholds" class="panel">
   <div class="panel-head"><div><h2>Thresholds and timing</h2><div class="hint">Drive escalations, the daily admin mail and offer approval routing.</div></div></div>
   <form method="post" action="/settings/thresholds" class="panel-body stack">
     <div class="grid4">
-      <label class="f">Grace period (working days)<input type="number" name="grace_days" min="0" max="60" value="{{ account.grace_days }}" required><span class="hint">Sent to GTD but not in the DP sheet → missing</span></label>
+      <label class="f">Grace period (working days)<input type="number" name="grace_days" min="0" max="60" value="{{ account.grace_days }}" required><span class="hint">Sent to GTD but not in the BCM sheet → missing</span></label>
       <label class="f">Aging (days without progress)<input type="number" name="aging_days" min="1" max="365" value="{{ account.aging_days }}" required></label>
       <label class="f">Panel SLA (hours)<input type="number" name="panel_timer_hours" min="1" max="720" value="{{ account.panel_timer_hours }}" required></label>
       <label class="f">Rejection limit<input type="number" name="rejection_limit" min="1" max="50" value="{{ account.rejection_limit }}" required><span class="hint">Panel + client rejections on one demand</span></label>
@@ -106,7 +106,7 @@
 </section>
 
 <section id="supply-channels" class="panel">
-  <div class="panel-head"><div><h2>Supply channels</h2><div class="hint">How the DP sheet names each channel. Clear a label to remove a row.</div></div></div>
+  <div class="panel-head"><div><h2>Supply channels</h2><div class="hint">How the BCM sheet names each channel. Clear a label to remove a row.</div></div></div>
   <form method="post" action="/settings/supply-channels">
     <div class="tbl chan">
       <div class="tr th"><div>Channel</div><div>Sheet marker</div><div>Needs sourcing req</div></div>
@@ -128,7 +128,7 @@
 </section>
 
 <section id="status-mapping" class="panel">
-  <div class="panel-head"><div><h2>DP sheet status mapping</h2><div class="hint">Once a demand is linked, its stage comes from the sheet's Status / Status Group through this table. Clear a status to remove a row.</div></div></div>
+  <div class="panel-head"><div><h2>BCM sheet status mapping</h2><div class="hint">Once a demand is linked, its stage comes from the sheet's Status / Status Group through this table. Clear a status to remove a row.</div></div></div>
   <form method="post" action="/settings/status-mapping">
     <div class="tbl map">
       <div class="tr th"><div>Status group</div><div>Status</div><div>App stage</div></div>
@@ -150,7 +150,7 @@
 </section>
 
 <section id="dp-columns" class="panel">
-  <div class="panel-head"><div><h2>DP sheet columns</h2><div class="hint">The header text in the DP sheet for each field the app reads. Matched ignoring case and extra spaces. If the sheet's format changes, update it here.</div></div></div>
+  <div class="panel-head"><div><h2>BCM sheet columns</h2><div class="hint">The header text in the BCM sheet for each field the app reads. Matched ignoring case and extra spaces. If the sheet's format changes, update it here.</div></div></div>
   <form method="post" action="/settings/dp-columns">
     <div class="tbl map">
       <div class="tr th"><div>Field</div><div>Column header in the sheet</div><div></div></div>

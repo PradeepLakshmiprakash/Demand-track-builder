@@ -1,4 +1,4 @@
-"""A made-up DP sheet in the real sheet's shape (same 16 headers, a title row above them, blanks
+"""A made-up BCM sheet in the real sheet's shape (same 16 headers, a title row above them, blanks
 written as 0 or -), built to reconcile against the seed data. No real names or candidates.
 
 python -m seed.sample_sheet  →  seed/sample_dp_sheet.xlsx
