@@ -439,7 +439,7 @@ status is a sub-stage of one of them:
 | Main stage | Sub-stages |
 |---|---|
 | Coverage Required | Draft · GTD creation pending · Correction required · GTD approval pending · GTD approval overdue · Removed from sheet · Marked incorrect · GTD approved · Sourcing profiles |
-| Selection In Progress | Panel interview · Panel selected · Client interview |
+| Selection In Progress | Panel interview · Panel selected · Client interview in progress |
 | Allocation Pending | Offer approval pending · Offer made, joining awaited |
 | Allocation Completed | Joined |
 | Abandoned | Cancelled in sheet · Closed by owner or GTD team |
@@ -473,7 +473,8 @@ Reconciliation page; closing it as "not ours" stops it being raised again.
 **D75. Accounts are added by the Administrator** (see D68); there is no platform admin.
 
 
-**D76. Client interview result.** The client has no access to the app or the BCM sheet. After its
+**D76. Client interview.** The client has no access to the app or the BCM sheet. The demand owner
+marks *Client interview started* (Selection In Progress · Client interview in progress), or the sheet does. After the
 interview, the demand owner records the result on the demand page: *Client selected* raises the offer
 approval (Allocation Pending · Offer approval pending); *Client did not select* needs a note, takes
 the candidate out, and the demand goes back to where its other candidates stand (Sourcing profiles

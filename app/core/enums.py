@@ -131,7 +131,7 @@ STATUS_META: dict[DemandStatus, tuple[str, str, str]] = {
     DemandStatus.COVERAGE_REQUIRED: ("Sourcing profiles", "teal", "coverage"),
     DemandStatus.INTERVIEWING: ("Panel interview", "teal", "coverage"),
     DemandStatus.PANEL_SELECTED: ("Panel selected", "blue", "coverage"),
-    DemandStatus.PROFILES_WITH_CLIENT: ("Client interview", "teal", "coverage"),
+    DemandStatus.PROFILES_WITH_CLIENT: ("Client interview in progress", "teal", "coverage"),
     DemandStatus.OFFER_IN_PROCESS: ("Offer approval pending", "blue", "coverage"),
     DemandStatus.OFFER_IN_MARKET: ("Offer made, joining awaited", "blue", "coverage"),
     DemandStatus.STAFFED: ("Joined", "done", "coverage"),

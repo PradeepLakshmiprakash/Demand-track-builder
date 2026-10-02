@@ -320,7 +320,7 @@ def test_phase5_exit_leadership_numbers_match_manual_calculation(client: Client,
     # DM-000142 has a scheduled panel interview, so it's Interviewing, not waiting for coverage.
     assert pipeline == {"coverage": 8, "selection": 3, "alloc_pending": 4, "alloc_done": 1, "abandoned": 1}
     # ... and the sub-stages inside each main stage
-    assert dict(o.subs["selection"]) == {"Panel interview": 1, "Client interview": 2}
+    assert dict(o.subs["selection"]) == {"Panel interview": 1, "Client interview in progress": 2}
     # DM-000151 was waiting for its GTD ID; the sheet's W3NX5A row is clearly it, so it links itself.
     assert dict(o.subs["coverage"])["Sourcing profiles"] == 4 and sum(dict(o.subs["coverage"]).values()) == 8
     assert (o.open, o.live, o.need_coverage, o.missing_rates) == (15, 17, 4, 0)

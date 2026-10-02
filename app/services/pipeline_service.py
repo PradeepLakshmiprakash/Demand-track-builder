@@ -177,6 +177,34 @@ def can_record_client(actor: Actor, demand: Demand) -> bool:
     return actor.id == demand.owner_id and demand.status_enum not in FINISHED
 
 
+def start_client_interview(db: Session, actor: Actor, demand: Demand) -> None:
+    """The demand owner records that the client has started interviewing the panel's selection."""
+    if not can_record_client(actor, demand):
+        raise ClientDecisionError("Only the demand's owner records the client interview.")
+    waiting = awaiting_client(db, demand)
+    if demand.status_enum is not DemandStatus.PANEL_SELECTED or not waiting:
+        raise ClientDecisionError("The client interview starts once the panel has selected a candidate.")
+    record_stage(db, demand, DemandStatus.PROFILES_WITH_CLIENT, actor.id, StageOrigin.APP)
+    for c in waiting:
+        c.current_stage = DemandStatus.PROFILES_WITH_CLIENT.label
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    names = ", ".join(c.name for c in waiting)
+    notify_service.safely(
+        mail.send,
+        mail.Mail(
+            to=margin_service._team_admins(db, demand.account_id),
+            cc=[actor.email],
+            subject=f"[{ref}] Client interview started",
+            text=(
+                f"{actor.name} recorded that the client interview has started on {demand.app_ref} "
+                f"({demand.name}) for {names}.\n\n"
+                f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+            ),
+        ),
+    )
+    db.commit()
+
+
 def record_client_decision(
     db: Session, actor: Actor, demand: Demand, candidate_id: int, outcome: str, channel: str, note: str
 ) -> Candidate:

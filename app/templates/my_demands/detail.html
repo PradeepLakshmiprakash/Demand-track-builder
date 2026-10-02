@@ -57,6 +57,12 @@
     <section class="panel panel-body" id="client">
       <h2>Client interview</h2>
       <p class="muted small" style="margin:4px 0 0">Record the client's decision once it has interviewed the candidate. The BCM sheet can also move this on.</p>
+      {% if d.status == 'panel_selected' %}
+        <form method="post" action="/demands/{{ d.app_ref }}/client-interview" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
+          <div class="title" style="flex:1 1 220px">Has the client started interviewing? <span class="small muted">Moves the demand to Selection In Progress · Client interview in progress.</span></div>
+          <button class="btn small">Client interview started</button>
+        </form>
+      {% endif %}
       {% for c in client_pending %}
         <form method="post" action="/demands/{{ d.app_ref }}/client-decision" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
           <input type="hidden" name="candidate_id" value="{{ c.id }}">

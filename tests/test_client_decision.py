@@ -84,3 +84,26 @@ def test_only_the_owner_records_it(client: Client, db: Session) -> None:
     c = panel_selects(db, "Someone")
     assert "err=" in decide(client, "kavya", c, "select", channel="sogeti")
     assert db.scalars(select(Demand).where(Demand.app_ref == "DM-000146")).one().status == "panel_selected"
+
+
+def test_owner_marks_the_client_interview_started(client: Client, db: Session) -> None:
+    c = panel_selects(db, "With Client")
+    assert "Client interview started" in client.as_user("neha").get("/demands/DM-000146").text
+    r = client.as_user("kavya").post("/demands/DM-000146/client-interview")
+    assert "err=" in r.headers["location"]  # the owner's to record
+    mail.sent.clear()
+    r = client.as_user("neha").post("/demands/DM-000146/client-interview")
+    assert "msg=" in r.headers["location"]
+    d = by_ref(db, "DM-000146")
+    assert (
+        d.status == "profiles_with_client"
+        and d.status_enum.full == "Selection In Progress · Client interview in progress"
+    )
+    assert any("Client interview started" in m.subject for m in mail.sent)
+    page = client.as_user("neha").get("/demands/DM-000146").text
+    assert "Has the client started interviewing?" not in page and "Client did not select" in page
+
+    import_sample(client, date.today())  # a sheet still on Coverage Required doesn't undo it
+    assert by_ref(db, "DM-000146").status == "profiles_with_client"
+    decide(client, "neha", c, "reject", note="Not a fit")
+    assert by_ref(db, "DM-000146").status == "coverage_required"

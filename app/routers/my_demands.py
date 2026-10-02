@@ -175,6 +175,22 @@ async def record_joining_date(
     return RedirectResponse(f"/demands/{ref}?msg=Joining+date+recorded#offers", status_code=303)
 
 
+@router.post("/demands/{ref}/client-interview")
+def start_client_interview(
+    ref: str, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """The demand owner marks that the client has started interviewing."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    try:
+        pipeline_service.start_client_interview(db, actor, demand)
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#client", status_code=303)
+    return RedirectResponse(f"/demands/{ref}?msg=Client+interview+started#client", status_code=303)
+
+
 @router.post("/demands/{ref}/client-decision")
 async def record_client_decision(
     ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)

@@ -467,7 +467,7 @@ Where this section differs from the text above, this section is what is built. "
 | | Sourcing profiles | BCM sheet |
 | Selection In Progress | Panel interview | App: a candidate is in the panel |
 | | Panel selected | App: selected, client interview next |
-| | Client interview | BCM sheet |
+| | Client interview in progress | BCM sheet, or the demand owner |
 | Allocation Pending | Offer approval pending | BCM sheet, or the app when the panel's decision is final |
 | | Offer made, joining awaited | The owner records the joining date, or the BCM sheet |
 | Allocation Completed | Joined | BCM sheet |
