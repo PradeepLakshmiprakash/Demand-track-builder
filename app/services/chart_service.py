@@ -24,6 +24,7 @@ class Slice:
     color: str
     dash: str = ""  # stroke-dasharray
     offset: float = 0.0  # stroke-dashoffset
+    parts: list[tuple[str, str]] = field(default_factory=list)  # its breakdown: (name, shown value)
 
 
 @dataclass
@@ -45,8 +46,12 @@ def donut(
     items: list[tuple[str, Decimal | int, str]],
     center: str,
     center_label: str,
+    parts: dict[str, list[tuple[str, str]]] | None = None,
 ) -> Donut:
-    """`items` are (label, value, shown value) in a fixed order; the order decides the colour."""
+    """`items` are (label, value, shown value) in a fixed order; the order decides the colour.
+
+    `parts` breaks a slice down by its label; the breakdown opens when the slice or its row is clicked.
+    """
     if len(items) > len(SLOTS):  # never invent a sixth colour: fold the tail into "Other"
         head, tail = items[: len(SLOTS) - 1], items[len(SLOTS) - 1 :]
         items = [*head, ("Other", sum((Decimal(v) for _, v, _ in tail), Decimal(0)), f"{len(tail)} more")]
@@ -56,7 +61,7 @@ def donut(
     start = 0.0
     for i, (label, value, display) in enumerate(items):
         share = float(Decimal(value) / total) if total else 0.0
-        s = Slice(label, display, round(share * 100), SLOTS[i])
+        s = Slice(label, display, round(share * 100), SLOTS[i], parts=(parts or {}).get(label, []))
         if share > 0:
             length = share * CIRCUMFERENCE
             visible = length if nonzero == 1 else max(length - GAP, 0.75)

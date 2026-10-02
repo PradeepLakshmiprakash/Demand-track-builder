@@ -27,5 +27,7 @@ def test_overview_shows_the_three_charts(client: Client, db: Session) -> None:
     page = client.as_user("sanjay").get("/overview").text
     for title in ("Positions by stage", "Revenue lost by business unit", "Open positions by type"):
         assert title in page
+    assert "Click a stage for its sub-stages" in page and '<details id="parts-0-0">' in page
+    assert "GTD approval pending" in page  # a sub-stage of Coverage Required, behind the click
     o = loss_service.overview(db, 1, date.today())
     assert sum(o.mix.values()) == o.open and sum(n for _, _, n in o.pipeline) == o.live

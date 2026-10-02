@@ -328,8 +328,17 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .donut-total { font: 600 22px 'IBM Plex Sans', system-ui, sans-serif; fill: var(--ink); }
 .donut-unit { font: 400 11px 'IBM Plex Sans', system-ui, sans-serif; fill: var(--muted); }
 .donut-legend { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 13px; }
-.donut-legend li { display: grid; grid-template-columns: 12px 1fr auto 38px; gap: 8px; align-items: center; padding: 4px 0; }
-.donut-legend li + li { border-top: 1px solid var(--line, #E7E3DA); }
+.donut-legend .row { display: grid; grid-template-columns: 12px 1fr auto 38px; gap: 8px; align-items: center; padding: 4px 0; }
+.donut-legend summary.row { cursor: pointer; list-style: none; grid-template-columns: 12px 1fr auto 38px 10px; }
+.donut-legend summary.row::-webkit-details-marker { display: none; }
+.donut-legend summary.row::after { content: "▸"; color: var(--muted); font-size: 11px; }
+.donut-legend details[open] > summary.row::after { content: "▾"; }
+.donut-legend summary.row:hover .name { text-decoration: underline; }
+.donut-legend div.row { padding-right: 18px; }
+.donut-parts { list-style: none; margin: 0 0 6px 20px; padding: 2px 0 2px 10px; border-left: 2px solid var(--line, #E7E3DA); }
+.donut-parts li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 66px 2px 0; color: var(--muted); border: 0 !important; }
+.donut-body .slice.opens { cursor: pointer; }
+.donut-legend > li + li { border-top: 1px solid var(--line, #E7E3DA); }
 .donut-legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
 .donut-legend .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .donut-legend .val { font-weight: 600; font-variant-numeric: tabular-nums; }

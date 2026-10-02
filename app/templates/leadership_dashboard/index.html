@@ -43,6 +43,7 @@
 
 <div class="donuts">
   {% for c in charts %}
+  {% set ci = loop.index0 %}
   <section class="panel panel-body donut-card">
     <h2>{{ c.title }}</h2>
     <div class="hint">{{ c.hint }}</div>
@@ -50,16 +51,30 @@
     <div class="donut-body">
       <svg viewBox="0 0 140 140" width="168" height="168" role="img" aria-label="{{ c.title }}: {% for s in c.slices if s.dash %}{{ s.label }} {{ s.display }}{{ ', ' if not loop.last }}{% endfor %}">
         <g transform="rotate(-90 70 70)" fill="none" stroke-width="22">
-          {% for s in c.drawn %}
-          <circle class="slice" cx="70" cy="70" r="54" stroke="{{ s.color }}" stroke-dasharray="{{ s.dash }}" stroke-dashoffset="{{ '%.2f' % s.offset }}"><title>{{ s.label }}: {{ s.display }} ({{ s.pct }}%)</title></circle>
+          {% for s in c.slices if s.dash %}
+          <circle class="slice{{ ' opens' if s.parts }}" {% if s.parts %}onclick="var d=document.getElementById('parts-{{ ci }}-{{ loop.index0 }}');d.open=!d.open" {% endif %}cx="70" cy="70" r="54" stroke="{{ s.color }}" stroke-dasharray="{{ s.dash }}" stroke-dashoffset="{{ '%.2f' % s.offset }}"><title>{{ s.label }}: {{ s.display }} ({{ s.pct }}%)</title></circle>
           {% endfor %}
         </g>
         <text x="70" y="68" text-anchor="middle" class="donut-total">{{ c.center }}</text>
         <text x="70" y="86" text-anchor="middle" class="donut-unit">{{ c.center_label }}</text>
       </svg>
       <ul class="donut-legend">
-        {% for s in c.slices %}
-        <li class="{{ 'zero' if not s.dash }}"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></li>
+        {% for s in c.slices if s.dash %}
+        <li>
+          {% if s.parts %}
+          <details id="parts-{{ ci }}-{{ loop.index0 }}">
+            <summary class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></summary>
+            <ul class="donut-parts">
+              {% for name, shown in s.parts %}<li><span>{{ name }}</span><span class="val">{{ shown }}</span></li>{% endfor %}
+            </ul>
+          </details>
+          {% else %}
+          <div class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></div>
+          {% endif %}
+        </li>
+        {% endfor %}
+        {% for s in c.slices if not s.dash %}
+        <li class="zero"><div class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></div></li>
         {% endfor %}
       </ul>
     </div>

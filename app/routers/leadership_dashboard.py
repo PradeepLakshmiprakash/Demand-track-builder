@@ -82,10 +82,11 @@ def _charts(o: loss_service.Overview) -> list[chart_service.Donut]:
     return [
         chart_service.donut(
             "Positions by stage",
-            "Every demand past draft, by main stage.",
+            "Every demand past draft, by main stage. Click a stage for its sub-stages.",
             [(label, n, str(n)) for _, label, n in o.pipeline],
             str(o.live),
             "positions",
+            parts={label: [(name, str(c)) for name, c in o.subs.get(k, [])] for k, label, _ in o.pipeline},
         ),
         chart_service.donut(
             "Revenue lost by business unit",
