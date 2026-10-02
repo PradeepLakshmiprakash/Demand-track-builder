@@ -10,17 +10,20 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import storage
+from app.core import mail, storage
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
 from app.services import (
+    demand_service,
     escalation_service,
     interview_service,
     loss_service,
     margin_service,
+    notify_service,
     pipeline_service,
 )
 from app.services.account_service import get_account
@@ -153,6 +156,7 @@ def demand_page(
         ),
         sees_escalations=actor.role in (Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP),
         respond=_to_respond(db, actor, demand),
+        can_revise_dates=demand_service.can_revise_dates(actor, demand),
         candidates=interview_service.for_demand(db, demand.id),
         decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,
         people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
@@ -191,6 +195,47 @@ async def record_joining_date(
         db.rollback()
         return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#offers", status_code=303)
     return RedirectResponse(f"/demands/{ref}?msg=Joining+date+recorded#offers", status_code=303)
+
+
+@router.post("/demands/{ref}/dates")
+async def revise_dates(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """Start date and last working day stay editable after the demand is on GTD."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    f = await request.form()
+
+    def day(key: str) -> date | None:
+        raw = str(f.get(key) or "")
+        return date.fromisoformat(raw) if raw else None
+
+    try:
+        changes = demand_service.revise_dates(db, actor, demand, day("start_date"), day("lwd"))
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#dates", status_code=303)
+    if not changes:
+        return RedirectResponse(f"/demands/{ref}?msg=No+change#dates", status_code=303)
+    tag = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    owner = db.get_one(User, demand.owner_id)
+    notify_service.safely(
+        mail.send,
+        mail.Mail(
+            to=margin_service._team_admins(db, demand.account_id),
+            cc=sorted({actor.email, owner.email}),
+            subject=f"[{tag}] Dates changed by {actor.name}",
+            text=(
+                f"{actor.name} changed the dates on {demand.app_ref} ({demand.name}):\n"
+                + "\n".join(f"- {c}" for c in changes)
+                + "\nUpdate GTD if the requisition carries these dates.\n\n"
+                f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+            ),
+        ),
+    )
+    db.commit()
+    return RedirectResponse(f"/demands/{ref}?msg={quote('Dates updated')}#dates", status_code=303)
 
 
 @router.post("/demands/{ref}/client-interview")

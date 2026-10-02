@@ -21,7 +21,7 @@
 <section class="panel panel-body respond-here" id="respond">
   <div class="eyebrow">Needs your response · L{{ x.e.level }}{{ ' · overdue' if x.e.level == 2 }}</div>
   <h2 style="margin-top:2px">{{ x.e.type_enum.label }} <span class="small sev-{{ x.e.severity }}">{{ x.e.severity_enum.label }} severity</span></h2>
-  <div class="small" style="margin:6px 0 12px">{{ x.e.detail }}<br><strong>Steps:</strong> {{ x.steps }}<br><span class="muted">{{ 'Was due' if x.e.level == 2 else 'Respond by' }} {{ x.e.due_at | at(tz, '%d %b %Y') }}.{% if can_change %} You can also <a href="/demands/{{ d.app_ref }}/edit">edit the demand</a>.{% endif %}{% if can_set_joining %} The <a href="#offers">joining date</a> is recorded below.{% endif %}</span></div>
+  <div class="small" style="margin:6px 0 12px">{{ x.e.detail }}<br><strong>Steps:</strong> {{ x.steps }}<br><span class="muted">{{ 'Was due' if x.e.level == 2 else 'Respond by' }} {{ x.e.due_at | at(tz, '%d %b %Y') }}.{% if can_change %} You can also <a href="/demands/{{ d.app_ref }}/edit">edit the demand</a>.{% endif %}{% if can_revise_dates %} The start date and last working day can be <a href="#dates">changed below</a>.{% endif %}{% if can_set_joining %} The <a href="#offers">joining date</a> is recorded below.{% endif %}</span></div>
   {% with e = x.e, sd = d, actions = x.actions, reasons = x.reasons, is_owner = actor.id == d.owner_id, next_url = '/demands/' ~ d.app_ref %}
     {% include "escalations/_respond.html" %}
   {% endwith %}
@@ -37,6 +37,7 @@
     <section class="panel panel-body">
       <h2>Position</h2>
       <div class="facts">
+        {{ field('Demand owner', d.owner.name ~ ' · ' ~ d.business_unit.name) }}
         {{ field('Practice', d.practice) }}{{ field('Grade', d.grade) }}{{ field('Category', d.category) }}
         {{ field('Type', d.type ~ (' · replacing ' ~ d.replaced_resource if d.replaced_resource else '')) }}
         {% if d.lwd %}{{ field('Last working day (leaver)', (d.lwd | d) ~ (' · %d days uncovered before the requested start' % d.uncovered_days if d.uncovered_days else '') ~ (' · loss counts from ' ~ (d.loss_from | d) if d.loss_from and d.loss_from != d.start_date else '')) }}{% endif %}
@@ -63,6 +64,14 @@
         {{ field('Region', d.region) }}{{ field('Location', d.location) }}{{ field('Work mode', d.work_mode) }}
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
+      {% if can_revise_dates %}
+      <form method="post" action="/demands/{{ d.app_ref }}/dates" id="dates" class="cand-mini row" style="gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="title" style="flex:1 1 100%">Change the dates <span class="small muted">The rest of the demand is locked now that it is on GTD. The GTD team admin is told.</span></div>
+        <label class="f" style="margin:0">Start date<input type="date" name="start_date" value="{{ d.start_date or '' }}" required style="width:auto;min-height:38px"></label>
+        {% if d.type == 'Replacement' %}<label class="f" style="margin:0">Last working day (leaver)<input type="date" name="lwd" value="{{ d.lwd or '' }}" required style="width:auto;min-height:38px"></label>{% endif %}
+        <button class="btn small primary">Save dates</button>
+      </form>
+      {% endif %}
     </section>
     {% if client_pending %}
     <section class="panel panel-body" id="client">

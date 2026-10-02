@@ -286,6 +286,37 @@ def can_change(actor: Actor, demand: Demand) -> bool:
     return can_edit(actor, demand) and demand.status_enum in EDITABLE
 
 
+def can_revise_dates(actor: Actor, demand: Demand) -> bool:
+    """Once a demand is on GTD its details are locked, but its dates still move: the owner (or the GTD
+    team admin) may change the start date and, for a replacement, the leaver's last working day."""
+    s = demand.status_enum
+    return can_edit(actor, demand) and s not in EDITABLE and s not in FINISHED
+
+
+def revise_dates(
+    db: Session, actor: Actor, demand: Demand, start: date | None, lwd: date | None
+) -> list[str]:
+    """Change the start date and last working day. Returns what changed, in words ([] if nothing)."""
+    if not can_revise_dates(actor, demand):
+        raise DemandError("Only the demand's owner changes its dates, while the demand is open.")
+    if start is None:
+        raise DemandError("Enter the start date.")
+    replacement = demand.type == "Replacement"
+    if replacement and lwd is None:
+        raise DemandError("Enter the leaver's last working day.")
+    changes = []
+    if start != demand.start_date:
+        was = f"{demand.start_date:%d %b %Y}" if demand.start_date else "not set"
+        changes.append(f"Start date: {was} → {start:%d %b %Y}")
+        demand.start_date = start
+    if replacement and lwd != demand.lwd:
+        was = f"{demand.lwd:%d %b %Y}" if demand.lwd else "not set"
+        changes.append(f"Last working day: {was} → {lwd:%d %b %Y}")
+        demand.lwd = lwd
+    db.flush()
+    return changes
+
+
 def record_stage(
     db: Session,
     demand: Demand,

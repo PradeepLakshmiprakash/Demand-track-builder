@@ -492,3 +492,8 @@ offers "Client moved the start date", "Offer in progress" …; a missing-from-sh
 still pending on GTD" …), each list editable by the Administrator under Escalation rules; "Other" is
 always offered and needs a comment. The responsible person can respond on the demand's own page,
 where the whole demand is in front of them, or from the Escalations screen, which links there.
+
+**D79. Dates stay editable.** After a demand is on GTD its details are locked, but the demand owner
+(or the GTD team admin) can still change the start date and, for a replacement, the leaver's last
+working day, on the demand page; the GTD team admin is mailed the change. Not on a finished demand.
+The demand page shows the demand owner's name with the position details.
