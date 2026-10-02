@@ -50,6 +50,7 @@ def test_rows_and_summary_for_priya(db: Session) -> None:
 
     assert summary(rows) == {"open": 7, "coverage": 4, "selection": 0, "alloc_pending": 3, "attention": 4}
     assert filter_counts(rows) == {
+        "archived": 0,
         "all": 8,
         "attention": 4,
         "coverage": 4,

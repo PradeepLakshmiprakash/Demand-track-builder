@@ -15,7 +15,7 @@ from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, OfferApproval
 from app.services import chart_service, loss_service, reconcile_service
-from app.services.demand_service import account_today
+from app.services.demand_service import account_today, period_for
 
 router = APIRouter(tags=["leadership"])
 guard = require_screen("overview")
@@ -32,10 +32,14 @@ def _open_escalations(db: Session, account_id: int) -> dict[int, int]:
 
 @router.get("/overview", response_class=HTMLResponse)
 def overview_page(
-    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+    request: Request,
+    start: str = "",
+    end: str = "",
+    actor: Actor = Depends(guard),
+    db: Session = Depends(get_db),
 ) -> HTMLResponse:
     today = account_today(db, actor.account_id)
-    o = loss_service.overview(db, actor.account_id, today)
+    o = loss_service.overview(db, actor.account_id, today, period_for(db, actor.account_id, start, end))
     # Offers this viewer decides: below the cut-off for leadership, at or above for the GTD team admin.
     route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(
@@ -82,7 +86,7 @@ def _charts(o: loss_service.Overview) -> list[chart_service.Donut]:
     return [
         chart_service.donut(
             "Positions by stage",
-            "Every demand past draft, by main stage. Click a stage for its sub-stages.",
+            "By main stage. Click a stage for its sub-stages.",
             [(label, n, str(n)) for _, label, n in o.pipeline],
             str(o.live),
             "positions",

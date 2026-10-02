@@ -55,8 +55,79 @@ def account_today(db: Session, account_id: int) -> date:
     return datetime.now(ZoneInfo(tz)).date()
 
 
-FILTERS = {"all": "All", "attention": "Needs attention"} | {m.value: m.label for m in MainStage}
+FILTERS = (
+    {"all": "All", "attention": "Needs attention"}
+    | {m.value: m.label for m in MainStage}
+    | {"archived": "Archived"}
+)
 OPEN_MAIN = (MainStage.COVERAGE, MainStage.SELECTION, MainStage.ALLOC_PENDING)
+
+
+@dataclass(frozen=True)
+class Period:
+    """Which demands a list or the overview shows.
+
+    With no dates chosen: everything still open, plus what finished (joined or abandoned) in the last
+    `keep_days` days; older finished demands are archived. With dates chosen: every demand that was
+    live at some point between them, archived ones included.
+    """
+
+    today: date
+    keep_days: int = 30
+    start: date | None = None
+    end: date | None = None
+
+    @property
+    def chosen(self) -> bool:
+        return self.start is not None or self.end is not None
+
+    def archived(self, finished: date | None) -> bool:
+        return finished is not None and (self.today - finished).days > self.keep_days
+
+    def shows(self, created: date, finished: date | None) -> bool:
+        if not self.chosen:
+            return not self.archived(finished)
+        if self.end is not None and created > self.end:
+            return False
+        return not (self.start is not None and finished is not None and finished < self.start)
+
+    @property
+    def label(self) -> str:
+        if not self.chosen:
+            return f"Open, or finished in the last {self.keep_days} days"
+        a = f"{self.start:%d %b %Y}" if self.start else "the start"
+        b = f"{self.end:%d %b %Y}" if self.end else "today"
+        return f"Live at any time from {a} to {b}"
+
+
+def period_for(db: Session, account_id: int, start: str = "", end: str = "") -> Period:
+    """The period a screen asked for; dates that don't parse are ignored."""
+
+    def parse(raw: str) -> date | None:
+        try:
+            return date.fromisoformat(raw) if raw else None
+        except ValueError:
+            return None
+
+    a, b = parse(start), parse(end)
+    if a and b and a > b:
+        a, b = b, a
+    account = db.get_one(Account, account_id)
+    return Period(account_today(db, account_id), account.settings.archive_after_days, a, b)
+
+
+def finished_dates(db: Session, demands: list[Demand]) -> dict[int, date]:
+    """The day each finished demand reached its final stage (joined, cancelled or closed)."""
+    done = {d.id: d.status for d in demands if d.status_enum in FINISHED}
+    out: dict[int, date] = {}
+    if not done:
+        return out
+    for e in db.scalars(
+        select(StageEvent).where(StageEvent.demand_id.in_(done)).order_by(StageEvent.at, StageEvent.id)
+    ):
+        if e.to_stage == done[e.demand_id]:
+            out[e.demand_id] = e.at.date()  # the latest one wins
+    return out
 
 
 @dataclass
@@ -70,6 +141,7 @@ class DemandRow:
     read_only: bool
     open_escalations: list[Escalation]
     doj: date | None = None  # from the BCM sheet, or the owner's expected date
+    finished_on: date | None = None  # joined or abandoned on this day; None while it is open
 
     @property
     def main(self) -> MainStage:
@@ -130,6 +202,7 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
     from app.services.pipeline_service import notes as panel_notes  # pipeline_service imports this module
 
     joining = current_doj(db, actor.account_id)
+    finished = finished_dates(db, demands)
     progress = panel_notes(db, demands) | offer_notes(db, demands)
     rows = []
     for d in demands:
@@ -149,14 +222,22 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
                 read_only=not can_edit(actor, d),
                 open_escalations=escs.get(d.id, []),
                 doj=joining.get(d.id),
+                finished_on=finished.get(d.id),
             )
         )
     return rows
 
 
-def filter_rows(rows: list[DemandRow], filter_key: str = "all", bu_id: int | None = None) -> list[DemandRow]:
+def filter_rows(
+    rows: list[DemandRow], filter_key: str = "all", bu_id: int | None = None, period: Period | None = None
+) -> list[DemandRow]:
+    """`period` hides archived demands (or keeps to the chosen dates); without one nothing is hidden."""
     if bu_id:
         rows = [r for r in rows if r.demand.bu_id == bu_id]
+    if filter_key == "archived":
+        return [r for r in rows if period is not None and period.archived(r.finished_on)]
+    if period is not None:
+        rows = [r for r in rows if period.shows(r.demand.created_at.date(), r.finished_on)]
     if filter_key == "attention":
         return [r for r in rows if r.attention]
     if filter_key in {m.value for m in MainStage}:
@@ -164,8 +245,8 @@ def filter_rows(rows: list[DemandRow], filter_key: str = "all", bu_id: int | Non
     return rows
 
 
-def filter_counts(rows: list[DemandRow]) -> dict[str, int]:
-    return {key: len(filter_rows(rows, key)) for key in FILTERS}
+def filter_counts(rows: list[DemandRow], period: Period | None = None) -> dict[str, int]:
+    return {key: len(filter_rows(rows, key, None, period)) for key in FILTERS}
 
 
 def summary(rows: list[DemandRow]) -> dict[str, int]:

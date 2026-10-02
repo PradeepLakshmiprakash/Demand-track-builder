@@ -36,6 +36,7 @@ class Thresholds(BaseModel):
     mail_time: time
     timezone: str
     billable_hours_per_day: float = Field(8.0, gt=0, le=24)
+    archive_after_days: int = Field(30, ge=1, le=365)
 
 
 def get_account(db: Session, account_id: int) -> Account:
@@ -57,11 +58,12 @@ def update_thresholds(db: Session, account_id: int, data: dict[str, str]) -> Non
         raise SettingsError(f"Unknown time zone: {t.timezone}") from e
 
     acc = get_account(db, account_id)
-    for k, v in t.model_dump(exclude={"timezone", "billable_hours_per_day"}).items():
+    for k, v in t.model_dump(exclude={"timezone", "billable_hours_per_day", "archive_after_days"}).items():
         setattr(acc, k, v)
     cfg = acc.settings
     cfg.timezone = t.timezone
     cfg.billable_hours_per_day = t.billable_hours_per_day
+    cfg.archive_after_days = t.archive_after_days
     acc.settings = cfg
     db.commit()
 

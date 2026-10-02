@@ -25,6 +25,14 @@
   <div class="small muted">{% if latest %}BCM sheet of {{ latest.sheet_date | d }} · {% endif %}as of {{ o.today | d }}</div>
 </div>
 
+<form method="get" class="panel panel-body row" style="gap:10px;flex-wrap:wrap;align-items:center">
+  <div style="flex:1 1 260px"><strong>{{ o.period.label }}</strong>{% if o.archived %}<div class="small muted">{{ o.archived }} older finished demand{{ 's' if o.archived != 1 }} not shown; pick dates to include them.</div>{% endif %}</div>
+  <label class="row small muted">From <input type="date" name="start" value="{{ o.period.start or '' }}" style="width:auto;min-height:40px"></label>
+  <label class="row small muted">To <input type="date" name="end" value="{{ o.period.end or '' }}" style="width:auto;min-height:40px"></label>
+  <button class="btn small primary">Show period</button>
+  {% if o.period.chosen %}<a class="small" href="/overview">Clear dates</a>{% endif %}
+</form>
+
 <div class="cards">
   <div class="card"><div class="k">Open demands</div><div class="v">{{ o.open }}</div><div class="s">of {{ o.live }} past draft{% if latest %} · {{ latest.row_count }} in the sheet{% endif %}</div></div>
   <div class="card"><div class="k">Still need coverage</div><div class="v">{{ o.need_coverage }}</div><div class="s">No profile with the client yet</div></div>

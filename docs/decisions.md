@@ -480,3 +480,9 @@ approval (Allocation Pending · Offer approval pending); *Client did not select*
 the candidate out, and the demand goes back to where its other candidates stand (Sourcing profiles
 when there are none). The GTD team admin is mailed either way. The BCM sheet can still move the
 demand on; a sheet that still says "with the client" after a recorded "no" doesn't pull it back.
+
+**D77. Archive and period.** A demand is never deleted. Once it is Joined or Abandoned it stays in the
+lists and the leadership overview for 30 days (Account settings → *Archive finished demands after*),
+then moves under the list's *Archived* filter and out of the overview. A From/To date filter on the
+demand lists and the overview shows every demand that was live at some point in that period, archived
+ones included.

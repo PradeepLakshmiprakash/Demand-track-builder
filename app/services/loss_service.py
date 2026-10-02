@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.enums import DemandStatus, MainStage
 from app.core.workdays import is_working_day
 from app.models import Account, BusinessUnit, Demand
+from app.services.demand_service import Period, finished_dates
 from app.services.escalation_service import current_doj
 
 NOT_LIVE = frozenset({DemandStatus.DRAFT, DemandStatus.CANCELLED, DemandStatus.CLOSED})
@@ -120,17 +121,25 @@ class Overview:
     by_practice: list[Slice]
     by_bu: list[Slice]
     hours_per_day: float
+    period: Period
+    archived: int  # finished demands left out because they are older than the period shows
 
 
-def overview(db: Session, account_id: int, today: date) -> Overview:
+def overview(db: Session, account_id: int, today: date, period: Period | None = None) -> Overview:
+    """The account's picture. Without dates: open demands and those finished within the archive window.
+    With dates: demands that were live at some point in the period."""
     account = db.get_one(Account, account_id)
-    demands = list(
+    period = period or Period(today, account.settings.archive_after_days)
+    everything = list(
         db.scalars(
             select(Demand)
             .where(Demand.account_id == account_id, Demand.status != DemandStatus.DRAFT.value)
             .options(selectinload(Demand.business_unit))
         )
     )
+    finished = finished_dates(db, everything)
+    demands = [d for d in everything if period.shows(d.created_at.date(), finished.get(d.id))]
+    shown = {d.id for d in demands}
     counts = {key: 0 for key, _, _ in GROUPS}
     by_sub: dict[DemandStatus, int] = {}
     for d in demands:
@@ -150,7 +159,7 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
             kind = "Replacement" if d.type == "Replacement" else "New"
             mix[f"{kind} · {'non-billable' if d.position_type == 'Non-billable' else 'billable'}"] += 1
 
-    loss = losses(db, account_id, today)
+    loss = [x for x in losses(db, account_id, today) if x.demand.id in shown]
     lost_by_demand = {x.demand.id: x.lost or Decimal(0) for x in loss}
 
     def slices(key_of: object) -> list[Slice]:
@@ -180,6 +189,8 @@ def overview(db: Session, account_id: int, today: date) -> Overview:
         by_practice=slices(lambda d: d.practice),
         by_bu=slices(lambda d: d.business_unit.name),
         hours_per_day=account.settings.billable_hours_per_day,
+        period=period,
+        archived=sum(period.archived(finished.get(d.id)) for d in everything if d.id not in shown),
     )
 
 

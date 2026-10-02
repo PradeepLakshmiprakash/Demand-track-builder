@@ -27,6 +27,7 @@ from app.services.demand_service import (
     filter_counts,
     filter_rows,
     get_visible,
+    period_for,
     stage_history,
     summary,
 )
@@ -42,11 +43,14 @@ def demands_page(
     request: Request,
     filter: str = "all",
     bu: int | None = None,
+    start: str = "",
+    end: str = "",
     actor: Actor = Depends(guard),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     if filter not in FILTERS:
         filter = "all"
+    period = period_for(db, actor.account_id, start, end)
     all_rows = demand_rows(db, actor)
     # BU filter: only the BUs this actor can actually see, and only when there's more than one.
     bus_stmt = (
@@ -62,8 +66,9 @@ def demands_page(
         "my_demands/index.html",
         actor,
         db,
-        rows=filter_rows(all_rows, filter, bu),
-        counts=filter_counts(filter_rows(all_rows, "all", bu)),
+        rows=filter_rows(all_rows, filter, bu, period),
+        counts=filter_counts(filter_rows(all_rows, "all", bu), period),
+        period=period,
         filters=FILTERS,
         active_filter=filter,
         bus=bus,
@@ -76,9 +81,15 @@ def demands_page(
 
 @router.get("/api/demands")
 def demands_json(
-    filter: str = "all", bu: int | None = None, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+    filter: str = "all",
+    bu: int | None = None,
+    start: str = "",
+    end: str = "",
+    actor: Actor = Depends(guard),
+    db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    rows = filter_rows(demand_rows(db, actor), filter if filter in FILTERS else "all", bu)
+    period = period_for(db, actor.account_id, start, end)
+    rows = filter_rows(demand_rows(db, actor), filter if filter in FILTERS else "all", bu, period)
     out = []
     for r in rows:
         d = r.demand

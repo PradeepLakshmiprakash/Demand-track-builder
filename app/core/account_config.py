@@ -159,6 +159,8 @@ class AccountConfig(BaseModel):
     interview_ratings: list[str] = ["Technical depth", "Problem solving", "Communication"]
     # Revenue lost = hourly bill rate × these hours × working days late (flow-artifact §10).
     billable_hours_per_day: float = Field(8.0, gt=0, le=24)
+    # A joined or abandoned demand leaves the lists and the overview this many days after it finished.
+    archive_after_days: int = Field(30, ge=1, le=365)
     dp_columns: dict[str, str] = Field(default_factory=_default_dp_columns)
     # Cell values the BCM sheet uses for "empty".
     dp_blank_values: list[str] = ["0", "-"]
