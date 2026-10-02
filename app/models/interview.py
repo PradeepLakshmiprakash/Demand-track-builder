@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +36,12 @@ class Candidate(Base):
         String(10), default=CandidateSource.SHEET.value, server_default="sheet"
     )
     cv_path: Mapped[str | None] = mapped_column(Text)
+    # The client's interview result ("select" or "reject"), recorded by the demand owner: the client
+    # has no access to the app or the BCM sheet.
+    client_outcome: Mapped[str | None] = mapped_column(String(10))
+    client_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    client_decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    client_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

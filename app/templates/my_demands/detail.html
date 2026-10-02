@@ -53,6 +53,25 @@
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
     </section>
+    {% if client_pending %}
+    <section class="panel panel-body" id="client">
+      <h2>Client interview</h2>
+      <p class="muted small" style="margin:4px 0 0">Record the client's decision once it has interviewed the candidate. The BCM sheet can also move this on.</p>
+      {% for c in client_pending %}
+        <form method="post" action="/demands/{{ d.app_ref }}/client-decision" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
+          <input type="hidden" name="candidate_id" value="{{ c.id }}">
+          <div class="title" style="flex:1 1 100%">{{ c.name }} <span class="small muted">· waiting for the client's decision</span></div>
+          <select name="channel" aria-label="Supply channel for {{ c.name }}" style="width:auto;min-height:38px">
+            <option value="">Supply channel…</option>
+            {% for k, label in channels.items() %}<option value="{{ k }}" {{ 'selected' if c.channel == k }}>{{ label }}</option>{% endfor %}
+          </select>
+          <input type="text" name="note" placeholder="Note (required if not selected)" aria-label="Note on the client's decision for {{ c.name }}" style="flex:1 1 200px;min-height:38px">
+          <button class="btn small primary" name="outcome" value="select">Client selected</button>
+          <button class="btn small danger" name="outcome" value="reject">Client did not select</button>
+        </form>
+      {% endfor %}
+    </section>
+    {% endif %}
     {% if offers or askable %}
     <section class="panel panel-body" id="offers">
       <h2>Offer approval</h2>
@@ -86,7 +105,7 @@
       <h2>Candidates and interviews</h2>
       {% for c, ivs in candidates %}
         <div class="cand-mini">
-          <div class="title">{{ c.name }}{% if c.current_stage %} <span class="small muted">· {{ c.current_stage }}</span>{% endif %}</div>
+          <div class="title">{{ c.name }}{% if c.current_stage %} <span class="small muted">· {{ c.current_stage }}</span>{% endif %}{% if c.client_outcome %} <span class="chip {{ 'done' if c.client_outcome == 'select' else 'esc' }}">Client · {{ 'selected' if c.client_outcome == 'select' else 'not selected' }}</span>{% if c.client_note %} <span class="small muted">“{{ c.client_note }}”</span>{% endif %}{% endif %}</div>
           {% for iv in ivs %}
             <div class="small round">
               <span class="chip {{ 'blue' if iv.status == 'scheduled' else 'risk' if iv.status in ('requested', 'open') else 'done' if iv.outcome == 'select' else 'esc' if iv.outcome == 'reject' else 'gray' }}">{{ iv.round }} · {{ iv.status_enum.label }}{% if iv.outcome %} · {{ iv.outcome }}{% endif %}</span>

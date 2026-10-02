@@ -472,3 +472,10 @@ Reconciliation page; closing it as "not ours" stops it being raised again.
 
 **D75. Accounts are added by the Administrator** (see D68); there is no platform admin.
 
+
+**D76. Client interview result.** The client has no access to the app or the BCM sheet. After its
+interview, the demand owner records the result on the demand page: *Client selected* raises the offer
+approval (Allocation Pending · Offer approval pending); *Client did not select* needs a note, takes
+the candidate out, and the demand goes back to where its other candidates stand (Sourcing profiles
+when there are none). The GTD team admin is mailed either way. The BCM sheet can still move the
+demand on; a sheet that still says "with the client" after a recorded "no" doesn't pull it back.

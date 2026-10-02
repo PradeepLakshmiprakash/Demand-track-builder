@@ -16,7 +16,7 @@ from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
-from app.services import interview_service, loss_service, margin_service
+from app.services import interview_service, loss_service, margin_service, pipeline_service
 from app.services.account_service import get_account
 from app.services.demand_service import (
     FILTERS,
@@ -149,6 +149,11 @@ def demand_page(
         # The owner follows the money on their own demand; so do the roles that see rates.
         loss=_loss(db, actor, demand),
         askable=margin_service.askable(db, demand) if actor.id == demand.owner_id else [],
+        client_pending=(
+            pipeline_service.awaiting_client(db, demand)
+            if pipeline_service.can_record_client(actor, demand) and demand.client_interview_required
+            else []
+        ),
         channels={c.key: c.label for c in get_account(db, actor.account_id).settings.supply_channels},
     )
 
@@ -168,6 +173,35 @@ async def record_joining_date(
         db.rollback()
         return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#offers", status_code=303)
     return RedirectResponse(f"/demands/{ref}?msg=Joining+date+recorded#offers", status_code=303)
+
+
+@router.post("/demands/{ref}/client-decision")
+async def record_client_decision(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """The client interviewed a candidate: the demand owner records whether they were selected."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    f = await request.form()
+    try:
+        cand = pipeline_service.record_client_decision(
+            db,
+            actor,
+            demand,
+            int(str(f.get("candidate_id") or 0)),
+            str(f.get("outcome") or ""),
+            str(f.get("channel") or ""),
+            str(f.get("note") or ""),
+        )
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#client", status_code=303)
+    if cand.client_outcome == "select":
+        msg = f"{cand.name} selected by the client; offer approval raised"
+    else:
+        msg = f"{cand.name} recorded as not selected by the client"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#offers", status_code=303)
 
 
 @router.post("/demands/{ref}/offers")

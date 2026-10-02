@@ -9,6 +9,10 @@ The BCM sheet arrives about weekly, but panel feedback is recorded in the app th
   panel's decision is final (`Demand.client_interview_required`, set when the demand is raised). Then
   the offer approval is raised and the demand owner is told.
 - If every candidate is rejected, an app-set stage falls back to **Coverage required**.
+- The client has no access to anything, so the **client interview result** is recorded by the demand
+  owner (`record_client_decision`) or arrives with the BCM sheet. Selected: the offer approval is
+  raised. Not selected: the candidate is out and the demand goes back to wherever its other
+  candidates stand.
 
 The BCM sheet still wins when it's ahead or final (profiles with client, offers, staffed, cancelled,
 incorrect). A sheet still saying Coverage required doesn't undo newer panel progress (`sheet_yields`).
@@ -16,6 +20,7 @@ Every change is a stage event, so interview progress also counts as progress for
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,14 +29,16 @@ from app.core import mail
 from app.core.config import get_settings
 from app.core.enums import (
     APP_PROGRESS,
+    FINISHED,
     PROGRESS_ORDER,
     DemandStatus,
     InterviewOutcome,
     InterviewStatus,
     StageOrigin,
 )
-from app.models import Account, Candidate, Demand, Interview, StageEvent, User
-from app.services import margin_service
+from app.core.security import Actor
+from app.models import Account, Candidate, Demand, Interview, OfferApproval, StageEvent, User
+from app.services import margin_service, notify_service
 from app.services.demand_service import record_stage
 
 PENDING = {InterviewStatus.REQUESTED.value, InterviewStatus.OPEN.value, InterviewStatus.SCHEDULED.value}
@@ -73,6 +80,8 @@ def evidence(db: Session, demand: Demand) -> Evidence | None:
     selected: list[tuple[Candidate, Interview]] = []
     alive: list[Candidate] = []
     for c in cands:
+        if c.client_outcome == InterviewOutcome.REJECT.value:
+            continue  # the client said no
         mine = by_cand.get(c.id, [])
         done = [iv for iv in mine if iv.status == InterviewStatus.COMPLETED.value]
         pending = [iv for iv in mine if iv.status in PENDING]
@@ -86,7 +95,9 @@ def evidence(db: Session, demand: Demand) -> Evidence | None:
 
     if selected:
         c, iv = max(selected, key=lambda x: x[1].submitted_at)  # type: ignore[arg-type, return-value]
-        final = not demand.client_interview_required
+        final = not demand.client_interview_required or any(
+            s.client_outcome == InterviewOutcome.SELECT.value for s, _ in selected
+        )
         nxt = "offer next (panel decision is final)" if final else "client interview next"
         return Evidence(
             DemandStatus.OFFER_IN_PROCESS if final else DemandStatus.PANEL_SELECTED,
@@ -131,11 +142,120 @@ def apply_for(db: Session, demand_id: int | None, actor_id: int | None) -> None:
         apply(db, db.get_one(Account, d.account_id), d, actor_id)
 
 
+# --- Client interview result -----------------------------------------------------------------------
+
+CLIENT_STAGES = (DemandStatus.PANEL_SELECTED, DemandStatus.PROFILES_WITH_CLIENT)
+
+
+class ClientDecisionError(ValueError):
+    pass
+
+
+def awaiting_client(db: Session, demand: Demand) -> list[Candidate]:
+    """Candidates whose client interview result is still to be recorded: selected by the panel (or put
+    to the client by staffing, per the BCM sheet), no client result and no offer approval yet."""
+    cur = demand.status_enum
+    if cur not in CLIENT_STAGES:
+        return []
+    have = set(db.scalars(select(OfferApproval.candidate_id).where(OfferApproval.demand_id == demand.id)))
+    out = []
+    for c in db.scalars(select(Candidate).where(Candidate.demand_id == demand.id).order_by(Candidate.name)):
+        if c.client_outcome is not None or c.id in have:
+            continue
+        ivs = list(db.scalars(select(Interview).where(Interview.candidate_id == c.id)))
+        done = [iv for iv in ivs if iv.status == InterviewStatus.COMPLETED.value]
+        last = max(done, key=lambda iv: (iv.round_no, iv.submitted_at)) if done else None
+        if last is not None and last.outcome == InterviewOutcome.REJECT.value:
+            continue
+        panel_selected = last is not None and last.outcome == InterviewOutcome.SELECT.value
+        if panel_selected or (cur is DemandStatus.PROFILES_WITH_CLIENT and last is None):
+            out.append(c)
+    return out
+
+
+def can_record_client(actor: Actor, demand: Demand) -> bool:
+    return actor.id == demand.owner_id and demand.status_enum not in FINISHED
+
+
+def record_client_decision(
+    db: Session, actor: Actor, demand: Demand, candidate_id: int, outcome: str, channel: str, note: str
+) -> Candidate:
+    """The demand owner records what the client decided after its interview."""
+    if not can_record_client(actor, demand):
+        raise ClientDecisionError("Only the demand's owner records the client's decision.")
+    cand = next((c for c in awaiting_client(db, demand) if c.id == candidate_id), None)
+    if cand is None:
+        raise ClientDecisionError("Pick a candidate who is waiting for the client's decision.")
+    if outcome not in (InterviewOutcome.SELECT.value, InterviewOutcome.REJECT.value):
+        raise ClientDecisionError("Say whether the client selected the candidate or not.")
+    account = db.get_one(Account, demand.account_id)
+    selected = outcome == InterviewOutcome.SELECT.value
+    channel = channel or cand.channel or ""
+    if selected and channel not in {c.key for c in account.settings.supply_channels}:
+        raise ClientDecisionError("Choose the supply channel the candidate comes through.")
+    if not selected and not note.strip():
+        raise ClientDecisionError("Add a short note on why the client did not select the candidate.")
+
+    cand.client_outcome = outcome
+    cand.client_decided_at = datetime.now(UTC)
+    cand.client_decided_by = actor.id
+    cand.client_note = note.strip() or None
+    if selected:
+        cand.channel = channel
+        record_stage(db, demand, DemandStatus.OFFER_IN_PROCESS, actor.id, StageOrigin.APP)
+        margin_service.ensure_offer(db, account, demand, cand.name, channel)  # mails whoever decides it
+        outcome_text = "selected by the client · offer approval raised"
+    else:
+        cand.current_stage = "Not selected by the client"
+        db.flush()
+        if not awaiting_client(db, demand):  # nobody else is with the client: back to where the rest stand
+            ev = evidence(db, demand)
+            back = ev.stage if ev is not None else DemandStatus.COVERAGE_REQUIRED
+            record_stage(db, demand, back, actor.id, StageOrigin.APP)
+        outcome_text = "not selected by the client"
+    ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
+    notify_service.safely(
+        mail.send,
+        mail.Mail(
+            to=margin_service._team_admins(db, account.id),
+            cc=[actor.email],
+            subject=f"[{ref}] Client interview: {cand.name} {'selected' if selected else 'not selected'}",
+            text=(
+                f"{actor.name} recorded the client's decision on {demand.app_ref} ({demand.name}): "
+                f"{cand.name} was {outcome_text}.\n"
+                + (f"Note: {cand.client_note}\n" if cand.client_note else "")
+                + f"The demand is now {demand.status_enum.full}.\n\n"
+                f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+            ),
+        ),
+    )
+    db.commit()
+    return cand
+
+
+def _client_said_no(db: Session, demand: Demand) -> bool:
+    """The owner recorded a client rejection and nobody else is waiting on the client."""
+    rejected = db.scalar(
+        select(Candidate.id).where(
+            Candidate.demand_id == demand.id, Candidate.client_outcome == InterviewOutcome.REJECT.value
+        )
+    )
+    return rejected is not None
+
+
 def sheet_yields(db: Session, demand: Demand, sheet_stage: DemandStatus | None) -> bool:
     """True when the BCM sheet's stage is behind progress the app already recorded: panel progress,
     or an offer the owner marked as accepted. A sheet stage further on always wins."""
     cur = demand.status_enum
-    if sheet_stage not in PROGRESS_ORDER or cur not in PROGRESS_ORDER or _rank(sheet_stage) >= _rank(cur):
+    if sheet_stage not in PROGRESS_ORDER or cur not in PROGRESS_ORDER:
+        return False
+    if (
+        sheet_stage is DemandStatus.PROFILES_WITH_CLIENT
+        and _rank(cur) < _rank(sheet_stage)
+        and _client_said_no(db, demand)
+    ):
+        return True  # the sheet still says "with the client" after the owner recorded the client's no
+    if _rank(sheet_stage) >= _rank(cur):
         return False
     if cur in APP_PROGRESS:
         return True

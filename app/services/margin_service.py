@@ -180,7 +180,7 @@ def askable(db: Session, demand: Demand) -> list[Candidate]:
     have = set(db.scalars(select(OfferApproval.candidate_id).where(OfferApproval.demand_id == demand.id)))
     out = []
     for c, ivs in interview_service.for_demand(db, demand.id):
-        if c.id not in have and any(iv.outcome == "select" for iv in ivs):
+        if c.id not in have and c.client_outcome != "reject" and any(iv.outcome == "select" for iv in ivs):
             out.append(c)
     return out
 
