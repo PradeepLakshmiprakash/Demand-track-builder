@@ -312,7 +312,7 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .sev-high { color: var(--esc-ink); font-weight: 600; }
 .sev-medium { color: var(--risk-ink, #8A5A00); }
 .sev-low { color: var(--muted); }
-.esc-rules .tr { display: grid; grid-template-columns: 150px 44px 170px 120px 1fr; gap: 12px; align-items: start; }
+.esc-rules .tr { display: grid; grid-template-columns: 130px 36px 150px 104px 1fr 1fr; gap: 12px; align-items: start; }
 .esc-rules textarea { min-height: 56px; }
 .tr.calc { display: grid; grid-template-columns: 1.3fr 1fr .8fr 1.1fr 1.3fr; gap: 12px; align-items: center; }
 .bar-subs { margin: -2px 0 8px 0; padding-left: 2px; }
@@ -346,3 +346,7 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .donut-legend li.zero { color: var(--muted); }
 .donut-legend li.zero .swatch { opacity: .35; }
 @media (max-width: 1100px) { .donuts { grid-template-columns: 1fr; } }
+
+/* An escalation answered on the demand's own page. */
+.respond-here { border-left: 4px solid var(--esc, #B4532A); margin-bottom: 16px; }
+.respond-here .esc-form { max-width: 640px; }

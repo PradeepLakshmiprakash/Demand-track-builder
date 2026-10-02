@@ -214,7 +214,7 @@ def test_a_row_declared_not_ours_is_not_raised_again(team: Client, db: Session) 
     esc = db.scalars(select(Escalation).where(Escalation.sheet_req_id == "N9T49U")).one()
     r = team.post(
         f"/escalations/{esc.id}/resolve",
-        data={"reason": "Unknown", "action": "no_action", "comment": "Another account's requisition"},
+        data={"reason": "Other", "action": "no_action", "comment": "Another account's requisition"},
     )
     assert "msg=Escalation" in r.headers["location"]
     upload(team, sample_sheet.build(title=False), date.today() + timedelta(days=7))

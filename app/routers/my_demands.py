@@ -16,7 +16,13 @@ from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
-from app.services import interview_service, loss_service, margin_service, pipeline_service
+from app.services import (
+    escalation_service,
+    interview_service,
+    loss_service,
+    margin_service,
+    pipeline_service,
+)
 from app.services.account_service import get_account
 from app.services.demand_service import (
     FILTERS,
@@ -146,6 +152,7 @@ def demand_page(
             )
         ),
         sees_escalations=actor.role in (Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP),
+        respond=_to_respond(db, actor, demand),
         candidates=interview_service.for_demand(db, demand.id),
         decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,
         people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
@@ -325,6 +332,27 @@ def _my_loss(db: Session, actor: Actor) -> dict[str, Any] | None:
     ]
     known = [x.lost for x in mine if x.lost is not None]
     return {"total": sum(known, Decimal(0)), "late": len(mine), "unknown": len(mine) - len(known)}
+
+
+def _to_respond(db: Session, actor: Actor, demand: Demand) -> list[dict[str, Any]]:
+    """Open escalations on this demand that this person has to answer, with what they can choose."""
+    account = get_account(db, demand.account_id)
+    out = []
+    for e in db.scalars(
+        select(Escalation)
+        .where(Escalation.demand_id == demand.id, Escalation.status == "open")
+        .order_by(Escalation.opened_at)
+    ):
+        if escalation_service.can_resolve(actor, e, demand):
+            out.append(
+                {
+                    "e": e,
+                    "actions": escalation_service.allowed_actions(db, account, e, demand),
+                    "reasons": account.settings.reasons_for(e.type),
+                    "steps": account.settings.rule_for(e.type).steps,
+                }
+            )
+    return out
 
 
 def _sheet_doj(db: Session, demand: Demand) -> bool:

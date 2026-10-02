@@ -37,6 +37,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core import mail
+from app.core.account_config import OTHER_REASON
 from app.core.config import get_settings
 from app.core.enums import (
     FINISHED,
@@ -766,8 +767,10 @@ def resolve(
     if not can_resolve(actor, esc, demand):
         raise EscalationError(f"This escalation is for {who_acts(esc)} to respond to.")
     account = db.get_one(Account, actor.account_id)
-    if reason not in account.settings.resolution_reasons:
+    if reason not in account.settings.reasons_for(esc.type):
         raise EscalationError("Choose a reason.")
+    if reason == OTHER_REASON and not (comment or "").strip():
+        raise EscalationError("With 'Other', say what the reason is in the comment.")
     try:
         act = ResolutionAction(action)
     except ValueError as e:

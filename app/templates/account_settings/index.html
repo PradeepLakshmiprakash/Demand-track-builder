@@ -68,7 +68,7 @@
       <label class="f">Regions<textarea name="regions" rows="6">{{ cfg.regions | join('\n') }}</textarea></label>
       <label class="f">Work modes<textarea name="work_modes" rows="4">{{ cfg.work_modes | join('\n') }}</textarea></label>
       <label class="f">Categories<textarea name="categories" rows="4">{{ cfg.categories | join('\n') }}</textarea></label>
-      <label class="f">Escalation reasons<textarea name="resolution_reasons" rows="6">{{ cfg.resolution_reasons | join('\n') }}</textarea></label>
+
       <label class="f">Interview ratings<textarea name="interview_ratings" rows="4">{{ cfg.interview_ratings | join('\n') }}</textarea><span class="hint">What a panelist rates, each 1 to 5</span></label>
       <label class="f">Who owns L1 escalations<input type="text" name="escalation_owner_l1" value="{{ cfg.escalation_owners.get('L1', '') }}"><span class="hint">Mailed per BU: the BU's delivery head</span></label>
       <label class="f">Who owns L2 escalations<input type="text" name="escalation_owner_l2" value="{{ cfg.escalation_owners.get('L2', '') }}"></label>
@@ -78,10 +78,10 @@
 </section>
 
 <section id="escalation-rules" class="panel">
-  <div class="panel-head"><div><h2>Escalation rules</h2><div class="hint">For each trigger: whether it's on, who has to act, how urgent it is, and the steps the email tells them. The responsible person acts; everyone else is only informed.</div></div></div>
+  <div class="panel-head"><div><h2>Escalation rules</h2><div class="hint">For each trigger: whether it's on, who has to act, how urgent it is, and the steps the email tells them, and the reasons they choose from when they respond. The responsible person acts; everyone else is only informed.</div></div></div>
   <form method="post" action="/settings/escalation-rules" class="panel-body stack">
     <div class="tbl plain esc-rules">
-      <div class="tr th"><div>Trigger</div><div>On</div><div>Who acts</div><div>Severity</div><div>Steps in the email</div></div>
+      <div class="tr th"><div>Trigger</div><div>On</div><div>Who acts</div><div>Severity</div><div>Steps in the email</div><div>Reasons to choose from (one per line)</div></div>
       {% for t in esc_types %}{% set r = cfg.rule_for(t.value) %}
       <div class="tr">
         <div><strong>{{ t.label }}</strong></div>
@@ -89,6 +89,7 @@
         <div><select name="responsible_{{ t.value }}" aria-label="Who acts on {{ t.label }}">{% for x in responsibles %}<option value="{{ x.value }}" {{ 'selected' if r.responsible == x }}>{{ x.label }}</option>{% endfor %}</select></div>
         <div><select name="severity_{{ t.value }}" aria-label="Severity of {{ t.label }}">{% for x in severities %}<option value="{{ x.value }}" {{ 'selected' if r.severity == x }}>{{ x.label }}</option>{% endfor %}</select></div>
         <div><textarea name="steps_{{ t.value }}" rows="2" required aria-label="Steps for {{ t.label }}">{{ r.steps }}</textarea></div>
+        <div><textarea name="reasons_{{ t.value }}" rows="4" aria-label="Reasons for {{ t.label }}">{{ cfg.reasons_for(t.value)[:-1] | join('\n') }}</textarea><div class="hint">"Other" is always offered, with a comment.</div></div>
       </div>
       {% endfor %}
     </div>

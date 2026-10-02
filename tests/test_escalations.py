@@ -274,7 +274,7 @@ def test_more_time_keeps_the_level(db: Session) -> None:
     svc.sweep(db, 1, NOW)
     assert all("DM-000121" not in m.text for m in mail.sent)  # no reminders until the new date passes
     with pytest.raises(EscalationError, match="after today"):
-        svc.resolve(db, actor(db, "priya"), esc.id, reason="Unknown", action="extend", comment=None,
+        svc.resolve(db, actor(db, "priya"), esc.id, reason="Other", action="extend", comment="n/a",
                     extend_to=date.today())  # fmt: skip
 
 
@@ -282,12 +282,17 @@ def test_no_further_action_only_once_cleared(db: Session, client: Client) -> Non
     esc = open_esc(db, "DM-000149", "not_submitted")  # seeded
     assert esc is not None
     with pytest.raises(EscalationError, match="isn't available"):
-        svc.resolve(db, actor(db, "farah"), esc.id, reason="Unknown", action="no_action", comment=None)
+        svc.resolve(db, actor(db, "farah"), esc.id, reason="Other", action="no_action", comment="n/a")
     client.as_user("farah").post(
         f"/gtd-queue/{by_ref(db, 'DM-000149').id}/link", data={"gtd_req_id": "LATE01"}
     )
     svc.resolve(
-        db, actor(db, "farah"), esc.id, reason="Unknown", action="no_action", comment="Linked a day late"
+        db,
+        actor(db, "farah"),
+        esc.id,
+        reason="Created on GTD now",
+        action="no_action",
+        comment="Linked a day late",
     )
     assert db.get_one(Escalation, esc.id).status == "resolved"
 
@@ -298,17 +303,17 @@ def test_only_the_responsible_party_responds(db: Session) -> None:
     assert gtd is not None and own is not None
     for who in ("priya", "sanjay"):
         with pytest.raises(EscalationError, match="for the GTD admin team to respond"):
-            svc.resolve(db, actor(db, who), gtd.id, reason="Unknown", action="close", comment=None)
+            svc.resolve(db, actor(db, who), gtd.id, reason="Other", action="close", comment="n/a")
     for who in ("farah", "kavya", "sanjay", "neha"):
         with pytest.raises(EscalationError, match="for the demand owner to respond"):
-            svc.resolve(db, actor(db, who), own.id, reason="Unknown", action="close", comment=None)
+            svc.resolve(db, actor(db, who), own.id, reason="Other", action="close", comment="n/a")
     with pytest.raises(EscalationError, match="Choose a reason"):
         svc.resolve(db, actor(db, "farah"), gtd.id, reason="Because", action="close", comment=None)
     aging = open_esc(db, "DM-000135", "aging")
     assert aging is not None
     owner = actor_from_user(db, db.get_one(User, by_ref(db, "DM-000135").owner_id))
     with pytest.raises(EscalationError, match="isn't available"):
-        svc.resolve(db, owner, aging.id, reason="Unknown", action="resubmit", comment=None)
+        svc.resolve(db, owner, aging.id, reason="Other", action="resubmit", comment="n/a")
 
 
 # --- Screen ---------------------------------------------------------------------------------------
@@ -343,7 +348,7 @@ def test_demand_owner_revises_the_start_date(db: Session) -> None:
     esc = open_esc(db, "DM-000121", "past_start")
     assert esc is not None
     with pytest.raises(EscalationError, match="revised start date"):
-        svc.resolve(db, actor(db, "priya"), esc.id, reason="Unknown", action="new_start", comment=None)
+        svc.resolve(db, actor(db, "priya"), esc.id, reason="Other", action="new_start", comment="n/a")
     new = date.today() + timedelta(days=21)
     svc.resolve(db, actor(db, "priya"), esc.id, reason="Client budget pending", action="new_start",
                 comment="Agreed with the client", extend_to=new)  # fmt: skip
@@ -436,7 +441,7 @@ def test_administrator_changes_the_rules_in_settings(client: Client, db: Session
     esc = svc.open_escalation(db, account, d, svc.EscalationType.INCORRECT, "wrong", NOW)
     assert esc is not None and esc.responsible == "gtd_team"
     db.commit()
-    svc.resolve(db, actor(db, "farah"), esc.id, reason="Unknown", action="close", comment=None)
+    svc.resolve(db, actor(db, "farah"), esc.id, reason="Other", action="close", comment="n/a")
 
     page = client.get("/settings").text
     assert "Escalation rules" in page and "Ring GTD staffing and ask." in page
@@ -472,3 +477,46 @@ def test_late_feedback_goes_to_the_interviewer_and_closes_when_given(db: Session
     svc.sweep(db, 1, NOW)
     done = db.get_one(Escalation, esc.id)
     assert done.status == "resolved" and done.reason == "Feedback submitted" and done.resolved_by is None
+
+
+def test_reasons_fit_the_trigger_and_the_demand_page_takes_the_response(client: Client, db: Session) -> None:
+    esc = open_esc(db, "DM-000121", "past_start")  # Priya's demand
+    assert esc is not None
+    cfg = db.get_one(Account, 1).settings
+    assert "Client moved the start date" in cfg.reasons_for("past_start")
+    assert "Client moved the start date" not in cfg.reasons_for("missing")
+    assert cfg.reasons_for("missing")[-1] == "Other"
+    with pytest.raises(EscalationError, match="Choose a reason"):  # a reason for another trigger
+        svc.resolve(db, actor(db, "priya"), esc.id, reason="Wrong requisition ID was linked",
+                    action="close", comment=None)  # fmt: skip
+    with pytest.raises(EscalationError, match="say what the reason is"):
+        svc.resolve(db, actor(db, "priya"), esc.id, reason="Other", action="close", comment=None)
+
+    page = client.as_user("priya").get("/demands/DM-000121").text  # the full demand, with the form on it
+    assert "Needs your response" in page and "Client moved the start date" in page
+    assert "Revise the start date" in page and "Commercial and timing" in page
+    assert "Needs your response" not in client.as_user("farah").get("/demands/DM-000121").text
+    assert "Open the full demand" in client.as_user("priya").get(f"/escalations?id={esc.id}").text
+    new = date.today() + timedelta(days=14)
+    r = client.as_user("priya").post(
+        f"/escalations/{esc.id}/resolve",
+        data={"reason": "Client moved the start date", "action": "new_start", "extend_to": new.isoformat(),
+              "comment": "", "next": "/demands/DM-000121"},
+    )  # fmt: skip
+    assert r.headers["location"].startswith("/demands/DM-000121?msg=")
+    assert by_ref(db, "DM-000121").start_date == new and db.get_one(Escalation, esc.id).status == "resolved"
+
+
+def test_administrator_sets_the_reasons_for_a_trigger(client: Client, db: Session) -> None:
+    account = db.get_one(Account, 1)
+    form = {"days_high": "1", "days_medium": "2", "days_low": "3"}
+    for t in svc.EscalationType:
+        r = account.settings.rule_for(t.value)
+        form |= {f"enabled_{t.value}": "on", f"responsible_{t.value}": r.responsible.value,
+                 f"severity_{t.value}": r.severity.value, f"steps_{t.value}": r.steps}  # fmt: skip
+    form["reasons_aging"] = "Hiring freeze\nRole on hold\n"
+    assert client.as_user("anil").post("/settings/escalation-rules", data=form).status_code == 303
+    db.expire_all()
+    cfg = db.get_one(Account, 1).settings
+    assert cfg.reasons_for("aging") == ["Hiring freeze", "Role on hold", "Other"]
+    assert "Offer in progress" in cfg.reasons_for("past_start")  # untouched triggers keep the defaults

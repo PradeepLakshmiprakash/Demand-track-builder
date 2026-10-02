@@ -91,7 +91,7 @@ def escalations_page(
             "who_acts": svc.who_acts(esc),
             "steps": account.settings.rule_for(esc.type).steps,
             "is_owner": d is not None and actor.id == d.owner_id,
-            "reasons": account.settings.resolution_reasons,
+            "reasons": account.settings.reasons_for(esc.type),
             "names": names,
             "action_labels": {a.value: a.label for a in ResolutionAction},
         }
@@ -111,6 +111,8 @@ async def resolve(
 ) -> RedirectResponse:
     form = await request.form()
     raw_date = str(form.get("extend_to") or "")
+    nxt = str(form.get("next") or "")
+    on_demand = nxt.startswith("/demands/") and "//" not in nxt and "?" not in nxt  # answered on its page
     try:
         extend_to = date.fromisoformat(raw_date) if raw_date else None
         esc = svc.resolve(
@@ -124,10 +126,13 @@ async def resolve(
         )
     except (EscalationError, ValueError) as e:
         db.rollback()
+        if on_demand:
+            return RedirectResponse(f"{nxt}?err={quote(str(e))}#respond", status_code=303)
         return _back(esc_id, "open", err=str(e))
-    if esc.status == "open":
-        return _back(esc_id, "open", msg=f"Due date extended to {esc.due_at:%d %b}")
-    return _back(esc_id, "resolved", msg="Escalation resolved")
+    msg = f"Due date extended to {esc.due_at:%d %b}" if esc.status == "open" else "Escalation resolved"
+    if on_demand:
+        return RedirectResponse(f"{nxt}?msg={quote(msg)}", status_code=303)
+    return _back(esc_id, "open" if esc.status == "open" else "resolved", msg=msg)
 
 
 @router.post("/escalations/sweep")

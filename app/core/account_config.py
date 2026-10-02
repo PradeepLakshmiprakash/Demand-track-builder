@@ -37,6 +37,7 @@ class EscalationRule(BaseModel):
     responsible: Responsible
     severity: Severity
     steps: str
+    reasons: list[str] = []  # what the responder picks from; empty = the defaults for this trigger
 
 
 DEFAULT_RULES: dict[str, tuple[Responsible, Severity, str]] = {
@@ -90,6 +91,71 @@ DEFAULT_RULES: dict[str, tuple[Responsible, Severity, str]] = {
         "Give a revised start date, or confirm the date of joining with staffing. Close the demand if it "
         "is no longer needed.",
     ),
+}
+
+
+# The reasons a responder picks from, per trigger: each list answers "why is this late / wrong?" for
+# that kind of escalation. "Other" is always offered last and needs a comment.
+OTHER_REASON = "Other"
+DEFAULT_REASONS: dict[str, list[str]] = {
+    "not_submitted": [
+        "Created on GTD now",
+        "Waiting for details from the demand owner",
+        "GTD was unavailable",
+        "Duplicate demand",
+    ],
+    "missing": [
+        "Approval still pending on GTD",
+        "Wrong requisition ID was linked",
+        "Failed GTD basic checks",
+        "Approved late: will be in the next BCM sheet",
+        "Duplicate demand",
+    ],
+    "dropped": [
+        "Removed by mistake: position still needed",
+        "Position no longer needed",
+        "Withdrawn by client",
+        "Replaced by another requisition",
+    ],
+    "incorrect": [
+        "Details corrected",
+        "Failed GTD basic checks",
+        "Duplicate demand",
+        "Withdrawn by client",
+    ],
+    "aging": [
+        "No coverage available",
+        "Requirements being revised",
+        "Waiting for the client's feedback",
+        "Client budget pending",
+        "Position no longer needed",
+    ],
+    "rejection_limit": [
+        "Job description revised",
+        "Bar reviewed with the panel",
+        "Rate or grade being revised",
+        "Scarce skill: sourcing widened",
+        "Position no longer needed",
+    ],
+    "panel_sla": [
+        "Feedback submitted",
+        "Interviewer unavailable: interview reassigned",
+        "Interview did not take place",
+    ],
+    "unlinked_row": [
+        "Belongs to another account",
+        "Old requisition, already closed",
+        "Duplicate of an existing demand",
+    ],
+    "past_start": [
+        "Candidate selected: joining date agreed",
+        "Offer in progress",
+        "Client moved the start date",
+        "Still sourcing: no suitable profile yet",
+        "Client budget pending",
+        "Withdrawn by client",
+        "Position no longer needed",
+    ],
 }
 
 
@@ -186,6 +252,11 @@ class AccountConfig(BaseModel):
     def rule_for(self, trigger: str) -> EscalationRule:
         """The account's rule for a trigger; the default for one the account hasn't set."""
         return self.escalation_rules.get(trigger) or _default_rules()[trigger]
+
+    def reasons_for(self, trigger: str) -> list[str]:
+        """The reasons offered when responding to this kind of escalation; "Other" always comes last."""
+        own = self.rule_for(trigger).reasons or DEFAULT_REASONS[trigger]
+        return [*(r for r in own if r != OTHER_REASON), OTHER_REASON]
 
     def grade_rank(self, grade: str) -> int:
         try:

@@ -220,6 +220,13 @@ def update_escalation_rules(db: Session, account_id: int, form: dict[str, str]) 
                 responsible=form.get(f"responsible_{t.value}", ""),  # type: ignore[arg-type]
                 severity=form.get(f"severity_{t.value}", ""),  # type: ignore[arg-type]
                 steps=steps[:400],
+                reasons=list(
+                    dict.fromkeys(
+                        r.strip()[:80]
+                        for r in (form.get(f"reasons_{t.value}") or "").splitlines()
+                        if r.strip()
+                    )
+                ),
             )
         except ValidationError as e:
             raise SettingsError(f"{t.label}: {_errors(e)}") from e

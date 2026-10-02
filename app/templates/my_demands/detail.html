@@ -17,6 +17,17 @@
   </div>
 </div>
 
+{% for x in respond %}
+<section class="panel panel-body respond-here" id="respond">
+  <div class="eyebrow">Needs your response · L{{ x.e.level }}{{ ' · overdue' if x.e.level == 2 }}</div>
+  <h2 style="margin-top:2px">{{ x.e.type_enum.label }} <span class="small sev-{{ x.e.severity }}">{{ x.e.severity_enum.label }} severity</span></h2>
+  <div class="small" style="margin:6px 0 12px">{{ x.e.detail }}<br><strong>Steps:</strong> {{ x.steps }}<br><span class="muted">{{ 'Was due' if x.e.level == 2 else 'Respond by' }} {{ x.e.due_at | at(tz, '%d %b %Y') }}.{% if can_change %} You can also <a href="/demands/{{ d.app_ref }}/edit">edit the demand</a>.{% endif %}{% if can_set_joining %} The <a href="#offers">joining date</a> is recorded below.{% endif %}</span></div>
+  {% with e = x.e, sd = d, actions = x.actions, reasons = x.reasons, is_owner = actor.id == d.owner_id, next_url = '/demands/' ~ d.app_ref %}
+    {% include "escalations/_respond.html" %}
+  {% endwith %}
+</section>
+{% endfor %}
+
 {% if d.status == 'returned' and returned %}
 <div class="flash bad" role="alert"><strong>Sent back for correction</strong> by {{ returned.by }} on {{ returned.at | at(tz, '%d %b') }}: {{ returned.reason }}{% if returned.comment %}. {{ returned.comment }}{% endif %}.
   {% if can_change %}Correct it with Edit, then resubmit; it goes back to the GTD admin team for GTD.{% endif %}</div>

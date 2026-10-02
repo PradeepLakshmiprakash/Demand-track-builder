@@ -79,22 +79,8 @@
 
     {% if e.status == 'open' and can_resolve %}
     {% if not sd %}<div class="small"><a class="btn small primary" href="/reconciliation#to-match">Match it or create the demand on Reconciliation</a></div>{% endif %}
-    <form method="post" action="/escalations/{{ e.id }}/resolve" class="stack">
-      <label class="f">Reason
-        <select name="reason" required>
-          <option value="">Choose a reason</option>
-          {% for r in reasons %}<option>{{ r }}</option>{% endfor %}
-        </select>
-      </label>
-      <fieldset class="f radios"><legend>Action</legend>
-        {% for a in actions %}
-          <label><input type="radio" name="action" value="{{ a.value }}" {{ 'checked' if loop.first }} required> {{ "I'll correct it and resubmit" if a.value == 'return' and is_owner else "Not ours: ignore this requisition" if not sd else a.label }}</label>
-        {% endfor %}
-      </fieldset>
-      <label class="f" id="extend-date"><span id="extend-label">New due date</span><input type="date" name="extend_to"></label>
-      <label class="f">Comment<textarea name="comment" rows="3" placeholder="What was agreed, and with whom"></textarea></label>
-      <div><button class="btn primary">Respond</button></div>
-    </form>
+    {% if sd %}<div><a class="btn small" href="/demands/{{ sd.app_ref }}#respond">Open the full demand</a> <span class="small muted">See everything about it and respond there, or respond here.</span></div>{% endif %}
+    {% include "escalations/_respond.html" %}
     {% elif e.status == 'open' %}
       <div class="flash ok small">You are informed only: this is for {{ who_acts }} to respond to.</div>
     {% else %}
@@ -115,19 +101,4 @@
   </aside>
   {% endif %}
 </div>
-<script>
-(function () {
-  var box = document.getElementById('extend-date');
-  if (!box) return;
-  function sync() {
-    var ext = document.querySelector('input[name=action][value=extend]');
-    var start = document.querySelector('input[name=action][value=new_start]');
-    var isStart = !!(start && start.checked);
-    box.hidden = !((ext && ext.checked) || isStart);
-    document.getElementById('extend-label').textContent = isStart ? 'Revised start date' : 'New due date';
-  }
-  document.querySelectorAll('input[name=action]').forEach(function (r) { r.addEventListener('change', sync); });
-  sync();
-})();
-</script>
 {% endblock %}

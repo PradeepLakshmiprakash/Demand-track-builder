@@ -486,3 +486,9 @@ lists and the leadership overview for 30 days (Account settings → *Archive fin
 then moves under the list's *Archived* filter and out of the overview. A From/To date filter on the
 demand lists and the overview shows every demand that was live at some point in that period, archived
 ones included.
+
+**D78. Responding to an escalation.** The reasons offered fit the trigger (a past-start escalation
+offers "Client moved the start date", "Offer in progress" …; a missing-from-sheet one offers "Approval
+still pending on GTD" …), each list editable by the Administrator under Escalation rules; "Other" is
+always offered and needs a comment. The responsible person can respond on the demand's own page,
+where the whole demand is in front of them, or from the Escalations screen, which links there.
