@@ -72,7 +72,7 @@
       + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated</div><div class="v">' + escd + '</div><div class="h">with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '</div></div>'
       + '<div class="fact"><div class="k">Revenue lost</div><div class="v">' + money(lost) + '</div><div class="h">bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '</div></div>'
       + '<div class="fact pick cost' + (F.costing ? ' on' : '') + '" data-key="costing" data-val="Non-billable cost" role="button" tabindex="0"><div class="k">Non-billable cost</div><div class="v">' + money(cost) + '</div><div class="h">' + costn + ' proactive position' + (costn === 1 ? '' : 's') + ' not billing · ' + (F.costing ? 'showing only these' : 'click to see them') + '</div></div></div>';
-    h += costing(rows);
+    if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     if (F.stage) h += bars('sub');
     h += bars(dim === 'stage' ? 'bu' : 'stage');
     h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
