@@ -5,8 +5,10 @@
    for one demand.
    The layout comes from workflow_service.layout(). */
 (function () {
-  var COL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
-  var TINT = ['#EAF2FC', '#FDEFE8', '#E6F6EF', '#FDF4DD', '#FCEEF3'];
+  // One blue, light to dark, while a demand is in progress; green once joined; grey if abandoned.
+  var COL = ['#6FA8EA', '#2468C2', '#123B73', '#17966A', '#B0ACA2'];
+  var TINT = ['#EDF4FD', '#E6EEFA', '#E3E9F2', '#E5F4EE', '#F2F0EB'];
+  var ON = ['#0B2545', '#fff', '#fff', '#fff', '#1B1B18'];  // text that sits on each colour
   var INK = '#1B1B18', MUTED = '#6B675E', WARN = '#B4532A';
   var BW = 150, BH = 40, TOP = 60, GAP = 58;
   // container x, container width, main column x, problem column x (first stage only)
@@ -43,15 +45,15 @@
       var now = cur && cur.sub === sub && cur.stage === stage;
       var done = cur && !left && !problem && idx >= 0 && (idx < reached || (idx === reached && hangs[cur.sub]));
       var dim = counts ? !n : (cur && !now && !done), sel = o.sel === sub;
-      var fill = now ? COL[ci] : (done ? TINT[ci] : '#fff'), ink = now ? '#fff' : (dim ? '#8B877E' : INK);
+      var fill = now ? COL[ci] : (done ? TINT[ci] : '#fff'), ink = now ? ON[ci] : (dim ? '#8B877E' : INK);
       var s = '<g class="wfbox" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '"' + (counts ? ' style="cursor:pointer"' : '') + '>';
       s += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '" rx="4" fill="' + fill + '" stroke="' + (sel || now ? INK : (problem ? WARN : '#C9C4B8')) + '" stroke-width="' + (sel || now ? 2 : 1) + '"' + (problem && !now ? ' stroke-dasharray="4 3"' : '') + '/>';
       if (!now) s += '<rect x="' + x + '" y="' + y + '" width="5" height="' + BH + '" rx="2" fill="' + (problem ? WARN : COL[ci]) + '" opacity="' + (dim ? .35 : 1) + '"/>';
       var ls = lines(sub), ty = y + (ls.length === 1 ? 24 : 17);
       ls.forEach(function (l, k) { s += '<text x="' + (x + 13) + '" y="' + (ty + k * 13) + '" font-size="11" fill="' + ink + '"' + (now ? ' font-weight="700"' : '') + '>' + esc(l) + '</text>'; });
-      if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + COL[ci] + '"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' + n + '</text>';
+      if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + COL[ci] + '"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="' + ON[ci] + '">' + n + '</text>';
       if (done) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="13" font-weight="700" fill="' + COL[ci] + '">✓</text>';
-      if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="#fff">●</text>';
+      if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="' + ON[ci] + '">●</text>';
       var en = o.esc ? (o.esc[sub] || 0) : (now && o.escalations ? o.escalations.length : 0);
       if (en) s += '<rect x="' + (x + BW - 46) + '" y="' + (y - 9) + '" width="40" height="17" rx="8.5" fill="' + WARN + '" stroke="#fff" stroke-width="1.5"/><text x="' + (x + BW - 26) + '" y="' + (y + 3.5) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">⚠ ' + en + '</text><title>' + en + ' open escalation' + (en === 1 ? '' : 's') + '</title>';
       return s + '</g>';
@@ -64,8 +66,8 @@
       var on = o.sel === c.label || (cur && cur.stage === c.label);
       h += '<g class="wfstage" data-stage="' + esc(c.label) + '"' + (counts ? ' style="cursor:pointer"' : '') + '><rect x="' + g.x + '" y="10" width="' + g.w + '" height="' + (H - 10) + '" rx="6" fill="' + TINT[ci] + '" stroke="' + COL[ci] + '" stroke-width="' + (on ? 2.5 : 1) + '"/>';
       h += '<rect x="' + g.x + '" y="10" width="' + g.w + '" height="32" rx="6" fill="' + COL[ci] + '"/><rect x="' + g.x + '" y="30" width="' + g.w + '" height="12" fill="' + COL[ci] + '"/>';
-      h += '<text x="' + (g.x + 12) + '" y="31" font-size="12.5" font-weight="700" fill="#fff">' + esc(c.label) + '</text>';
-      if (counts) h += '<text x="' + (g.x + g.w - 12) + '" y="31" text-anchor="end" font-size="13" font-weight="700" fill="#fff">' + total + '</text>';
+      h += '<text x="' + (g.x + 12) + '" y="31" font-size="12.5" font-weight="700" fill="' + ON[ci] + '">' + esc(c.label) + '</text>';
+      if (counts) h += '<text x="' + (g.x + g.w - 12) + '" y="31" text-anchor="end" font-size="13" font-weight="700" fill="' + ON[ci] + '">' + total + '</text>';
       h += '</g>';
       c.subs.forEach(function (b, k) {
         var y = TOP + k * GAP;
@@ -86,7 +88,7 @@
     if (counts) ab.subs.forEach(function (b) { abN += counts[b] || 0; });
     h += '<line x1="495" y1="' + (H + 2) + '" x2="495" y2="' + (AY - 2) + '" stroke="' + MUTED + '" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#wfa)"/>';
     h += '<g class="wfstage" data-stage="' + esc(ab.label) + '"' + (counts ? ' style="cursor:pointer"' : '') + '><rect x="10" y="' + AY + '" width="970" height="64" rx="6" fill="' + TINT[4] + '" stroke="' + COL[4] + '" stroke-width="' + (o.sel === ab.label || left ? 2.5 : 1) + '"/><rect x="10" y="' + AY + '" width="150" height="64" rx="6" fill="' + COL[4] + '"/>';
-    h += '<text x="22" y="' + (AY + 28) + '" font-size="12.5" font-weight="700" fill="#fff">' + esc(ab.label) + (counts ? ' · ' + abN : '') + '</text><text x="22" y="' + (AY + 46) + '" font-size="10.5" fill="#fff">leaves the flow</text></g>';
+    h += '<text x="22" y="' + (AY + 28) + '" font-size="12.5" font-weight="700" fill="' + ON[4] + '">' + esc(ab.label) + (counts ? ' · ' + abN : '') + '</text><text x="22" y="' + (AY + 46) + '" font-size="10.5" fill="' + ON[4] + '">leaves the flow</text></g>';
     ab.subs.forEach(function (b, k) { h += box(ab.label, b, 185 + k * 170, AY + 12, 4, false); });
     h += '<text x="' + (185 + ab.subs.length * 170 + 5) + '" y="' + (AY + 36) + '" font-size="11.5" fill="' + MUTED + '">A demand can be cancelled or closed from any step above.</text>';
     return '<svg viewBox="0 0 990 ' + (AY + 74) + '" width="100%" role="img" aria-label="Workflow diagram" style="min-width:860px">' + h + '</svg>'

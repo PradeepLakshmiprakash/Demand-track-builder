@@ -546,3 +546,13 @@ overview has a clickable *Non-billable cost* number, a Costing block (positions 
 far, cost per month, by business unit against the agreed cap) and the list of those positions. A
 joined proactive position stays in view, not archived, until 30 days after it becomes billable.
 Draft, cancelled and closed demands are not costed.
+
+**D87. Overview after the UI review.** The six numbers sit in one bar across the top and still follow
+every click; those needing action are coloured (Past start amber; Escalated red when any is overdue,
+otherwise amber; Revenue lost red) and stay neutral at zero; Non-billable cost stays neutral. Stage
+colours read as a journey: one blue, light to dark, while in progress; green once joined; grey when
+abandoned (the workflow diagram uses the same); business units keep distinct colours. With nothing
+narrowed, the list opens on the most urgent demands (overdue escalations first, then past start,
+ten at most) instead of an empty prompt. Period, date range, *Past 30 days* / *Past 60 days*
+shortcuts, Show workflow and the alerts share one toolbar; the shortcuts are on the demand lists too.
+The sidebar's current page has a bright left edge.

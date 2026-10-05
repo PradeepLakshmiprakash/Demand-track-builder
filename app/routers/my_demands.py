@@ -56,12 +56,13 @@ def demands_page(
     bu: int | None = None,
     start: str = "",
     end: str = "",
+    days: str = "",
     actor: Actor = Depends(guard),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     if filter not in FILTERS:
         filter = "all"
-    period = period_for(db, actor.account_id, start, end)
+    period = period_for(db, actor.account_id, start, end, days)
     all_rows = demand_rows(db, actor)
     # BU filter: only the BUs this actor can actually see, and only when there's more than one.
     bus_stmt = (

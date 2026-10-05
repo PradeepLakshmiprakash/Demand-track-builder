@@ -5,7 +5,7 @@ later the jobs), driven by the actor's visibility scope, account and BUs.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, false, or_, select
@@ -76,6 +76,7 @@ class Period:
     keep_days: int = 30
     start: date | None = None
     end: date | None = None
+    past_days: int | None = None  # set when the dates came from a "past N days" shortcut
 
     @property
     def chosen(self) -> bool:
@@ -95,13 +96,19 @@ class Period:
     def label(self) -> str:
         if not self.chosen:
             return f"Open, or finished in the last {self.keep_days} days"
+        if self.past_days:
+            return f"Live at any time in the past {self.past_days} days"
         a = f"{self.start:%d %b %Y}" if self.start else "the start"
         b = f"{self.end:%d %b %Y}" if self.end else "today"
         return f"Live at any time from {a} to {b}"
 
 
-def period_for(db: Session, account_id: int, start: str = "", end: str = "") -> Period:
-    """The period a screen asked for; dates that don't parse are ignored."""
+PAST_DAYS = (30, 60)  # the shortcuts offered beside the date range
+
+
+def period_for(db: Session, account_id: int, start: str = "", end: str = "", days: str = "") -> Period:
+    """The period a screen asked for; dates that don't parse are ignored. `days` is a "past N days"
+    shortcut and wins over the dates."""
 
     def parse(raw: str) -> date | None:
         try:
@@ -113,7 +120,11 @@ def period_for(db: Session, account_id: int, start: str = "", end: str = "") -> 
     if a and b and a > b:
         a, b = b, a
     account = db.get_one(Account, account_id)
-    return Period(account_today(db, account_id), account.settings.archive_after_days, a, b)
+    today = account_today(db, account_id)
+    if days.isdigit() and int(days) in PAST_DAYS:
+        n = int(days)
+        return Period(today, account.settings.archive_after_days, today - timedelta(days=n), today, n)
+    return Period(today, account.settings.archive_after_days, a, b)
 
 
 def finished_dates(db: Session, demands: list[Demand]) -> dict[int, date]:

@@ -59,7 +59,7 @@ def test_overview_keeps_to_the_period(client: Client, db: Session) -> None:
     page = client.as_user("sanjay").get("/overview").text
     assert "finished in the last 30 days" in page and "1 older finished demand not shown" in page
     page = client.as_user("sanjay").get(f"/overview?start={today - timedelta(days=90)}").text
-    assert "Live at any time from" in page and "Clear dates" in page
+    assert "Live at any time from" in page and ">Current</a>" in page
 
 
 def test_administrator_sets_the_archive_days(db: Session) -> None:
@@ -73,3 +73,17 @@ def test_administrator_sets_the_archive_days(db: Session) -> None:
     }  # fmt: skip
     account_service.update_thresholds(db, 1, data)
     assert period_for(db, 1).keep_days == 60
+
+
+def test_past_30_and_60_day_shortcuts(client: Client, db: Session) -> None:
+    today = date.today()
+    p = period_for(db, 1, days="60")
+    assert (p.start, p.end, p.past_days) == (today - timedelta(days=60), today, 60)
+    assert p.label == "Live at any time in the past 60 days"
+    assert period_for(db, 1, days="45").past_days is None  # only the shortcuts offered
+    finish(db, 45)  # joined 45 days ago: archived, outside the past 30 days, inside the past 60
+    c = client.as_user("kavya")
+    assert REF not in c.get("/demands?days=30").text and REF in c.get("/demands?days=60").text
+    page = client.as_user("sanjay").get("/overview?days=60").text
+    assert "Live at any time in the past 60 days" in page and "Past 30 days" in page
+    assert loss_service.overview(db, 1, today, p).archived == 0

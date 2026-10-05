@@ -36,11 +36,13 @@ def overview_page(
     request: Request,
     start: str = "",
     end: str = "",
+    days: str = "",
     actor: Actor = Depends(guard),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     today = account_today(db, actor.account_id)
-    o = loss_service.overview(db, actor.account_id, today, period_for(db, actor.account_id, start, end))
+    period = period_for(db, actor.account_id, start, end, days)
+    o = loss_service.overview(db, actor.account_id, today, period)
     # Offers this viewer decides: below the cut-off for leadership, at or above for the GTD team admin.
     route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(

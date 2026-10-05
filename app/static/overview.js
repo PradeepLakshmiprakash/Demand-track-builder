@@ -5,6 +5,9 @@
   var OV = window.OV;
   if (!OV) return;
   var C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+  // Stages read as a journey: one blue, light to dark, while in progress; green once joined; grey if
+  // abandoned. Business units have no order, so they keep the categorical colours above.
+  var STAGE_C = ['#6FA8EA', '#2468C2', '#123B73', '#17966A', '#B0ACA2'];
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
   var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations', costing: 'Costing' };
   var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
@@ -33,7 +36,7 @@
     var base = rowsFor(dim), total = base.length, sel = F[dim], R = 74, LEN = 2 * Math.PI * R, start = 0;
     var keys = ORDER[dim].slice();
     base.forEach(function (x) { if (keys.indexOf(x[dim]) < 0) keys.push(x[dim]); });
-    var items = keys.map(function (k, j) { return { k: k, n: base.filter(function (x) { return x[dim] === k; }).length, c: C[j] || '#8B877E' }; });
+    var items = keys.map(function (k, j) { return { k: k, n: base.filter(function (x) { return x[dim] === k; }).length, c: (dim === 'stage' ? STAGE_C[j] : C[j]) || '#8B877E' }; });
     var h = '<g transform="rotate(-90 100 100)" fill="none">';
     items.forEach(function (it) {
       if (!it.n) return;
@@ -45,8 +48,9 @@
     h += '</g><text x="100" y="97" text-anchor="middle" class="ov-total">' + rows.length + '</text>';
     h += '<text x="100" y="116" text-anchor="middle" class="ov-unit">' + (rows.length < D.length ? 'of ' + D.length + ' positions' : 'positions') + '</text>';
     $('ov-ring').innerHTML = h;
-    $('ov-legend').innerHTML = items.map(function (it) {
-      return '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (total ? Math.round(it.n / total * 100) : 0) + '%</span>' + '</li>';
+    $('ov-legend').innerHTML = items.map(function (it, j) {
+      var head = dim !== 'stage' ? '' : j === 0 ? '<li class="grp-l">In progress · lighter to darker as it moves on</li>' : j === 3 ? '<li class="grp-l">Finished</li>' : '';
+      return head + '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (total ? Math.round(it.n / total * 100) : 0) + '%</span>' + '</li>';
     }).join('');
     return rows;
   }
@@ -59,21 +63,36 @@
     }).join('') + '</div>';
   }
 
+  function kpi(label, tipText, value, state, tag, key, val) {
+    var pick = key ? ' pick' + (F[key] ? ' on' : '') + '" data-key="' + key + '" data-val="' + val + '" role="button" tabindex="0' : '';
+    return '<div class="kpi' + (state ? ' ' + state : '') + pick + '"><div class="k">' + label + tip(tipText) + '</div><div class="v">' + value + '</div>' + (tag ? '<span class="tag">' + tag + '</span>' : '') + '</div>';
+  }
+
+  // The six numbers, across the top. The ones that need action turn amber or red; zero stays neutral.
+  function kpis(rows) {
+    var lost = 0, late = 0, open = 0, norate = 0, escd = 0, overdue = 0, cost = 0, costn = 0;
+    rows.forEach(function (x) {
+      lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0;
+      escd += x.esc.length ? 1 : 0; overdue += x.esc.some(function (e) { return e.l === 2; }) ? 1 : 0;
+      cost += x.cost || 0; costn += x.cost_active ? 1 : 0;
+    });
+    var more = function (on) { return on ? ' Showing only these; click again to go back.' : ' Click to see them.'; };
+    $('ov-kpis').innerHTML = kpi('Positions', 'Positions in this view.', rows.length)
+      + kpi('Open', 'Nobody has joined yet.', open)
+      + kpi('Past start', 'Start date gone, still unfilled.' + more(F.pstart), late, late ? 'amber' : '', late ? 'needs action' : '', 'pstart', 'Past start')
+      + kpi('Escalated', 'Demands with an open escalation.' + more(F.escd), escd, overdue ? 'red' : escd ? 'amber' : '', overdue ? overdue + ' overdue' : '', 'escd', 'Escalated')
+      + kpi('Revenue lost', 'Bill rate × ' + OV.hours + ' h × working days late, on billable positions.' + (norate ? ' ' + norate + ' with no bill rate.' : ''), money(lost), lost ? 'red' : '')
+      + kpi('Non-billable cost', 'What proactive, non-billable positions have cost the account since their start date.' + more(F.costing), money(cost), '', costn ? costn + ' not billing' : '', 'costing', 'Non-billable cost');
+  }
+
   function detail(rows) {
-    var lost = 0, late = 0, open = 0, norate = 0, escd = 0, cost = 0, costn = 0, ks = Object.keys(F);
-    rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; escd += x.esc.length ? 1 : 0; cost += x.cost || 0; costn += x.cost_active ? 1 : 0; });
+    var ks = Object.keys(F);
     var h = '<div class="eyebrow">You are looking at' + (ks.length ? tip('Click a tag to remove it, or Clear all to see the whole account again.') : '') + '</div>';
     if (ks.length) {
       h += '<div class="chips">' + ks.map(function (k) { return '<button class="chip-x" data-key="' + k + '" data-val="' + esc(F[k]) + '">' + esc(F[k]) + ' ✕</button>'; }).join('') + '<button class="chip-x clear" id="ov-clear">Clear all</button></div>';
     } else {
       h += '<h2>The whole account' + tip('Click a slice of the ring, any row below, or a number with an arrow, to narrow down. The numbers and the list of demands follow every click.') + '</h2>';
     }
-    h += '<div class="facts4"><div class="fact"><div class="k">Positions' + tip('in this view') + '</div><div class="v">' + rows.length + '</div></div>'
-      + '<div class="fact"><div class="k">Open' + tip('nobody has joined yet') + '</div><div class="v">' + open + '</div></div>'
-      + '<div class="fact pick' + (F.pstart ? ' on' : '') + '" data-key="pstart" data-val="Past start" role="button" tabindex="0"><div class="k">Past start' + tip('start date gone, still unfilled · ' + (F.pstart ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + late + '</div></div>'
-      + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated' + tip('with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + escd + '</div></div>'
-      + '<div class="fact"><div class="k">Revenue lost' + tip('bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '') + '</div><div class="v">' + money(lost) + '</div></div>'
-      + '<div class="fact pick cost' + (F.costing ? ' on' : '') + '" data-key="costing" data-val="Non-billable cost" role="button" tabindex="0"><div class="k">Non-billable cost' + tip('' + costn + ' proactive position' + (costn === 1 ? '' : 's') + ' not billing · ' + (F.costing ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + money(cost) + '</div></div></div>';
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     if (F.stage) h += bars('sub');
     h += bars(dim === 'stage' ? 'bu' : 'stage');
@@ -116,12 +135,28 @@
     $('ov-list').innerHTML = h;
   }
 
+  // Nothing narrowed yet: open with what needs attention first, not with every demand.
+  function urgent() {
+    var late2 = function (x) { return x.esc.some(function (e) { return e.l === 2; }); };
+    var rows = D.filter(function (x) { return late2(x) || x.late; }).sort(function (a, b) {
+      return (late2(b) - late2(a)) || (b.days_late - a.days_late) || (a.ref < b.ref ? -1 : 1);
+    });
+    var total = rows.length; rows = rows.slice(0, 10);
+    var h = '<div class="ov-listhead"><h2>Most urgent <span class="small muted">· ' + (total > rows.length ? rows.length + ' of ' + total : total) + '</span>' + tip('Demands with an overdue (L2) escalation first, then those past their start date, longest first. Narrow down above to list any other demands.') + '</h2></div>';
+    if (!rows.length) { $('ov-list').innerHTML = h + '<div class="empty">Nothing is overdue or past its start date. Click a slice, a row or a number above to list demands.</div>'; return; }
+    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Stage</th><th>Start</th><th>Why it is here</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
+    h += rows.map(function (x) {
+      var on = openRef === x.ref;
+      var why = x.esc.map(function (e) { return '<div class="' + (e.l === 2 ? 'late' : '') + '">⚠ ' + esc(e.t) + ' · L' + e.l + (e.l === 2 ? ' overdue' : '') + '</div>'; }).join('') || '<div>Past its start date</div>';
+      return '<tr><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a></td><td>' + esc(x.name) + '<div class="small muted">' + esc(x.type) + '</div></td><td>' + esc(x.owner) + '<div class="small muted">' + esc(x.bu) + '</div></td><td>' + esc(x.stage) + '<div class="small muted">' + esc(x.sub) + '</div></td><td class="' + (x.late ? 'late' : '') + '">' + esc(x.start || '—') + (x.late ? '<div class="small late">' + x.days_late + ' days late</div>' : '') + '</td><td class="small">' + why + '</td><td class="r">' + (x.lost ? money(x.lost) : '—') + '</td><td><a href="#" class="wf-link" data-flow="' + esc(x.ref) + '">' + (on ? 'Hide workflow' : 'Show workflow') + '</a></td></tr>'
+        + (on ? '<tr class="wfrow"><td colspan="8"><div class="wf-wrap">' + wfDiagram(L, { current: { stage: x.stage, sub: x.sub }, escalations: x.esc }) + '</div></td></tr>' : '');
+    }).join('');
+    $('ov-list').innerHTML = h + '</tbody></table></div>';
+  }
+
   function list(rows) {
     var ks = Object.keys(F);
-    if (!ks.length) {
-      $('ov-list').innerHTML = '<div class="empty">Demands are listed here once you narrow down. Click a slice of the ring, any row beside it, the Past start, Escalated or Non-billable cost number, or a box in the workflow.</div>';
-      return;
-    }
+    if (!ks.length) { urgent(); return; }
     var title = ks.map(function (k) { return NAME[k].toLowerCase() + ': ' + F[k]; }).join(' · ');
     if (F.costing) { costList(rows, title); return; }
     var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('These are the demands behind the numbers above. Click a reference to open the demand.') + '</h2></div>';
@@ -144,7 +179,7 @@
     if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('Every stage and sub-stage a demand can be in. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
-  function draw() { var rows = ring(); flow(); detail(rows); list(rows); }
+  function draw() { var rows = ring(); kpis(rows); flow(); detail(rows); list(rows); }
 
   $('ov-tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
