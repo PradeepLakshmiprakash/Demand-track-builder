@@ -514,3 +514,10 @@ demand page draws every main stage as a container and every sub-stage as a box i
 states dashed beside the step they belong to, Abandoned along the bottom. On the overview each box
 carries its number of demands and is clickable; for one demand the steps passed are ticked, the current
 one is filled in, and a "Next" line says who acts.
+
+**D83. Overview trimmed; escalations on the workflow.** "Revenue at risk · past start date" is gone
+from the overview: the *Past start* number is clickable and lists those demands with days late, joining
+date and revenue lost. The non-billable caps show only to the GTD team admin, who sets them. Open
+escalations ride on the workflow: a ⚠ count on each box on the overview, and on one demand's current
+box with the escalations named underneath. An *Escalated* number on the overview narrows to demands
+with an open escalation, and each listed demand shows its escalations.

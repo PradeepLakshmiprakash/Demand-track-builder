@@ -51,28 +51,9 @@
 <script src="/static/workflow.js"></script>
 <script src="/static/overview.js"></script>
 
-<section class="panel">
-  <div class="panel-head"><div><h2>Revenue at risk · past start date</h2><div class="hint">Open demands whose requested start has passed with no DOJ on or before it. Days late count to today.</div></div></div>
-  <div class="tbl risk">
-    <div class="tr th"><div>GTD req</div><div>Demand</div><div>Grade</div><div>Start</div><div class="num">Days late</div><div>DOJ</div><div class="num">Lost to date</div></div>
-    {% for x in o.at_risk %}{% set d = x.demand %}
-    <a class="tr link" href="/demands/{{ d.app_ref }}">
-      <div class="mono">{{ d.gtd_req_id or d.app_ref }}</div>
-      <div><div class="title">{{ d.name }}</div><div class="note">{{ d.status_enum.label }} · {{ d.business_unit.name }}</div></div>
-      <div>{{ d.grade }}</div>
-      <div>{{ d.start_date | d('%d %b') }}</div>
-      <div class="num"><strong>{{ x.days_late }}</strong></div>
-      <div>{{ x.doj | d('%d %b') if x.doj else 'Not set' }}</div>
-      <div class="num">{{ x.lost | money }}</div>
-    </a>
-    {% else %}
-    <div class="empty">No open demand is past its start date.</div>
-    {% endfor %}
-  </div>
-</section>
-
+{% if sets_caps %}
 <section class="panel" id="nb">
-  <div class="panel-head"><div><h2>Non-billable positions against the agreed cap</h2><div class="hint">Open non-billable (proactive) demands per business unit. The GTD team admin sets each cap; blank means no cap agreed.</div></div></div>
+  <div class="panel-head"><div><h2>Non-billable positions against the agreed cap</h2><div class="hint">Open non-billable (proactive) demands per business unit. You set each cap; blank means no cap agreed. Only the GTD team admin sees this.</div></div></div>
   <form method="post" action="/overview/nb-caps">
     <div class="tbl plain">
       <div class="tr th" style="display:grid;grid-template-columns:140px 110px 150px 1fr;gap:12px"><div>BU</div><div>Open</div><div>Agreed cap</div><div>By practice</div></div>
@@ -88,5 +69,5 @@
     {% if sets_caps %}<div class="panel-body"><button class="btn">Save caps</button></div>{% endif %}
   </form>
 </section>
-
+{% endif %}
 {% endblock %}

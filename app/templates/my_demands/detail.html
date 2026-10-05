@@ -29,7 +29,7 @@
 (function () {
   var panel = document.getElementById('wf-panel'), link = document.getElementById('wf-toggle'), drawn = false;
   function show(on) {
-    if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }} }); drawn = true; }
+    if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }}, escalations: {{ wf_esc | tojson }} }); drawn = true; }
     panel.hidden = !on;
     link.textContent = on ? 'Hide workflow' : 'Show workflow';
   }

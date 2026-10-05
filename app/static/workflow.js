@@ -1,6 +1,8 @@
 /* The workflow diagram: each main stage a container, each sub-stage a box, arrows in the order a demand
    moves. wfDiagram(layout, {counts}) puts the number of demands on each box (account overview);
    wfDiagram(layout, {current}) ticks the steps one demand has passed and fills in where it is now.
+   Open escalations ride on the box they belong to: {esc: {sub: n}} on the overview, {escalations: [...]}
+   for one demand.
    The layout comes from workflow_service.layout(). */
 (function () {
   var COL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
@@ -43,6 +45,8 @@
       if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + COL[ci] + '"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' + n + '</text>';
       if (done) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="13" font-weight="700" fill="' + COL[ci] + '">✓</text>';
       if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="#fff">●</text>';
+      var en = o.esc ? (o.esc[sub] || 0) : (now && o.escalations ? o.escalations.length : 0);
+      if (en) s += '<rect x="' + (x + BW - 46) + '" y="' + (y - 9) + '" width="40" height="17" rx="8.5" fill="' + WARN + '" stroke="#fff" stroke-width="1.5"/><text x="' + (x + BW - 26) + '" y="' + (y + 3.5) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">⚠ ' + en + '</text><title>' + en + ' open escalation' + (en === 1 ? '' : 's') + '</title>';
       return s + '</g>';
     }
 
@@ -80,6 +84,10 @@
     h += '<text x="' + (185 + ab.subs.length * 170 + 5) + '" y="' + (AY + 36) + '" font-size="11.5" fill="' + MUTED + '">A demand can be cancelled or closed from any step above.</text>';
     return '<svg viewBox="0 0 990 ' + (AY + 74) + '" width="100%" role="img" aria-label="Workflow diagram" style="min-width:860px">' + h + '</svg>'
       + '<div class="wf-key">Solid boxes are the normal path, top to bottom then left to right. Dashed boxes are problem states a demand can fall into at that step.'
-      + (cur ? ' ✓ = already passed · ● = where it is now.' : ' The number on a box is how many demands are there now; click a box or a stage to see them.') + '</div>';
+      + (cur ? ' ✓ = already passed · ● = where it is now.' : ' The number on a box is how many demands are there now; click a box or a stage to see them.')
+      + ' ⚠ = open escalations at that step.</div>'
+      + (cur ? '<div class="wf-esc">' + (o.escalations && o.escalations.length
+        ? '<strong>Open escalations:</strong> ' + o.escalations.map(function (e) { return '<span>⚠ ' + esc(e.t) + ' · L' + e.l + (e.l === 2 ? ' overdue' : '') + '</span>'; }).join(' ')
+        : 'No open escalations on this demand.') + '</div>' : '');
   };
 })();

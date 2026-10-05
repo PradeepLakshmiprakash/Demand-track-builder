@@ -81,7 +81,8 @@ def test_gtd_team_admin_sets_caps_and_leadership_sees_them(client: Client, db: S
     assert "This takes PAYMENTS to 2 against an agreed cap of 1" in landed.text
 
     page = client.as_user("sanjay").get("/overview").text
+    assert "Non-billable positions against the agreed cap" not in page  # only who sets the caps sees them
+    page = client.as_user("kavya").get("/overview").text
     assert "Non-billable positions against the agreed cap" in page and "over cap" in page
-    assert "2 Cloud-Java" in page and "Save caps" not in page  # leadership sees, doesn't set
-    assert "Save caps" in client.as_user("kavya").get("/overview").text
+    assert "2 Cloud-Java" in page and "Save caps" in page
     assert "err=" in client.post("/overview/nb-caps", data={f"cap_{pay}": "many"}).headers["location"]

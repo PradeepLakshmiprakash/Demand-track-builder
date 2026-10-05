@@ -38,6 +38,12 @@ def test_overview_page_carries_every_position(client: Client, db: Session) -> No
     o = loss_service.overview(db, 1, date.today())
     assert len(data["rows"]) == o.live and sum(r["open"] for r in data["rows"]) == o.open
     assert sum(r["late"] for r in data["rows"]) == len(o.at_risk)
+    assert sum(r["pstart"] == "Past start" for r in data["rows"]) == len(o.at_risk)
+    assert all(r["days_late"] > 0 for r in data["rows"] if r["late"])
+    by_ref = {r["ref"]: r for r in data["rows"]}
+    assert {"t": "Past start date", "l": 2} in by_ref["DM-000121"]["esc"]  # seeded, overdue
+    assert by_ref["DM-000121"]["escd"] == "Escalated"
+    assert all((r["escd"] == "Escalated") == bool(r["esc"]) for r in data["rows"])
     assert round(sum(r["lost"] for r in data["rows"]), 2) == float(o.lost_to_date)
     assert data["order"]["stage"] == [m.label for m in MainStage]
     assert {r["type"] for r in data["rows"]} <= set(data["order"]["type"])
@@ -54,3 +60,4 @@ def test_demand_page_has_its_workflow(client: Client) -> None:
     assert "Show workflow" in html and "wfDiagram(" in html
     assert '"sub": "Offer approval pending"' in html and '"stage": "Allocation Pending"' in html
     assert "<strong>Next:</strong> The offer is approved" in html
+    assert '"t": "Past start date"' in html  # its open escalation rides on the diagram

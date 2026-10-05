@@ -82,6 +82,18 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
     """Everything static/overview.js needs: one row per position in view, and the order things show in."""
     account = get_account(db, o.demands[0].account_id) if o.demands else None
     doj = current_doj(db, account.id) if account else {}
+    escs: dict[int, list[dict[str, Any]]] = {}
+    if o.demands:
+        for e in db.scalars(
+            select(Escalation)
+            .where(
+                Escalation.demand_id.in_([d.id for d in o.demands]),
+                Escalation.status == EscalationStatus.OPEN.value,
+            )
+            .order_by(Escalation.level.desc(), Escalation.opened_at)
+        ):
+            if e.demand_id is not None:
+                escs.setdefault(e.demand_id, []).append({"t": e.type_enum.label, "l": e.level})
     rows = []
     for d in sorted(o.demands, key=lambda d: d.app_ref):
         loss = o.loss_of.get(d.id)
@@ -101,6 +113,10 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
                 "joining": f"{doj[d.id]:%d %b %Y}" if doj.get(d.id) else None,
                 "open": d.status_enum.main.value in loss_service.OPEN_GROUPS,
                 "late": loss is not None and not loss.filled,
+                "esc": escs.get(d.id, []),
+                "escd": "Escalated" if d.id in escs else "",
+                "pstart": "Past start" if loss is not None and not loss.filled else "",
+                "days_late": loss.days_late if loss is not None and not loss.filled else 0,
                 "lost": float(loss.lost) if loss is not None and loss.lost is not None else 0,
                 "norate": loss is not None and loss.lost is None,
             }

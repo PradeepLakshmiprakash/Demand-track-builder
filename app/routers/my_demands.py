@@ -160,6 +160,14 @@ def demand_page(
         wf_layout=workflow_service.layout(),
         wf_at=workflow_service.position(demand),
         wf_next=workflow_service.next_step(demand),
+        wf_esc=[
+            {"t": e.type_enum.label, "l": e.level}
+            for e in db.scalars(
+                select(Escalation)
+                .where(Escalation.demand_id == demand.id, Escalation.status == "open")
+                .order_by(Escalation.level.desc(), Escalation.opened_at)
+            )
+        ],
         can_revise_dates=demand_service.can_revise_dates(actor, demand),
         candidates=interview_service.for_demand(db, demand.id),
         decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,

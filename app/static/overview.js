@@ -6,7 +6,7 @@
   if (!OV) return;
   var C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
-  var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice' };
+  var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations' };
   var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
     type: 'new or replacement, billable or not', practice: 'the skill area' };
   var dim = 'stage', F = {}, openRef = null, showFlow = location.hash === '#workflow';
@@ -58,8 +58,8 @@
   }
 
   function detail(rows) {
-    var lost = 0, late = 0, open = 0, norate = 0, ks = Object.keys(F);
-    rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; });
+    var lost = 0, late = 0, open = 0, norate = 0, escd = 0, ks = Object.keys(F);
+    rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; escd += x.esc.length ? 1 : 0; });
     var h = '<div class="eyebrow">' + (ks.length ? 'You are looking at · click a tag to remove it' : 'You are looking at') + '</div>';
     if (ks.length) {
       h += '<div class="chips">' + ks.map(function (k) { return '<button class="chip-x" data-key="' + k + '" data-val="' + esc(F[k]) + '">' + esc(F[k]) + ' ✕</button>'; }).join('') + '<button class="chip-x clear" id="ov-clear">Clear all</button></div>';
@@ -68,7 +68,8 @@
     }
     h += '<div class="facts4"><div class="fact"><div class="k">Positions</div><div class="v">' + rows.length + '</div><div class="h">in this view</div></div>'
       + '<div class="fact"><div class="k">Open</div><div class="v">' + open + '</div><div class="h">nobody has joined yet</div></div>'
-      + '<div class="fact"><div class="k">Past start</div><div class="v">' + late + '</div><div class="h">start date gone, still unfilled</div></div>'
+      + '<div class="fact pick' + (F.pstart ? ' on' : '') + '" data-key="pstart" data-val="Past start" role="button" tabindex="0"><div class="k">Past start</div><div class="v">' + late + '</div><div class="h">start date gone, still unfilled · ' + (F.pstart ? 'showing only these' : 'click to see them') + '</div></div>'
+      + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated</div><div class="v">' + escd + '</div><div class="h">with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '</div></div>'
       + '<div class="fact"><div class="k">Revenue lost</div><div class="v">' + money(lost) + '</div><div class="h">bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '</div></div></div>';
     if (F.stage) h += bars('sub');
     h += bars(dim === 'stage' ? 'bu' : 'stage');
@@ -79,27 +80,28 @@
   function list(rows) {
     var ks = Object.keys(F);
     if (!ks.length) {
-      $('ov-list').innerHTML = '<div class="empty">Demands are listed here once you narrow down. Click a slice of the ring, any row beside it, or a box in the workflow.</div>';
+      $('ov-list').innerHTML = '<div class="empty">Demands are listed here once you narrow down. Click a slice of the ring, any row beside it, the Past start or Escalated number, or a box in the workflow.</div>';
       return;
     }
     var title = ks.map(function (k) { return NAME[k].toLowerCase() + ': ' + F[k]; }).join(' · ');
     var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span></h2><span class="small muted">These are the demands behind the numbers above.</span></div>';
-    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Practice</th><th>Stage</th><th>Start</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
+    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Practice</th><th>Stage</th><th>Start</th><th>Joining</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
     h += rows.map(function (x) {
       var on = openRef === x.ref;
-      return '<tr><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a></td><td>' + esc(x.name) + '<div class="small muted">' + esc(x.type) + '</div></td><td>' + esc(x.owner) + '<div class="small muted">' + esc(x.bu) + '</div></td><td>' + esc(x.practice) + '</td><td>' + esc(x.stage) + '<div class="small muted">' + esc(x.sub) + '</div></td><td class="' + (x.late ? 'late' : '') + '">' + esc(x.start || '—') + (x.late ? '<div class="small late">past start</div>' : '') + '</td><td class="r">' + (x.lost ? money(x.lost) : '—') + '</td><td><a href="#" class="wf-link" data-flow="' + esc(x.ref) + '">' + (on ? 'Hide workflow' : 'Show workflow') + '</a></td></tr>'
-        + (on ? '<tr class="wfrow"><td colspan="8"><div class="small" style="margin-bottom:8px"><strong>' + esc(x.ref) + ' · ' + esc(x.name) + '</strong> is now at <strong>' + esc(x.stage) + ' · ' + esc(x.sub) + '</strong></div><div class="wf-wrap">' + wfDiagram(L, { current: { stage: x.stage, sub: x.sub } }) + '</div></td></tr>' : '');
+      return '<tr><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a></td><td>' + esc(x.name) + '<div class="small muted">' + esc(x.type) + '</div></td><td>' + esc(x.owner) + '<div class="small muted">' + esc(x.bu) + '</div></td><td>' + esc(x.practice) + '</td><td>' + esc(x.stage) + '<div class="small muted">' + esc(x.sub) + '</div>' + x.esc.map(function (e) { return '<div class="small late">⚠ ' + esc(e.t) + ' · L' + e.l + '</div>'; }).join('') + '</td><td class="' + (x.late ? 'late' : '') + '">' + esc(x.start || '—') + (x.late ? '<div class="small late">' + x.days_late + ' days late</div>' : '') + '</td><td>' + esc(x.joining || 'Not set') + '</td><td class="r">' + (x.lost ? money(x.lost) : '—') + '</td><td><a href="#" class="wf-link" data-flow="' + esc(x.ref) + '">' + (on ? 'Hide workflow' : 'Show workflow') + '</a></td></tr>'
+        + (on ? '<tr class="wfrow"><td colspan="9"><div class="small" style="margin-bottom:8px"><strong>' + esc(x.ref) + ' · ' + esc(x.name) + '</strong> is now at <strong>' + esc(x.stage) + ' · ' + esc(x.sub) + '</strong></div><div class="wf-wrap">' + wfDiagram(L, { current: { stage: x.stage, sub: x.sub }, escalations: x.esc }) + '</div></td></tr>' : '');
     }).join('');
-    if (!rows.length) h += '<tr><td colspan="8" class="small muted">No demands match. Remove a tag above.</td></tr>';
+    if (!rows.length) h += '<tr><td colspan="9" class="small muted">No demands match. Remove a tag above.</td></tr>';
     $('ov-list').innerHTML = h + '</tbody></table></div>';
   }
 
   function flow() {
     var rows = D.filter(function (x) { for (var k in F) { if (k !== 'stage' && k !== 'sub' && x[k] !== F[k]) return false; } return true; });
-    var counts = {}; rows.forEach(function (x) { counts[x.sub] = (counts[x.sub] || 0) + 1; });
+    var counts = {}, em = {};
+    rows.forEach(function (x) { counts[x.sub] = (counts[x.sub] || 0) + 1; if (x.esc.length) em[x.sub] = (em[x.sub] || 0) + x.esc.length; });
     $('ov-flowlink').textContent = showFlow ? 'Hide workflow' : 'Show workflow';
     $('ov-flow').hidden = !showFlow;
-    if (showFlow) $('ov-flow').innerHTML = '<h2>Workflow</h2><div class="hint" style="margin-bottom:10px">Every stage and sub-stage a demand can be in.</div><div class="wf-wrap">' + wfDiagram(L, { counts: counts, sel: F.sub || F.stage }) + '</div>';
+    if (showFlow) $('ov-flow').innerHTML = '<h2>Workflow</h2><div class="hint" style="margin-bottom:10px">Every stage and sub-stage a demand can be in, with the open escalations at each step.</div><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
   function draw() { var rows = ring(); flow(); detail(rows); list(rows); }
