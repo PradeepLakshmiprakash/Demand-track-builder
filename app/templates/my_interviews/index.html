@@ -10,11 +10,14 @@
   </div>
 </div>
 
+{% if overdue %}
+<div class="flash bad" role="alert"><strong>Feedback overdue on {{ overdue | length }} interview{{ 's' if overdue | length != 1 }}.</strong> Feedback is expected within {{ sla_hours }} hours of the interview. This has been escalated: the GTD admin team and the demand owner have been told. Giving your feedback below closes it.</div>
+{% endif %}
 <div class="iv-split">
   <div class="stack">
     {% for iv, c, d in open_ %}
       <a class="iv-card {{ 'on' if selected and selected[0].id == iv.id }}" href="?id={{ iv.id }}">
-        <div class="row small">{{ ids(d) }} <span class="chip blue">{{ iv.round }}</span></div>
+        <div class="row small">{{ ids(d) }} <span class="chip blue">{{ iv.round }}</span>{% if iv.id in overdue %} <span class="chip esc">Feedback overdue · escalated</span>{% endif %}</div>
         <div class="title" style="font-size:17px">{{ c.name }}</div>
         {% if d %}<div class="note">{{ d.name }} · {{ d.grade }}</div>{% endif %}
         <div class="note">{{ iv.scheduled_at | at(tz, '%a %d %b · %H:%M %Z') if iv.scheduled_at else 'Time to be confirmed by staffing' }}</div>
@@ -59,6 +62,32 @@
         <div class="small muted">Nothing open matches your skills. The admin sets them under Interviewer profiles.</div>
       {% endfor %}
       <div class="small muted">Profiles expected soon. You'll get an invite when you're assigned an interview.</div>
+    </section>
+
+    <section class="panel panel-body stack" id="open" style="gap:10px">
+      <div class="row" style="justify-content:space-between">
+        <h2>All open requisitions <span class="small muted">· {{ shown | length }}{% if tech %} of {{ requisitions | length }}{% endif %}</span></h2>
+        <form method="get" action="#open" class="row" style="gap:8px">
+          <label class="row small muted">Technology
+            <select name="tech" onchange="this.form.submit()" style="width:auto;min-height:38px">
+              <option value="">All</option>
+              {% for t in techs %}<option {{ 'selected' if t | lower == tech | lower }}>{{ t }}</option>{% endfor %}
+            </select>
+          </label>
+          <noscript><button class="btn small">Show</button></noscript>
+          {% if tech %}<a class="small" href="/interviews#open">Clear</a>{% endif %}
+        </form>
+      </div>
+      <div class="small muted">Every requisition where interviews can happen, whatever its skill area. For reference: you still act only on interviews assigned to you, or on a candidate you find by name above.</div>
+      {% for d in shown %}
+        <div class="open-req">
+          <div>{{ ids(d) }} <strong>{{ d.name }}</strong></div>
+          <div class="small muted">{{ d.status_enum.full }} · {{ d.practice or '—' }} · {{ d.grade }}{% if d.location %} · {{ d.location }}{% endif %}{% if d.start_date %} · start {{ d.start_date | d('%d %b %Y') }}{% endif %}</div>
+          <div class="small">{% for t in d.primary_skills %}<span class="chip {{ 'blue' if t | lower == tech | lower else 'gray' }}">{{ t }}</span> {% endfor %}{% for t in d.secondary_skills %}<span class="chip {{ 'blue' if t | lower == tech | lower else 'gray' }}" style="opacity:.8">{{ t }}</span> {% endfor %}</div>
+        </div>
+      {% else %}
+        <div class="small muted">No open requisition{% if tech %} needs {{ tech }}{% endif %}.</div>
+      {% endfor %}
     </section>
 
     {% if done %}

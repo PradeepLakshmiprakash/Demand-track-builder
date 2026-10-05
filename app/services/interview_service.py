@@ -154,6 +154,27 @@ def search(db: Session, account_id: int, query: str, limit: int = 12) -> list[Ma
     return out[:limit]
 
 
+def technologies(demands: list[Demand]) -> list[str]:
+    """Every technology named on these requisitions (primary or secondary), once each, A to Z."""
+    seen: dict[str, str] = {}
+    for d in demands:
+        for t in [*(d.primary_skills or []), *(d.secondary_skills or [])]:
+            if t.strip():
+                seen.setdefault(t.strip().casefold(), t.strip())
+    return sorted(seen.values(), key=str.casefold)
+
+
+def with_technology(demands: list[Demand], tech: str) -> list[Demand]:
+    want = tech.strip().casefold()
+    if not want:
+        return demands
+    return [
+        d
+        for d in demands
+        if want in {t.strip().casefold() for t in [*(d.primary_skills or []), *(d.secondary_skills or [])]}
+    ]
+
+
 def open_requisitions(db: Session, account_id: int) -> list[Demand]:
     return list(
         db.scalars(

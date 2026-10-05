@@ -1,6 +1,7 @@
 """Interviewer: my interviews, requisitions in my skills, and recording a recommendation for any
 candidate found by name (staffing schedules outside the app, so this is the main way in)."""
 
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -13,6 +14,7 @@ from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import Account, Candidate, Demand, Interview
 from app.schemas.interviews import feedback_from_form
+from app.services import escalation_service
 from app.services import interview_service as svc
 from app.services.interview_service import InterviewError
 
@@ -34,6 +36,15 @@ def my_interviews(
     open_ = [x for x in mine if x[0].status == "scheduled"]
     sel_id = _int(request.query_params.get("id"))
     selected = next((x for x in open_ if x[0].id == sel_id), open_[0] if open_ else None)
+    requisitions = svc.open_requisitions(db, actor.account_id)
+    tech = request.query_params.get("tech", "")
+    # Feedback past the panel SLA: these are what a "feedback overdue" escalation is about.
+    overdue = {
+        iv.id
+        for rows in escalation_service.overdue_panels(db, account, datetime.now(UTC)).values()
+        for iv, _ in rows
+        if iv.interviewer_id == actor.id
+    }
     return render(
         request,
         "my_interviews/index.html",
@@ -46,7 +57,12 @@ def my_interviews(
         new_reqs=svc.new_in_my_skills(db, actor),
         q=request.query_params.get("q", ""),
         results=svc.search(db, actor.account_id, request.query_params.get("q", "")),
-        requisitions=svc.open_requisitions(db, actor.account_id),
+        requisitions=requisitions,
+        tech=tech,
+        overdue=overdue,
+        sla_hours=account.panel_timer_hours,
+        techs=svc.technologies(requisitions),
+        shown=svc.with_technology(requisitions, tech),
     )
 
 

@@ -380,3 +380,42 @@ def test_guards(client: Client, who: str, path: str, code: int) -> None:
 def test_my_interviews_page(client: Client) -> None:
     page = client.as_user("vikram").get("/interviews?q=candidate").text
     assert "Candidate A" in page and "Submit feedback" in page and "New in your skill area" in page
+
+
+def test_interviewer_sees_every_open_requisition_and_filters_by_technology(
+    client: Client, db: Session
+) -> None:
+    from app.models import Demand
+
+    d = db.scalars(select(Demand).where(Demand.app_ref == "DM-000121")).one()  # Salesforce, offer stage
+    page = client.as_user("vikram").get("/interviews").text
+    assert "All open requisitions" in page and "DM-000121" in page and d.name in page
+    assert "$" not in page.split("All open requisitions")[1].split("</section>")[0]  # no rates here
+
+    only = client.as_user("vikram").get("/interviews?tech=salesforce").text
+    part = only.split("All open requisitions")[1].split("</section>")[0]
+    assert "DM-000121" in part and "Clear</a>" in part
+    shown = svc.with_technology(svc.open_requisitions(db, 1), "Salesforce")
+    assert shown and all(
+        "salesforce" in [t.lower() for t in x.primary_skills + x.secondary_skills] for x in shown
+    )
+    assert part.count('class="open-req"') == len(shown) < len(svc.open_requisitions(db, 1))
+    none = client.as_user("vikram").get("/interviews?tech=Cobol-9000").text
+    assert "No open requisition needs Cobol-9000" in none
+
+
+def test_interviewer_is_shown_their_overdue_feedback(client: Client, db: Session) -> None:
+    account = db.get_one(Account, 1)
+    d = db.scalars(select(Demand).where(Demand.app_ref == "DM-000146")).one()
+    c = svc.ensure_candidate(db, 1, d, "Late Feedback")
+    db.add(
+        Interview(
+            candidate_id=c.id, demand_id=d.id, interviewer_id=user_id("vikram"), round="L1",
+            status="scheduled",
+            scheduled_at=datetime.now(UTC) - timedelta(hours=account.panel_timer_hours + 5),
+        )
+    )  # fmt: skip
+    db.commit()
+    page = client.as_user("vikram").get("/interviews").text
+    assert "Feedback overdue on" in page and "Feedback overdue · escalated" in page
+    assert "Feedback overdue on" not in client.as_user("anita").get("/interviews").text

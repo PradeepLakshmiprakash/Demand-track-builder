@@ -527,3 +527,10 @@ demand page and the Escalations screen say so ("more time given, until …") and
 until that date passes; the escalation itself stays open. When the owner moves the start date to a
 future date with *Change the dates*, an open past-start escalation closes with it, the same as
 answering it with "Revise the start date".
+
+**D85. Interviewers and requisitions.** My interviews lists every open requisition (the stages where
+interviews happen), for reference, with a filter by technology; "New in your skill area" stays. No
+rates are shown, and an interviewer still acts only on interviews assigned to them or on a candidate
+found by name. An interviewer whose feedback is past the panel SLA sees it flagged on the interview
+and in a notice at the top of the page; the escalation itself is on the Escalations screen (trigger
+*Panel SLA*) for the GTD admin team, leadership and the demand owner.
