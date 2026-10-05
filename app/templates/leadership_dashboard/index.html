@@ -6,7 +6,10 @@
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }} · all BUs</div>
     <h1>Account overview</h1>
   </div>
-  <div class="small muted">{% if latest %}BCM sheet of {{ latest.sheet_date | d }} · {% endif %}as of {{ o.today | d }}</div>
+  <div class="head-side">
+    <a href="#" id="ov-flowlink" class="btn primary wf-btn" role="button" aria-expanded="false">Show workflow</a>
+    <div class="small muted">{% if latest %}BCM sheet of {{ latest.sheet_date | d }} · {% endif %}as of {{ o.today | d }}</div>
+  </div>
 </div>
 
 <div id="ov" class="ov">
@@ -24,7 +27,6 @@
     </form>
     <span class="sep"></span>
     <div class="grp">
-      <a href="#" id="ov-flowlink" class="btn small">Show workflow</a>
       <span class="info" tabindex="0" role="note" data-tip="How to read this page: the ring shows every position as a share, and Show workflow shows the same positions on the process. Click a slice, a row beside it, a number with an arrow, or a box in the workflow to look only at that part. Keep clicking to narrow further: the numbers and the list of demands follow every click.">i</span>
     </div>
     <span class="grow"></span>
@@ -51,8 +53,8 @@
   <noscript><div class="flash bad">This page needs JavaScript to draw the ring and the workflow.</div></noscript>
 </div>
 <script>window.OV = {{ ov | tojson }};</script>
-<script src="/static/workflow.js"></script>
-<script src="/static/overview.js"></script>
+<script src="/static/workflow.js?v={{ static_v }}"></script>
+<script src="/static/overview.js?v={{ static_v }}"></script>
 
 {% if sets_caps %}
 <section class="panel" id="nb">

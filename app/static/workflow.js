@@ -14,6 +14,29 @@
   // container x, container width, main column x, problem column x (first stage only)
   var GEO = [{ x: 10, w: 340, mx: 185, ex: 25 }, { x: 380, w: 180, mx: 395 }, { x: 590, w: 180, mx: 605 }, { x: 800, w: 180, mx: 815 }];
 
+  function tint(hex, t) {  // mix towards white by t (0 = the colour itself)
+    var n = parseInt(hex.slice(1), 16), ch = [n >> 16, (n >> 8) & 255, n & 255];
+    return '#' + ch.map(function (v) { return ('0' + Math.round(v + (255 - v) * t).toString(16)).slice(-2); }).join('');
+  }
+  function inkOn(hex) {  // dark text on a light colour, white on a dark one
+    var n = parseInt(hex.slice(1), 16);
+    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? '#0B2545' : '#fff';
+  }
+  /* The colours everything on the overview shares: one per stage, and for each sub-stage its stage's
+     colour, lighter the later it comes within the stage. Sub-stages are returned in workflow order. */
+  window.wfColours = function (layout) {
+    var sub = {}, order = [];
+    layout.stages.concat([{ subs: layout.abandoned.subs, problems: [] }]).forEach(function (st, si) {
+      var mine = [];
+      st.subs.forEach(function (sb, k) {
+        mine.push(sb);
+        st.problems.forEach(function (pr) { if (pr[1] === k) mine.push(pr[0]); });
+      });
+      mine.forEach(function (sb, k) { order.push(sb); sub[sb] = tint(COL[si], mine.length > 1 ? .62 * k / (mine.length - 1) : 0); });
+    });
+    return { stage: COL.slice(), sub: sub, order: order };
+  };
+
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function lines(t) {
     if (t.length <= 17) return [t];
@@ -30,7 +53,7 @@
   };
 
   window.wfDiagram = function (layout, o) {
-    var cur = o.current, counts = o.counts, h = '', order = [], hangs = {};
+    var cur = o.current, counts = o.counts, h = '', order = [], hangs = {}, SUBC = window.wfColours(layout).sub;
     layout.stages.forEach(function (c) {
       c.subs.forEach(function (b) { order.push(b); });
       c.problems.forEach(function (e) { hangs[e[0]] = c.subs[e[1]]; });
@@ -45,15 +68,16 @@
       var now = cur && cur.sub === sub && cur.stage === stage;
       var done = cur && !left && !problem && idx >= 0 && (idx < reached || (idx === reached && hangs[cur.sub]));
       var dim = counts ? !n : (cur && !now && !done), sel = o.sel === sub;
-      var fill = now ? COL[ci] : (done ? TINT[ci] : '#fff'), ink = now ? ON[ci] : (dim ? '#8B877E' : INK);
+      var mine = SUBC[sub] || COL[ci];
+      var fill = now ? mine : (done ? TINT[ci] : '#fff'), ink = now ? inkOn(mine) : (dim ? '#8B877E' : INK);
       var s = '<g class="wfbox" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '"' + (counts ? ' style="cursor:pointer"' : '') + '>';
       s += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '" rx="4" fill="' + fill + '" stroke="' + (sel || now ? INK : (problem ? WARN : '#C9C4B8')) + '" stroke-width="' + (sel || now ? 2 : 1) + '"' + (problem && !now ? ' stroke-dasharray="4 3"' : '') + '/>';
-      if (!now) s += '<rect x="' + x + '" y="' + y + '" width="5" height="' + BH + '" rx="2" fill="' + (problem ? WARN : COL[ci]) + '" opacity="' + (dim ? .35 : 1) + '"/>';
+      if (!now) s += '<rect x="' + x + '" y="' + y + '" width="5" height="' + BH + '" rx="2" fill="' + mine + '" opacity="' + (dim ? .45 : 1) + '"/>';
       var ls = lines(sub), ty = y + (ls.length === 1 ? 24 : 17);
       ls.forEach(function (l, k) { s += '<text x="' + (x + 13) + '" y="' + (ty + k * 13) + '" font-size="11" fill="' + ink + '"' + (now ? ' font-weight="700"' : '') + '>' + esc(l) + '</text>'; });
-      if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + COL[ci] + '"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="' + ON[ci] + '">' + n + '</text>';
+      if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + mine + '" stroke="rgba(0,0,0,.18)" stroke-width="1"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="' + inkOn(mine) + '">' + n + '</text>';
       if (done) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="13" font-weight="700" fill="' + COL[ci] + '">✓</text>';
-      if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="' + ON[ci] + '">●</text>';
+      if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="' + inkOn(mine) + '">●</text>';
       var en = o.esc ? (o.esc[sub] || 0) : (now && o.escalations ? o.escalations.length : 0);
       if (en) s += '<rect x="' + (x + BW - 46) + '" y="' + (y - 9) + '" width="40" height="17" rx="8.5" fill="' + WARN + '" stroke="#fff" stroke-width="1.5"/><text x="' + (x + BW - 26) + '" y="' + (y + 3.5) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">⚠ ' + en + '</text><title>' + en + ' open escalation' + (en === 1 ? '' : 's') + '</title>';
       return s + '</g>';

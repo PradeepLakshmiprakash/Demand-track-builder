@@ -1,3 +1,4 @@
+import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,8 @@ def _money(value: object, cents: bool = False) -> str:
     return f"${value:,.2f}" if cents else f"${value:,.0f}"
 
 
+# Changes on every start (and on every deploy): appended to static URLs so browsers fetch the new file.
+templates.env.globals["static_v"] = str(int(time.time()))
 templates.env.filters["d"] = _fmt_date
 templates.env.filters["money"] = _money
 templates.env.filters["at"] = _at

@@ -7,24 +7,11 @@
   var C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
   // Stages read as a journey: one blue, light to dark, while in progress; green once joined; grey if
   // abandoned. Business units have no order, so they keep the categorical colours above.
-  var STAGE_C = ['#6FA8EA', '#2468C2', '#123B73', '#17966A', '#B0ACA2'];
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
-  // Sub-stages in workflow order. Each takes its stage's colour, lighter the later it comes within the
-  // stage, so the small ring reads as the big one cut finer.
-  ORDER.sub = [];
-  var SUB_C = {};
-  function tint(hex, t) {  // mix towards white by t (0 = the colour itself)
-    var n = parseInt(hex.slice(1), 16), ch = [n >> 16, (n >> 8) & 255, n & 255];
-    return '#' + ch.map(function (v) { return ('0' + Math.round(v + (255 - v) * t).toString(16)).slice(-2); }).join('');
-  }
-  L.stages.concat([{ subs: L.abandoned.subs, problems: [] }]).forEach(function (st, si) {
-    var mine = [];
-    st.subs.forEach(function (sb, k) {
-      mine.push(sb);
-      st.problems.forEach(function (pr) { if (pr[1] === k) mine.push(pr[0]); });
-    });
-    mine.forEach(function (sb, k) { ORDER.sub.push(sb); SUB_C[sb] = tint(STAGE_C[si], mine.length > 1 ? .62 * k / (mine.length - 1) : 0); });
-  });
+  var STAGE_C = wfColours(L).stage;
+  // Sub-stage order and colours come from the workflow diagram, so the two never drift apart.
+  var WFC = wfColours(L), SUB_C = WFC.sub;
+  ORDER.sub = WFC.order;
   var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations', costing: 'Costing' };
   var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
     type: 'new or replacement, billable or not', practice: 'the skill area' };
@@ -238,6 +225,7 @@
     var counts = {}, em = {};
     rows.forEach(function (x) { counts[x.sub] = (counts[x.sub] || 0) + 1; if (x.esc.length) em[x.sub] = (em[x.sub] || 0) + x.esc.length; });
     $('ov-flowlink').textContent = showFlow ? 'Hide workflow' : 'Show workflow';
+    $('ov-flowlink').setAttribute('aria-expanded', showFlow ? 'true' : 'false');
     $('ov-flow').hidden = !showFlow;
     if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('Every stage and sub-stage a demand can be in. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
@@ -291,6 +279,12 @@
   $('ov').addEventListener('mousemove', hover);
   $('ov').addEventListener('mouseleave', function () { tipBox.hidden = true; });
 
+  // The workflow button lives in the page head, outside the overview block.
+  $('ov-flowlink').addEventListener('click', function (e) {
+    e.preventDefault(); showFlow = !showFlow; draw();
+    if (showFlow) $('ov-flow').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
   $('ov').addEventListener('click', function (e) {
     if (e.target.id === 'ov-clear') { F = {}; draw(); return; }
     if (e.target.id === 'ov-reset') {  // everything back to how the page opens
@@ -298,7 +292,6 @@
       $('ov-tabs').querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x.dataset.d === 'stage'); });
       draw(); return;
     }
-    if (e.target.id === 'ov-flowlink') { e.preventDefault(); showFlow = !showFlow; draw(); return; }
     var w = e.target.closest('[data-flow]');
     if (w) { e.preventDefault(); openRef = openRef === w.dataset.flow ? null : w.dataset.flow; draw(); return; }
     var inFlow = e.target.closest('#ov-flow');
