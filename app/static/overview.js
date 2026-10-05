@@ -179,7 +179,10 @@
     if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('Every stage and sub-stage a demand can be in. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
-  function draw() { var rows = ring(); kpis(rows); flow(); detail(rows); list(rows); }
+  function draw() {
+    var rows = ring(); kpis(rows); flow(); detail(rows); list(rows);
+    $('ov-reset').disabled = !Object.keys(F).length && !openRef && !showFlow && dim === 'stage';
+  }
 
   $('ov-tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -189,6 +192,11 @@
   });
   $('ov').addEventListener('click', function (e) {
     if (e.target.id === 'ov-clear') { F = {}; draw(); return; }
+    if (e.target.id === 'ov-reset') {  // everything back to how the page opens
+      F = {}; openRef = null; showFlow = false; dim = 'stage';
+      $('ov-tabs').querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x.dataset.d === 'stage'); });
+      draw(); return;
+    }
     if (e.target.id === 'ov-flowlink') { e.preventDefault(); showFlow = !showFlow; draw(); return; }
     var w = e.target.closest('[data-flow]');
     if (w) { e.preventDefault(); openRef = openRef === w.dataset.flow ? null : w.dataset.flow; draw(); return; }
