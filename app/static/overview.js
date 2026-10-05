@@ -33,24 +33,28 @@
   }
 
   function ring() {
-    var base = rowsFor(dim), total = base.length, sel = F[dim], R = 74, LEN = 2 * Math.PI * R, start = 0;
+    // The ring is the open positions only. Joined and abandoned ones stay out of it; by stage they are
+    // still listed under the ring, so they can be opened.
+    var all = rowsFor(dim), base = all.filter(function (x) { return x.open; });
+    var total = base.length, sel = F[dim], R = 74, LEN = 2 * Math.PI * R, start = 0;
     var keys = ORDER[dim].slice();
     base.forEach(function (x) { if (keys.indexOf(x[dim]) < 0) keys.push(x[dim]); });
-    var items = keys.map(function (k, j) { return { k: k, n: base.filter(function (x) { return x[dim] === k; }).length, c: (dim === 'stage' ? STAGE_C[j] : C[j]) || '#8B877E' }; });
+    var items = keys.map(function (k, j) { var out = dim === 'stage' && j >= 3; return { k: k, out: out, n: (out ? all : base).filter(function (x) { return x[dim] === k; }).length, c: (dim === 'stage' ? STAGE_C[j] : C[j]) || '#8B877E' }; });
     var h = '<g transform="rotate(-90 100 100)" fill="none">';
     items.forEach(function (it) {
-      if (!it.n) return;
+      if (!it.n || it.out) return;
       var len = it.n / total * LEN, vis = Math.max(len - 2, 1);
       h += '<circle class="slice" data-key="' + dim + '" data-val="' + esc(it.k) + '" cx="100" cy="100" r="' + R + '" stroke="' + it.c + '" stroke-width="' + (sel === it.k ? 34 : 26) + '" opacity="' + (sel && sel !== it.k ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"><title>' + esc(it.k) + ': ' + it.n + '</title></circle>';
       start += len;
     });
-    var rows = rowsFor();
-    h += '</g><text x="100" y="97" text-anchor="middle" class="ov-total">' + rows.length + '</text>';
-    h += '<text x="100" y="116" text-anchor="middle" class="ov-unit">' + (rows.length < D.length ? 'of ' + D.length + ' positions' : 'positions') + '</text>';
+    var rows = rowsFor(), openAll = D.filter(function (x) { return x.open; }).length;
+    var openNow = rows.filter(function (x) { return x.open; }).length, finished = rows.length && !openNow;
+    h += '</g><text x="100" y="97" text-anchor="middle" class="ov-total">' + (finished ? rows.length : openNow) + '</text>';
+    h += '<text x="100" y="116" text-anchor="middle" class="ov-unit">' + (finished ? 'finished · not in the ring' : openNow < openAll ? 'of ' + openAll + ' open positions' : 'open positions') + '</text>';
     $('ov-ring').innerHTML = h;
     $('ov-legend').innerHTML = items.map(function (it, j) {
-      var head = dim !== 'stage' ? '' : j === 0 ? '<li class="grp-l">In progress · lighter to darker as it moves on</li>' : j === 3 ? '<li class="grp-l">Finished</li>' : '';
-      return head + '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (total ? Math.round(it.n / total * 100) : 0) + '%</span>' + '</li>';
+      var head = dim !== 'stage' ? '' : j === 0 ? '<li class="grp-l">In progress · lighter to darker as it moves on</li>' : j === 3 ? '<li class="grp-l">Finished · not in the ring</li>' : '';
+      return head + '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (it.out ? '' : (total ? Math.round(it.n / total * 100) : 0) + '%') + '</span>' + '</li>';
     }).join('');
     return rows;
   }
