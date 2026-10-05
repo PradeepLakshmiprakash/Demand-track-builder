@@ -9,6 +9,22 @@
   // abandoned. Business units have no order, so they keep the categorical colours above.
   var STAGE_C = ['#6FA8EA', '#2468C2', '#123B73', '#17966A', '#B0ACA2'];
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
+  // Sub-stages in workflow order. Each takes its stage's colour, lighter the later it comes within the
+  // stage, so the small ring reads as the big one cut finer.
+  ORDER.sub = [];
+  var SUB_C = {};
+  function tint(hex, t) {  // mix towards white by t (0 = the colour itself)
+    var n = parseInt(hex.slice(1), 16), ch = [n >> 16, (n >> 8) & 255, n & 255];
+    return '#' + ch.map(function (v) { return ('0' + Math.round(v + (255 - v) * t).toString(16)).slice(-2); }).join('');
+  }
+  L.stages.concat([{ subs: L.abandoned.subs, problems: [] }]).forEach(function (st, si) {
+    var mine = [];
+    st.subs.forEach(function (sb, k) {
+      mine.push(sb);
+      st.problems.forEach(function (pr) { if (pr[1] === k) mine.push(pr[0]); });
+    });
+    mine.forEach(function (sb, k) { ORDER.sub.push(sb); SUB_C[sb] = tint(STAGE_C[si], mine.length > 1 ? .62 * k / (mine.length - 1) : 0); });
+  });
   var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations', costing: 'Costing' };
   var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
     type: 'new or replacement, billable or not', practice: 'the skill area' };
@@ -29,6 +45,7 @@
   function toggle(key, val) {
     if (F[key] === val) { delete F[key]; } else { F[key] = val; }
     if (key === 'stage') delete F.sub;
+    if (key === 'sub' && F.sub) { var one = D.filter(function (x) { return x.sub === val; })[0]; if (one) F.stage = one.stage; }
     draw();
   }
 
@@ -59,12 +76,29 @@
     return rows;
   }
 
-  function bars(key) {
-    var base = rowsFor(key), pairs = count(base, key), max = base.length || 1;
+  // A small ring beside the main one: the same positions cut another way. Each entity keeps its own
+  // colour (by its place in the fixed order), so a filter never repaints what is left.
+  function mini(key) {
+    var base = rowsFor(key), pairs = count(base, key), total = base.length;
     if (!pairs.length) return '';
-    return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div>' + pairs.map(function (p) {
-      return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%"></span></span><span class="n">' + p[1] + '</span></div>';
-    }).join('') + '</div>';
+    var R = 34, LEN = 2 * Math.PI * R, start = 0, sel = F[key];
+    var order = ORDER[key] || [];
+    var colour = function (v) {
+      var i = order.indexOf(v);
+      if (key === 'stage') return STAGE_C[i] || '#8B877E';
+      if (key === 'sub') return SUB_C[v] || '#8B877E';
+      return i < 0 ? '#8B877E' : C[i % C.length];
+    };
+    var svg = '<svg viewBox="0 0 100 100" width="104" height="104" role="img" aria-label="By ' + NAME[key].toLowerCase() + '"><g transform="rotate(-90 50 50)" fill="none">';
+    pairs.forEach(function (p) {
+      var len = p[1] / total * LEN, vis = pairs.length === 1 ? len : Math.max(len - 1.5, 0.8);
+      svg += '<circle class="slice" data-key="' + key + '" data-val="' + esc(p[0]) + '" cx="50" cy="50" r="' + R + '" stroke="' + colour(p[0]) + '" stroke-width="' + (sel === p[0] ? 17 : 13) + '" opacity="' + (sel && sel !== p[0] ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"><title>' + esc(p[0]) + ': ' + p[1] + '</title></circle>';
+      start += len;
+    });
+    svg += '</g><text x="50" y="55" text-anchor="middle" class="mini-total">' + total + '</text></svg>';
+    return '<div class="mini' + (key === 'sub' ? ' wide' : '') + '"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div><div class="mini-body">' + svg + '<ul class="mini-legend">' + pairs.map(function (p) {
+      return '<li class="' + (sel === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span class="sw" style="background:' + colour(p[0]) + '"></span><span class="nm" title="' + esc(p[0]) + '">' + esc(p[0]) + '</span><span class="n">' + p[1] + '</span></li>';
+    }).join('') + '</ul></div></div>';
   }
 
   function kpi(label, tipText, value, state, tag, key, val) {
@@ -98,9 +132,8 @@
       h += '<h2>The whole account' + tip('Click a slice of the ring, any row below, or a number with an arrow, to narrow down. The numbers and the list of demands follow every click.') + '</h2>';
     }
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
-    if (F.stage) h += bars('sub');
-    h += bars(dim === 'stage' ? 'bu' : 'stage');
-    h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
+    // Sub-stage is always shown; picking one there also narrows to its stage.
+    h += '<div class="minis">' + mini('sub') + mini(dim === 'stage' ? 'bu' : 'stage') + mini('type') + mini('practice') + '</div>';
     $('ov-detail').innerHTML = h;
   }
 
