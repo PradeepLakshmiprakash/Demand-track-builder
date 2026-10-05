@@ -18,6 +18,7 @@ from app.core.security import Actor, current_user, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, User
 from app.services import (
+    costing_service,
     demand_service,
     escalation_service,
     interview_service,
@@ -169,6 +170,10 @@ def demand_page(
             )
         ],
         can_revise_dates=demand_service.can_revise_dates(actor, demand),
+        cost=costing_service.costs(db, demand.account_id).get(demand.id) if demand.is_proactive_nb else None,
+        can_mark_billable=costing_service.can_mark_billable(actor, demand),
+        billable_by=db.get(User, demand.billable_marked_by) if demand.billable_marked_by else None,
+        today=account_today(db, demand.account_id),
         candidates=interview_service.for_demand(db, demand.id),
         decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,
         people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
@@ -250,6 +255,32 @@ async def revise_dates(
     db.commit()
     msg = "Dates updated; the past start date escalation is closed" if closed else "Dates updated"
     return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#dates", status_code=303)
+
+
+@router.post("/demands/{ref}/billable")
+async def mark_billable(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """A proactive, non-billable position: the owner records the day the client started billing."""
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    f = await request.form()
+    raw = str(f.get("billable_from") or "")
+    try:
+        when = None if f.get("undo") else (date.fromisoformat(raw) if raw else None)
+        if when is None and not f.get("undo"):
+            raise ValueError("Enter the day the client's billing started.")
+        costing_service.mark_billable(db, actor, demand, when)
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#costing", status_code=303)
+    msg = (
+        f"Marked billable from {when:%d %b %Y}; costing stops"
+        if when
+        else "Back to non-billable; costing resumes"
+    )
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#costing", status_code=303)
 
 
 @router.post("/demands/{ref}/client-interview")

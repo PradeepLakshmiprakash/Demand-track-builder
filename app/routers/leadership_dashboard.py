@@ -13,7 +13,7 @@ from app.core.enums import EscalationStatus, MainStage, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, OfferApproval
-from app.services import loss_service, reconcile_service, workflow_service
+from app.services import costing_service, loss_service, reconcile_service, workflow_service
 from app.services.account_service import get_account
 from app.services.demand_service import account_today, period_for
 from app.services.escalation_service import current_doj
@@ -94,9 +94,11 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
         ):
             if e.demand_id is not None:
                 escs.setdefault(e.demand_id, []).append({"t": e.type_enum.label, "l": e.level})
+    costs = costing_service.costs(db, account.id, o.today) if account else {}
     rows = []
     for d in sorted(o.demands, key=lambda d: d.app_ref):
         loss = o.loss_of.get(d.id)
+        cost = costs.get(d.id)
         kind = "Replacement" if d.type == "Replacement" else "New"
         rows.append(
             {
@@ -114,6 +116,16 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
                 "open": d.status_enum.main.value in loss_service.OPEN_GROUPS,
                 "late": loss is not None and not loss.filled,
                 "esc": escs.get(d.id, []),
+                "costing": "Non-billable cost" if cost is not None else "",
+                "cost": float(cost.so_far) if cost is not None and cost.so_far is not None else 0,
+                "cost_month": float(cost.monthly) if cost is not None and cost.monthly is not None else 0,
+                "cost_active": cost is not None and cost.active,
+                "cost_rate": float(cost.rate) if cost is not None and cost.rate is not None else None,
+                "cost_source": cost.source if cost is not None else None,
+                "cost_days": cost.working_days if cost is not None else 0,
+                "cost_until": f"{cost.until:%d %b %Y}" if cost is not None and cost.until else None,
+                "resource": cost.resource if cost is not None else None,
+                "grade": d.grade or "—",
                 "escd": "Escalated" if d.id in escs else "",
                 "pstart": "Past start" if loss is not None and not loss.filled else "",
                 "days_late": loss.days_late if loss is not None and not loss.filled else 0,
@@ -132,6 +144,13 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
         "means": {m.label: text for m, text in MEANS.items()},
         "layout": workflow_service.layout(),
         "hours": f"{o.hours_per_day:g}",
+        "month_days": costing_service.MONTH_DAYS,
+        "caps": {
+            b.name: b.nb_cap
+            for b in db.scalars(select(BusinessUnit).where(BusinessUnit.account_id == account.id))
+        }
+        if account
+        else {},
     }
 
 

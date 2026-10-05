@@ -534,3 +534,15 @@ rates are shown, and an interviewer still acts only on interviews assigned to th
 found by name. An interviewer whose feedback is past the panel SLA sees it flagged on the interview
 and in a notice at the top of the page; the escalation itself is on the Escalations screen (trigger
 *Panel SLA*) for the GTD admin team, leadership and the demand owner.
+
+**D86. Costing of proactive, non-billable positions.** A Proactive position (shadow, bench, NGT) is
+non-billable by default on the Raise demand form. From its start date it costs the account every
+working day, whether or not a candidate has joined: cost rate × billable hours a day × working days.
+The cost rate is the offer's when there is one, otherwise the rate card's for the position's grade,
+practice and region (the highest across supply channels). It is never counted as revenue lost. The
+demand owner, and only the owner, marks the position billable with the date the client's billing
+started (changeable, undoable; the GTD team admin is mailed); costing stops from that date. The
+overview has a clickable *Non-billable cost* number, a Costing block (positions not billing, cost so
+far, cost per month, by business unit against the agreed cap) and the list of those positions. A
+joined proactive position stays in view, not archived, until 30 days after it becomes billable.
+Draft, cancelled and closed demands are not costed.

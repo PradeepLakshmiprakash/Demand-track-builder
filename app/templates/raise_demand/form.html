@@ -42,7 +42,7 @@
       <div class="grid3">
         <fieldset class="f radios"><legend>Category</legend>
           {% for c in cfg.categories %}<label><input type="radio" name="category" value="{{ c }}" {{ 'checked' if v.category == c }}> {{ c }}</label>{% endfor %}
-          <span class="hint">Proactive covers shadow, bench, NGT</span>
+          <span class="hint">Proactive covers shadow, bench, NGT. It is non-billable: it costs the account from its start date until you mark it billable.</span>
         </fieldset>
         <fieldset class="f radios"><legend>Type</legend>
           {% for t in ['New', 'Replacement'] %}<label><input type="radio" name="type" value="{{ t }}" {{ 'checked' if (v.type or 'New') == t }}> {{ t }}</label>{% endfor %}
@@ -124,6 +124,14 @@
   function sync() { box.hidden = !document.querySelector('input[name=type][value=Replacement]').checked; }
   document.querySelectorAll('input[name=type]').forEach(function (r) { r.addEventListener('change', sync); });
   sync();
+  // A Proactive position (shadow, bench, NGT) is non-billable unless the owner says otherwise.
+  document.querySelectorAll('input[name=category]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var want = r.value.toLowerCase() === 'proactive' ? 'Non-billable' : 'Billable';
+      var pick = document.querySelector('input[name=position_type][value="' + want + '"]');
+      if (pick) pick.checked = true;
+    });
+  });
 })();
 </script>
 {% endblock %}

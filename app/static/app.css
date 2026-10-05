@@ -397,3 +397,23 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 
 /* My interviews: every open requisition, for reference. */
 .open-req { padding: 10px 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 4px; }
+
+/* Costing: what proactive, non-billable positions cost the account. */
+.facts4 .fact.cost { border-color: #6250d6; background: #F1EFFC; }
+.facts4 .fact.cost.on { background: #E2DEFA; }
+.costing { border: 1.5px solid #6250d6; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+.cost3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.cost3 .k { font-size: 12px; color: var(--muted); }
+.cost3 .v { font-size: 22px; font-weight: 600; }
+.cost3 .h { font-size: 11px; color: var(--muted); }
+.cbar { display: inline-block; width: 100px; height: 8px; background: #F1EEE6; border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+.cbar i { display: block; height: 100%; background: #6250d6; }
+.ov-table tr.stopped td { color: var(--muted); }
+.ov-table tfoot td { border-bottom: 0; padding-top: 10px; }
+.cost-box { margin-top: 16px; padding: 14px 16px; background: #F1EFFC; border-radius: 10px; }
+.cost-box.done { background: #E6F6EF; }
+.cost-box .title { font-weight: 600; }
+.cost-box .fields { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-top: 12px; }
+.cost-box label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.cost-box input[type=date] { width: 180px; min-height: 40px; }
+@media (max-width: 1100px) { .cost3 { grid-template-columns: 1fr; } }

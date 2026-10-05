@@ -6,7 +6,7 @@
   if (!OV) return;
   var C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
-  var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations' };
+  var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations', costing: 'Costing' };
   var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
     type: 'new or replacement, billable or not', practice: 'the skill area' };
   var dim = 'stage', F = {}, openRef = null, showFlow = location.hash === '#workflow';
@@ -58,8 +58,8 @@
   }
 
   function detail(rows) {
-    var lost = 0, late = 0, open = 0, norate = 0, escd = 0, ks = Object.keys(F);
-    rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; escd += x.esc.length ? 1 : 0; });
+    var lost = 0, late = 0, open = 0, norate = 0, escd = 0, cost = 0, costn = 0, ks = Object.keys(F);
+    rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; escd += x.esc.length ? 1 : 0; cost += x.cost || 0; costn += x.cost_active ? 1 : 0; });
     var h = '<div class="eyebrow">' + (ks.length ? 'You are looking at · click a tag to remove it' : 'You are looking at') + '</div>';
     if (ks.length) {
       h += '<div class="chips">' + ks.map(function (k) { return '<button class="chip-x" data-key="' + k + '" data-val="' + esc(F[k]) + '">' + esc(F[k]) + ' ✕</button>'; }).join('') + '<button class="chip-x clear" id="ov-clear">Clear all</button></div>';
@@ -70,20 +70,58 @@
       + '<div class="fact"><div class="k">Open</div><div class="v">' + open + '</div><div class="h">nobody has joined yet</div></div>'
       + '<div class="fact pick' + (F.pstart ? ' on' : '') + '" data-key="pstart" data-val="Past start" role="button" tabindex="0"><div class="k">Past start</div><div class="v">' + late + '</div><div class="h">start date gone, still unfilled · ' + (F.pstart ? 'showing only these' : 'click to see them') + '</div></div>'
       + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated</div><div class="v">' + escd + '</div><div class="h">with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '</div></div>'
-      + '<div class="fact"><div class="k">Revenue lost</div><div class="v">' + money(lost) + '</div><div class="h">bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '</div></div></div>';
+      + '<div class="fact"><div class="k">Revenue lost</div><div class="v">' + money(lost) + '</div><div class="h">bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '</div></div>'
+      + '<div class="fact pick cost' + (F.costing ? ' on' : '') + '" data-key="costing" data-val="Non-billable cost" role="button" tabindex="0"><div class="k">Non-billable cost</div><div class="v">' + money(cost) + '</div><div class="h">' + costn + ' proactive position' + (costn === 1 ? '' : 's') + ' not billing · ' + (F.costing ? 'showing only these' : 'click to see them') + '</div></div></div>';
+    h += costing(rows);
     if (F.stage) h += bars('sub');
     h += bars(dim === 'stage' ? 'bu' : 'stage');
     h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
     $('ov-detail').innerHTML = h;
   }
 
+  function costing(rows) {
+    var c = rows.filter(function (x) { return x.costing; });
+    if (!c.length) return '';
+    var active = 0, sofar = 0, month = 0, norate = 0, bu = {};
+    c.forEach(function (x) {
+      active += x.cost_active ? 1 : 0; sofar += x.cost; month += x.cost_month; norate += x.cost_rate === null ? 1 : 0;
+      var b = bu[x.bu] || (bu[x.bu] = { n: 0, cost: 0, month: 0 });
+      b.n += x.cost_active ? 1 : 0; b.cost += x.cost; b.month += x.cost_month;
+    });
+    var max = Math.max.apply(null, Object.keys(bu).map(function (k) { return bu[k].cost; })) || 1;
+    var h = '<div class="costing"><div class="ov-listhead"><h2>Costing</h2><span class="small muted">proactive, non-billable positions past their start date</span></div>'
+      + '<div class="cost3"><div><div class="k">Positions not billing</div><div class="v">' + active + '</div><div class="h">the client isn\'t paying for them yet</div></div>'
+      + '<div><div class="k">Cost so far</div><div class="v">' + money(sofar) + '</div><div class="h">cost rate × ' + OV.hours + ' h × working days since the start date</div></div>'
+      + '<div><div class="k">Cost per month from here</div><div class="v">' + money(month) + '</div><div class="h">if nothing changes · ' + OV.month_days + ' working days</div></div></div>';
+    if (norate) h += '<div class="small late" style="margin-top:8px">' + norate + ' position' + (norate === 1 ? ' has' : 's have') + ' no cost rate: no offer, and no rate card entry for the grade, practice and region.</div>';
+    h += '<table class="ov-table"><thead><tr><th>Business unit</th><th class="r">Not billing</th><th>Agreed cap</th><th>Cost so far</th><th class="r">Per month</th></tr></thead><tbody>';
+    Object.keys(bu).sort().forEach(function (k) {
+      var b = bu[k], cap = OV.caps[k];
+      h += '<tr><td>' + esc(k) + '</td><td class="r">' + b.n + '</td><td>' + (cap === null || cap === undefined ? '—' : cap + (b.n > cap ? ' <span class="chip esc">over cap</span>' : '')) + '</td><td><span class="cbar"><i style="width:' + (b.cost / max * 100) + '%"></i></span>' + money(b.cost) + '</td><td class="r">' + money(b.month) + '</td></tr>';
+    });
+    return h + '</tbody></table><div class="small muted" style="margin-top:6px">Never counted as revenue lost. Costing stops when the demand owner marks the position billable.</div></div>';
+  }
+
+  function costList(rows, title) {
+    var h = '<div class="ov-listhead"><h2>' + rows.length + ' non-billable position' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span></h2><span class="small muted">What each one has cost the account since its start date.</span></div>';
+    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Position</th><th>Resource</th><th>Owner · BU</th><th>Practice · grade</th><th>Stage</th><th>Start date</th><th class="r">Working days</th><th class="r">Cost / h</th><th class="r">Cost so far</th></tr></thead><tbody>';
+    var total = 0;
+    h += rows.map(function (x) {
+      if (x.cost_active) total += x.cost;
+      return '<tr' + (x.cost_active ? '' : ' class="stopped"') + '><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a></td><td>' + esc(x.name) + '<div class="small muted">' + (x.cost_until ? 'Billable since ' + esc(x.cost_until) : esc(x.type)) + '</div></td><td>' + esc(x.resource || 'Not named yet') + '</td><td>' + esc(x.owner) + '<div class="small muted">' + esc(x.bu) + '</div></td><td>' + esc(x.practice) + ' · ' + esc(x.grade) + '</td><td>' + esc(x.stage) + '<div class="small muted">' + esc(x.sub) + '</div></td><td>' + esc(x.start || '—') + '</td><td class="r">' + x.cost_days + '</td><td class="r">' + (x.cost_rate === null ? '<span class="late">none</span>' : '$' + x.cost_rate.toFixed(2) + '<div class="small muted">' + esc(x.cost_source) + '</div>') + '</td><td class="r"><strong>' + (x.cost_rate === null ? '—' : money(x.cost)) + '</strong>' + (x.cost_active ? '' : '<div class="small muted">costing stopped</div>') + '</td></tr>';
+    }).join('');
+    h += '</tbody><tfoot><tr><td colspan="9" class="r"><strong>Still costing</strong></td><td class="r"><strong>' + money(total) + '</strong></td></tr></tfoot></table></div>';
+    $('ov-list').innerHTML = h;
+  }
+
   function list(rows) {
     var ks = Object.keys(F);
     if (!ks.length) {
-      $('ov-list').innerHTML = '<div class="empty">Demands are listed here once you narrow down. Click a slice of the ring, any row beside it, the Past start or Escalated number, or a box in the workflow.</div>';
+      $('ov-list').innerHTML = '<div class="empty">Demands are listed here once you narrow down. Click a slice of the ring, any row beside it, the Past start, Escalated or Non-billable cost number, or a box in the workflow.</div>';
       return;
     }
     var title = ks.map(function (k) { return NAME[k].toLowerCase() + ': ' + F[k]; }).join(' · ');
+    if (F.costing) { costList(rows, title); return; }
     var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span></h2><span class="small muted">These are the demands behind the numbers above.</span></div>';
     h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Practice</th><th>Stage</th><th>Start</th><th>Joining</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
     h += rows.map(function (x) {

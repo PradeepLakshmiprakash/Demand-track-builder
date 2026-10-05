@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -64,6 +65,11 @@ class Demand(Base):
     replaced_resource: Mapped[str | None] = mapped_column(String(120))
     # Replacement only: the last working day of the person being replaced.
     lwd: Mapped[date | None] = mapped_column(Date)
+    # Proactive, non-billable only: the day the client started billing (the owner records it). Until
+    # then the position costs the account from its start date (costing_service).
+    billable_from: Mapped[date | None] = mapped_column(Date)
+    billable_marked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    billable_marked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     primary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     secondary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     exp_min: Mapped[int | None] = mapped_column(Integer)
@@ -86,7 +92,7 @@ class Demand(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     business_unit: Mapped[BusinessUnit] = relationship()
-    owner: Mapped[User] = relationship()
+    owner: Mapped[User] = relationship(foreign_keys=[owner_id])
     submissions: Mapped[list["GtdSubmission"]] = relationship(
         back_populates="demand", order_by="GtdSubmission.submitted_at.desc()"
     )
@@ -105,6 +111,11 @@ class Demand(Base):
         """Name as entered on GTD: the plain demand name. The GTD admin team doesn't type the DM
         reference there; the demand is tied to GTD by the requisition ID they link back."""
         return self.name
+
+    @property
+    def is_proactive_nb(self) -> bool:
+        """A Proactive position the client isn't paying for: it costs the account, and loses no revenue."""
+        return (self.category or "").casefold() == "proactive" and self.position_type == "Non-billable"
 
     @property
     def loss_from(self) -> date | None:

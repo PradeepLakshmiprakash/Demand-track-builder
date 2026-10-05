@@ -92,6 +92,29 @@
         {{ field('Region', d.region) }}{{ field('Location', d.location) }}{{ field('Work mode', d.work_mode) }}
         {{ field('Client hiring manager', d.hiring_manager) }}
       </div>
+      {% if d.is_proactive_nb and (sees_rates or can_mark_billable) %}
+      <div class="cost-box {{ 'done' if d.billable_from }}" id="costing">
+        {% if d.billable_from %}
+          <div class="title">Billable since {{ d.billable_from | d }} · costing stopped</div>
+          {% if cost and sees_rates %}<div class="small" style="margin-top:4px">Non-billable from {{ cost.start | d }}: {{ cost.working_days }} working days{% if cost.rate is not none %} × ${{ '%.2f' % cost.rate }} / h ({{ cost.source }}) = <strong>{{ cost.so_far | money }}</strong> in total{% endif %}.</div>{% endif %}
+          <div class="small muted" style="margin-top:6px">Marked by {{ billable_by.name if billable_by else 'the demand owner' }}{% if d.billable_marked_at %} on {{ d.billable_marked_at | at(tz, '%d %b %Y') }}{% endif %}.</div>
+        {% elif cost %}
+          <div class="title">Non-billable cost · still costing the account</div>
+          <div class="small" style="margin-top:4px">Proactive position, start date {{ cost.start | d }}{% if cost.resource %} · {{ cost.resource }}{% endif %}. The client is not billing for it.{% if sees_rates %}<br>{{ cost.working_days }} working days{% if cost.rate is not none %} × ${{ '%.2f' % cost.rate }} / h ({{ cost.source }}) = <strong>{{ cost.so_far | money }}</strong> so far{% else %} · <span class="late">no cost rate: no offer, and no rate card entry for this grade, practice and region</span>{% endif %}.{% endif %}</div>
+        {% else %}
+          <div class="title">Proactive, non-billable position</div>
+          <div class="small" style="margin-top:4px">It starts costing the account on its start date{% if d.start_date %}, {{ d.start_date | d }}{% endif %}, and is never counted as revenue lost.</div>
+        {% endif %}
+        {% if can_mark_billable and (cost or d.billable_from) %}
+        <form method="post" action="/demands/{{ d.app_ref }}/billable" class="fields">
+          <label>Client billing started on<input type="date" name="billable_from" value="{{ d.billable_from or today }}" max="{{ today }}" required></label>
+          <button class="btn primary">{{ 'Change the date' if d.billable_from else 'Mark as billable' }}</button>
+          {% if d.billable_from %}<button class="btn" name="undo" value="1" formnovalidate>Undo: still non-billable</button>{% endif %}
+        </form>
+        {% if not d.billable_from %}<div class="small muted" style="margin-top:8px">Costing stops from that date. The GTD team admin is told.</div>{% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
       {% if can_revise_dates %}
       <form method="post" action="/demands/{{ d.app_ref }}/dates" id="dates" class="dates-form">
         <div class="title">Change the dates</div>

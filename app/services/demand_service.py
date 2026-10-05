@@ -127,6 +127,13 @@ def finished_dates(db: Session, demands: list[Demand]) -> dict[int, date]:
     ):
         if e.to_stage == done[e.demand_id]:
             out[e.demand_id] = e.at.date()  # the latest one wins
+    for d in demands:
+        # A joined proactive, non-billable position isn't finished while it still costs the account.
+        if d.id in out and d.is_proactive_nb and d.status_enum is DemandStatus.STAFFED:
+            if d.billable_from is None:
+                del out[d.id]
+            else:
+                out[d.id] = max(out[d.id], d.billable_from)
     return out
 
 

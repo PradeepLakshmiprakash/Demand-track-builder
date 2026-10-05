@@ -62,7 +62,7 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
         .options(selectinload(Demand.submissions), selectinload(Demand.business_unit))
     ):
         start = d.loss_from  # the start date, or the day after the leaver's last working day if later
-        if start is None:
+        if start is None or d.is_proactive_nb:  # proactive, non-billable: a cost, never revenue lost
             continue
         j = doj.get(d.id)
         end = min(j, today) if j else today
