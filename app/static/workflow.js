@@ -6,10 +6,10 @@
    The layout comes from workflow_service.layout(). */
 (function () {
   // One blue, light to dark, while a demand is in progress; green once joined; grey if abandoned.
-  var COL = ['#6FA8EA', '#2468C2', '#123B73', '#17966A', '#B0ACA2'];
-  var TINT = ['#EDF4FD', '#E6EEFA', '#E3E9F2', '#E5F4EE', '#F2F0EB'];
-  var ON = ['#0B2545', '#fff', '#fff', '#fff', '#1B1B18'];  // text that sits on each colour
-  var INK = '#1B1B18', MUTED = '#6B675E', WARN = '#B4532A';
+  var COL = ['#8EA6D5', '#3573C0', '#1C4076', '#43A063', '#A6ACB5'];
+  var TINT = ['#EFF0F4', '#E9EDF3', '#DFE1EB', '#E7F6EB', '#F1F4F7'];
+  var ON = ['#121A38', '#fff', '#fff', '#fff', '#171A22'];  // text that sits on each colour
+  var INK = '#171A22', MUTED = '#595E6A', WARN = '#C00036';
   var BW = 150, BH = 40, TOP = 60, GAP = 58;
   // container x, container width, main column x, problem column x (first stage only)
   var GEO = [{ x: 10, w: 340, mx: 185, ex: 25 }, { x: 380, w: 180, mx: 395 }, { x: 590, w: 180, mx: 605 }, { x: 800, w: 180, mx: 815 }];
@@ -20,7 +20,7 @@
   }
   function inkOn(hex) {  // dark text on a light colour, white on a dark one
     var n = parseInt(hex.slice(1), 16);
-    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? '#0B2545' : '#fff';
+    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? '#121A38' : '#fff';
   }
   /* The colours everything on the overview shares: one per stage, and for each sub-stage its stage's
      colour, lighter the later it comes within the stage. Sub-stages are returned in workflow order. */
@@ -69,9 +69,9 @@
       var done = cur && !left && !problem && idx >= 0 && (idx < reached || (idx === reached && hangs[cur.sub]));
       var dim = counts ? !n : (cur && !now && !done), sel = o.sel === sub;
       var mine = SUBC[sub] || COL[ci];
-      var fill = now ? mine : (done ? TINT[ci] : '#fff'), ink = now ? inkOn(mine) : (dim ? '#8B877E' : INK);
+      var fill = now ? mine : (done ? TINT[ci] : '#fff'), ink = now ? inkOn(mine) : (dim ? '#888F9A' : INK);
       var s = '<g class="wfbox" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '"' + (counts ? ' style="cursor:pointer"' : '') + '>';
-      s += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '" rx="4" fill="' + fill + '" stroke="' + (sel || now ? INK : (problem ? WARN : '#C9C4B8')) + '" stroke-width="' + (sel || now ? 2 : 1) + '"' + (problem && !now ? ' stroke-dasharray="4 3"' : '') + '/>';
+      s += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '" rx="4" fill="' + fill + '" stroke="' + (sel || now ? INK : (problem ? WARN : '#C7CCD3')) + '" stroke-width="' + (sel || now ? 2 : 1) + '"' + (problem && !now ? ' stroke-dasharray="4 3"' : '') + '/>';
       if (!now) s += '<rect x="' + x + '" y="' + y + '" width="5" height="' + BH + '" rx="2" fill="' + mine + '" opacity="' + (dim ? .45 : 1) + '"/>';
       var ls = lines(sub), ty = y + (ls.length === 1 ? 24 : 17);
       ls.forEach(function (l, k) { s += '<text x="' + (x + 13) + '" y="' + (ty + k * 13) + '" font-size="11" fill="' + ink + '"' + (now ? ' font-weight="700"' : '') + '>' + esc(l) + '</text>'; });

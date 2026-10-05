@@ -556,3 +556,8 @@ narrowed, the list opens on the most urgent demands (overdue escalations first, 
 ten at most) instead of an empty prompt. Period, date range, *Past 30 days* / *Past 60 days*
 shortcuts, Show workflow and the alerts share one toolbar; the shortcuts are on the demand lists too.
 The sidebar's current page has a bright left edge.
+
+**D88. Colours.** The app uses the colour set of capgemini.com (its published design tokens): its
+blues for brand, buttons, links and the sidebar; its neutrals for backgrounds, borders and text; its
+red and orange for warnings and its green for "joined". Stage colours are three of its blues, light to
+dark, then green and grey; the workflow diagram and the rings share them. The typeface is unchanged.

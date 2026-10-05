@@ -4,7 +4,7 @@
 (function () {
   var OV = window.OV;
   if (!OV) return;
-  var C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+  var C = ['#0058AB', '#F17817', '#00AE9D', '#DD1D46', '#5685C6', '#43A063', '#9F500D', '#29656F'];
   // Stages read as a journey: one blue, light to dark, while in progress; green once joined; grey if
   // abandoned. Business units have no order, so they keep the categorical colours above.
   var D = OV.rows, ORDER = OV.order, MEANS = OV.means, L = OV.layout;
@@ -40,7 +40,7 @@
   function subRows(stage) {
     var rows = rowsFor('sub').filter(function (x) { return x.stage === stage; });
     return count(rows, 'sub').map(function (p) {
-      return '<li class="sub-row' + (F.sub === p[0] ? ' on' : '') + '" data-key="sub" data-val="' + esc(p[0]) + '"><span class="sw" style="background:' + (SUB_C[p[0]] || '#8B877E') + '"></span><span>' + esc(p[0]) + '</span><span class="num">' + p[1] + '</span><span class="pct">' + (rows.length ? Math.round(p[1] / rows.length * 100) : 0) + '%</span></li>';
+      return '<li class="sub-row' + (F.sub === p[0] ? ' on' : '') + '" data-key="sub" data-val="' + esc(p[0]) + '"><span class="sw" style="background:' + (SUB_C[p[0]] || '#888F9A') + '"></span><span>' + esc(p[0]) + '</span><span class="num">' + p[1] + '</span><span class="pct">' + (rows.length ? Math.round(p[1] / rows.length * 100) : 0) + '%</span></li>';
     }).join('');
   }
 
@@ -51,7 +51,7 @@
     var total = base.length, sel = F[dim], R = 74, LEN = 2 * Math.PI * R, start = 0;
     var keys = ORDER[dim].slice();
     base.forEach(function (x) { if (keys.indexOf(x[dim]) < 0) keys.push(x[dim]); });
-    var items = keys.map(function (k, j) { var out = dim === 'stage' && j >= 3; return { k: k, out: out, n: (out ? all : base).filter(function (x) { return x[dim] === k; }).length, c: (dim === 'stage' ? STAGE_C[j] : C[j]) || '#8B877E' }; });
+    var items = keys.map(function (k, j) { var out = dim === 'stage' && j >= 3; return { k: k, out: out, n: (out ? all : base).filter(function (x) { return x[dim] === k; }).length, c: (dim === 'stage' ? STAGE_C[j] : C[j]) || '#888F9A' }; });
     var h = '<g transform="rotate(-90 100 100)" fill="none">';
     items.forEach(function (it) {
       if (!it.n || it.out) return;
@@ -88,9 +88,9 @@
     var order = ORDER[key] || [];
     var colour = function (v) {
       var i = order.indexOf(v);
-      if (key === 'stage') return STAGE_C[i] || '#8B877E';
-      if (key === 'sub') return SUB_C[v] || '#8B877E';
-      return i < 0 ? '#8B877E' : C[i % C.length];
+      if (key === 'stage') return STAGE_C[i] || '#888F9A';
+      if (key === 'sub') return SUB_C[v] || '#888F9A';
+      return i < 0 ? '#888F9A' : C[i % C.length];
     };
     var svg = '<svg viewBox="0 0 100 100" width="170" height="170" role="img" aria-label="By ' + NAME[key].toLowerCase() + '"><g transform="rotate(-90 50 50)" fill="none">';
     pairs.forEach(function (p) {
