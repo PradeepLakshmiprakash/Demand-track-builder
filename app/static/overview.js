@@ -101,6 +101,15 @@
     }).join('') + '</ul></div></div>';
   }
 
+  // Type and practice stay as plain bars: quick to read, and they don't compete with the rings.
+  function bars(key) {
+    var base = rowsFor(key), pairs = count(base, key), max = base.length || 1;
+    if (!pairs.length) return '';
+    return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div>' + pairs.map(function (p) {
+      return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%"></span></span><span class="n">' + p[1] + '</span></div>';
+    }).join('') + '</div>';
+  }
+
   function kpi(label, tipText, value, state, tag, key, val) {
     var pick = key ? ' pick' + (F[key] ? ' on' : '') + '" data-key="' + key + '" data-val="' + val + '" role="button" tabindex="0' : '';
     return '<div class="kpi' + (state ? ' ' + state : '') + pick + '"><div class="k">' + label + tip(tipText) + '</div><div class="v">' + value + '</div>' + (tag ? '<span class="tag">' + tag + '</span>' : '') + '</div>';
@@ -133,7 +142,8 @@
     }
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     // Sub-stage is always shown; picking one there also narrows to its stage.
-    h += '<div class="minis">' + mini('sub') + mini(dim === 'stage' ? 'bu' : 'stage') + mini('type') + mini('practice') + '</div>';
+    h += '<div class="minis">' + mini('sub') + mini(dim === 'stage' ? 'bu' : 'stage') + '</div>';
+    h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
     $('ov-detail').innerHTML = h;
   }
 
