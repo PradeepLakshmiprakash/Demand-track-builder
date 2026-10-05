@@ -521,3 +521,9 @@ date and revenue lost. The non-billable caps show only to the GTD team admin, wh
 escalations ride on the workflow: a ⚠ count on each box on the overview, and on one demand's current
 box with the escalations named underneath. An *Escalated* number on the overview narrows to demands
 with an open escalation, and each listed demand shows its escalations.
+
+**D84. After the responder acts.** When the responsible person extends an escalation's due date, the
+demand page and the Escalations screen say so ("more time given, until …") and fold the form away
+until that date passes; the escalation itself stays open. When the owner moves the start date to a
+future date with *Change the dates*, an open past-start escalation closes with it, the same as
+answering it with "Revise the start date".

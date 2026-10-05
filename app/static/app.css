@@ -386,3 +386,11 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .facts4 .fact.pick.on { background: var(--brand-tint); }
 .wf-esc { font-size: 13px; margin-top: 8px; }
 .wf-esc span { display: inline-block; background: #F7E3DA; color: #8A2A12; border-radius: 999px; padding: 2px 9px; margin: 2px 4px 2px 0; font-weight: 600; font-size: 12px; }
+
+/* Change the dates, on a demand that is already on GTD. */
+.dates-form { margin-top: 16px; padding: 14px 16px; background: var(--brand-tint); border-radius: 10px; text-align: left; }
+.dates-form .title { font-weight: 600; margin-bottom: 2px; }
+.dates-form .fields { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-top: 12px; }
+.dates-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.dates-form input[type=date] { width: 180px; min-height: 40px; }
+.dates-form .btn { min-height: 40px; }

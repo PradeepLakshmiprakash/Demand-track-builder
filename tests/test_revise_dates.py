@@ -50,3 +50,44 @@ def test_not_on_a_finished_demand(client: Client, db: Session) -> None:
     if owner_page.status_code == 200:
         assert "Change the dates" not in owner_page.text
     assert "Change the dates" not in client.as_user("kavya").get("/demands/DM-000116").text
+
+
+def test_extending_the_due_date_quietens_the_form(client: Client, db: Session) -> None:
+    from app.models import Escalation
+
+    esc = db.scalars(
+        select(Escalation).where(
+            Escalation.demand_id == demand(db).id,
+            Escalation.status == "open",
+            Escalation.type == "past_start",
+        )
+    ).one()
+    page = client.as_user("priya").get(f"/demands/{REF}").text
+    assert "Needs your response" in page and "You asked for more time" not in page
+    later = date.today() + timedelta(days=10)
+    client.as_user("priya").post(
+        f"/escalations/{esc.id}/resolve",
+        data={"reason": "Offer in progress", "action": "extend", "extend_to": later.isoformat(),
+              "comment": "", "next": f"/demands/{REF}"},
+    )  # fmt: skip
+    page = client.as_user("priya").get(f"/demands/{REF}").text
+    assert "You asked for more time, until" in page and "Respond again or close it now" in page
+    assert "Needs your response" not in page and "Escalation · more time given" in page
+    assert "More time was given" in client.as_user("priya").get(f"/escalations?id={esc.id}").text
+
+
+def test_moving_the_start_date_ahead_closes_the_past_start_escalation(client: Client, db: Session) -> None:
+    from app.models import Escalation
+
+    d = demand(db)
+    start = date.today() + timedelta(days=20)
+    r = client.as_user("priya").post(f"/demands/{REF}/dates", data={"start_date": start.isoformat()})
+    assert (
+        "escalation+is+closed" in r.headers["location"] or "escalation%20is%20closed" in r.headers["location"]
+    )
+    db.expire_all()
+    esc = db.scalars(
+        select(Escalation).where(Escalation.demand_id == d.id, Escalation.type == "past_start")
+    ).one()
+    assert (esc.status, esc.action, esc.reason) == ("resolved", "new_start", "Other")
+    assert "Needs your response · L2" not in client.as_user("priya").get(f"/demands/{REF}").text

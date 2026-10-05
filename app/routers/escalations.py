@@ -88,6 +88,7 @@ def escalations_page(
             "actions": svc.allowed_actions(db, account, esc, d) if esc.status == "open" else [],
             "cleared": esc.status == "open" and svc.is_cleared(db, account, esc, d, now),
             "can_resolve": svc.can_resolve(actor, esc, d),
+            "waiting": svc.given_more_time(esc, now),
             "who_acts": svc.who_acts(esc),
             "steps": account.settings.rule_for(esc.type).steps,
             "is_owner": d is not None and actor.id == d.owner_id,

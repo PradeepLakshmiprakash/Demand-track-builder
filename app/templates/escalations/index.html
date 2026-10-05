@@ -77,6 +77,7 @@
     </div>
     {% if cleared %}<div class="flash ok small">The condition has cleared since this opened. It still needs a person to close it.</div>{% endif %}
 
+    {% if e.status == 'open' and waiting %}<div class="flash ok small"><strong>More time was given, until {{ e.due_at | at(tz, '%d %b %Y') }}.</strong> Nothing more is needed until then; it stays open and reminders are paused.</div>{% endif %}
     {% if e.status == 'open' and can_resolve %}
     {% if not sd %}<div class="small"><a class="btn small primary" href="/reconciliation#to-match">Match it or create the demand on Reconciliation</a></div>{% endif %}
     {% if sd %}<div><a class="btn small" href="/demands/{{ sd.app_ref }}#respond">Open the full demand</a> <span class="small muted">See everything about it and respond there, or respond here.</span></div>{% endif %}

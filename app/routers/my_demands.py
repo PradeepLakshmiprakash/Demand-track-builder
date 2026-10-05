@@ -230,6 +230,7 @@ async def revise_dates(
         return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#dates", status_code=303)
     if not changes:
         return RedirectResponse(f"/demands/{ref}?msg=No+change#dates", status_code=303)
+    closed = escalation_service.close_past_start_on_new_date(db, actor, demand)
     tag = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
     owner = db.get_one(User, demand.owner_id)
     notify_service.safely(
@@ -247,7 +248,8 @@ async def revise_dates(
         ),
     )
     db.commit()
-    return RedirectResponse(f"/demands/{ref}?msg={quote('Dates updated')}#dates", status_code=303)
+    msg = "Dates updated; the past start date escalation is closed" if closed else "Dates updated"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#dates", status_code=303)
 
 
 @router.post("/demands/{ref}/client-interview")
@@ -407,6 +409,10 @@ def _to_respond(db: Session, actor: Actor, demand: Demand) -> list[dict[str, Any
                     "actions": escalation_service.allowed_actions(db, account, e, demand),
                     "reasons": account.settings.reasons_for(e.type),
                     "steps": account.settings.rule_for(e.type).steps,
+                    "waiting": escalation_service.given_more_time(e),
+                    "waiting_note": (e.events[-1].note or "")
+                    if escalation_service.given_more_time(e)
+                    else "",
                 }
             )
     return out

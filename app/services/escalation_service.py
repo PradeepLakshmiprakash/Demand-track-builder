@@ -721,6 +721,37 @@ def can_resolve(actor: Actor, esc: Escalation, demand: Demand | None) -> bool:
     return actor.role in GTD_TEAM_ROLES
 
 
+def given_more_time(esc: Escalation, now: datetime | None = None) -> bool:
+    """The responder extended the due date and that date hasn't passed: nothing is needed from them yet."""
+    now = now or datetime.now(UTC)
+    last = esc.events[-1] if esc.events else None
+    return (
+        esc.status == EscalationStatus.OPEN.value
+        and last is not None
+        and last.kind == EscalationEventKind.EXTENDED.value
+        and esc.due_at > now
+    )
+
+
+def close_past_start_on_new_date(db: Session, actor: Actor, demand: Demand) -> bool:
+    """The owner moved the start date to the future on the demand page: that answers an open past-start
+    escalation the same way "Revise the start date" does. True if one was closed."""
+    esc = db.scalar(
+        select(Escalation).where(
+            Escalation.demand_id == demand.id,
+            Escalation.status == EscalationStatus.OPEN.value,
+            Escalation.type == EscalationType.PAST_START.value,
+        )
+    )
+    account = db.get_one(Account, demand.account_id)
+    now = datetime.now(UTC)
+    if esc is None or not can_resolve(actor, esc, demand) or not is_cleared(db, account, esc, demand, now):
+        return False
+    comment = f"Start date revised to {demand.start_date:%d %b %Y} on the demand page"
+    _close(db, esc, actor.id, OTHER_REASON, ResolutionAction.NEW_START, comment, now)
+    return True
+
+
 def who_acts(esc: Escalation) -> str:
     who = esc.responsible_enum
     if esc.demand_id is None:
