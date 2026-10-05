@@ -61,7 +61,7 @@
     items.forEach(function (it) {
       if (!it.n || it.out) return;
       var len = it.n / total * LEN, vis = Math.max(len - 2, 1);
-      h += '<circle class="slice" data-key="' + dim + '" data-val="' + esc(it.k) + '" cx="100" cy="100" r="' + R + '" stroke="' + it.c + '" stroke-width="' + (sel === it.k ? 34 : 26) + '" opacity="' + (sel && sel !== it.k ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"><title>' + esc(it.k) + ': ' + it.n + '</title></circle>';
+      h += '<circle class="slice" data-key="' + dim + '" data-val="' + esc(it.k) + '" cx="100" cy="100" r="' + R + '" stroke="' + it.c + '" stroke-width="' + (sel === it.k ? 34 : 26) + '" opacity="' + (sel && sel !== it.k ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"></circle>';
       start += len;
     });
     var rows = rowsFor(), openAll = D.filter(function (x) { return x.open; }).length;
@@ -78,8 +78,15 @@
 
   // A small ring beside the main one: the same positions cut another way. Each entity keeps its own
   // colour (by its place in the fixed order), so a filter never repaints what is left.
+  // What the breakdowns beside the ring count: open positions, like the ring itself. If the view holds
+  // only finished ones (a finished stage was picked), those are shown instead of nothing.
+  function live(rows) {
+    var open = rows.filter(function (x) { return x.open; });
+    return open.length ? open : rows;
+  }
+
   function mini(key) {
-    var base = rowsFor(key), pairs = count(base, key), total = base.length;
+    var base = live(rowsFor(key)), pairs = count(base, key), total = base.length;
     if (!pairs.length) return '';
     var R = 34, LEN = 2 * Math.PI * R, start = 0, sel = F[key];
     var order = ORDER[key] || [];
@@ -92,7 +99,7 @@
     var svg = '<svg viewBox="0 0 100 100" width="104" height="104" role="img" aria-label="By ' + NAME[key].toLowerCase() + '"><g transform="rotate(-90 50 50)" fill="none">';
     pairs.forEach(function (p) {
       var len = p[1] / total * LEN, vis = pairs.length === 1 ? len : Math.max(len - 1.5, 0.8);
-      svg += '<circle class="slice" data-key="' + key + '" data-val="' + esc(p[0]) + '" cx="50" cy="50" r="' + R + '" stroke="' + colour(p[0]) + '" stroke-width="' + (sel === p[0] ? 17 : 13) + '" opacity="' + (sel && sel !== p[0] ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"><title>' + esc(p[0]) + ': ' + p[1] + '</title></circle>';
+      svg += '<circle class="slice" data-key="' + key + '" data-val="' + esc(p[0]) + '" cx="50" cy="50" r="' + R + '" stroke="' + colour(p[0]) + '" stroke-width="' + (sel === p[0] ? 17 : 13) + '" opacity="' + (sel && sel !== p[0] ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"></circle>';
       start += len;
     });
     svg += '</g><text x="50" y="55" text-anchor="middle" class="mini-total">' + total + '</text></svg>';
@@ -103,7 +110,7 @@
 
   // Type and practice stay as plain bars: quick to read, and they don't compete with the rings.
   function bars(key) {
-    var base = rowsFor(key), pairs = count(base, key), max = base.length || 1;
+    var base = live(rowsFor(key)), pairs = count(base, key), max = base.length || 1;
     if (!pairs.length) return '';
     return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div>' + pairs.map(function (p) {
       return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%"></span></span><span class="n">' + p[1] + '</span></div>';
@@ -227,6 +234,7 @@
   }
 
   function draw() {
+    tipBox.hidden = true;
     var rows = ring(); kpis(rows); flow(); detail(rows); list(rows);
     $('ov-reset').disabled = !Object.keys(F).length && !openRef && !showFlow && dim === 'stage';
   }
@@ -237,6 +245,43 @@
     this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
     draw();
   });
+  // Hovering a slice of any ring says what is inside it.
+  var tipBox = document.createElement('div');
+  tipBox.className = 'ov-tip'; tipBox.hidden = true; document.body.appendChild(tipBox);
+  function hover(e) {
+    var t = e.target.closest ? e.target.closest('circle.slice') : null;
+    if (!t) { tipBox.hidden = true; return; }
+    var key = t.dataset.key, val = t.dataset.val;
+    var base = live(rowsFor(key)), rows = base.filter(function (x) { return x[key] === val; });
+    var lost = 0, late = 0, escd = 0, overdue = 0, cost = 0, oldest = 0;
+    rows.forEach(function (x) {
+      lost += x.lost || 0; late += x.late ? 1 : 0; cost += x.cost || 0; oldest = Math.max(oldest, x.days_late || 0);
+      escd += x.esc.length ? 1 : 0; overdue += x.esc.some(function (q) { return q.l === 2; }) ? 1 : 0;
+    });
+    var line = function (k, v, cls) { return '<div class="l' + (cls ? ' ' + cls : '') + '"><span>' + k + '</span><b>' + v + '</b></div>'; };
+    var h = '<div class="h">' + esc(val) + '</div>'
+      + line('Positions', rows.length + ' · ' + (base.length ? Math.round(rows.length / base.length * 100) : 0) + '% of ' + base.length)
+      + line('Past start', late + (late ? ' · longest ' + oldest + ' days' : ''), late ? 'warn' : '')
+      + line('Escalated', escd + (overdue ? ' · ' + overdue + ' overdue' : ''), overdue ? 'warn' : '')
+      + line('Revenue lost', money(lost), lost ? 'warn' : '');
+    if (cost) h += line('Non-billable cost', money(cost));
+    if (key !== 'sub') {
+      var top = count(rows, 'sub').sort(function (a, b) { return b[1] - a[1]; }).slice(0, 3);
+      if (top.length) h += '<div class="s">Mostly at: ' + top.map(function (q) { return esc(q[0]) + ' (' + q[1] + ')'; }).join(', ') + '</div>';
+    } else {
+      var bus = count(rows, 'bu').map(function (q) { return esc(q[0]) + ' (' + q[1] + ')'; }).join(', ');
+      if (bus) h += '<div class="s">In: ' + bus + '</div>';
+    }
+    h += '<div class="s">' + (F[key] === val ? 'Click to stop narrowing to this' : 'Click to see these demands') + '</div>';
+    tipBox.innerHTML = h; tipBox.hidden = false;
+    var w = tipBox.offsetWidth, hh = tipBox.offsetHeight, x = e.clientX + 16, y = e.clientY + 16;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - 16;
+    if (y + hh > window.innerHeight - 8) y = e.clientY - hh - 16;
+    tipBox.style.left = Math.max(8, x) + 'px'; tipBox.style.top = Math.max(8, y) + 'px';
+  }
+  $('ov').addEventListener('mousemove', hover);
+  $('ov').addEventListener('mouseleave', function () { tipBox.hidden = true; });
+
   $('ov').addEventListener('click', function (e) {
     if (e.target.id === 'ov-clear') { F = {}; draw(); return; }
     if (e.target.id === 'ov-reset') {  // everything back to how the page opens
