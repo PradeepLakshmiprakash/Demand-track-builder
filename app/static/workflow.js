@@ -20,6 +20,13 @@
     return best < 0 ? [t] : [t.slice(0, best), t.slice(best + 1)];
   }
 
+  /* How to read the diagram, for an info mark beside its heading. */
+  window.wfKey = function (single) {
+    return 'Solid boxes are the normal path, top to bottom then left to right. Dashed boxes are problem states a demand can fall into at that step.'
+      + (single ? ' ✓ = already passed · ● = where it is now.' : ' The number on a box is how many demands are there now; click a box or a stage to see them.')
+      + ' ⚠ = open escalations at that step.';
+  };
+
   window.wfDiagram = function (layout, o) {
     var cur = o.current, counts = o.counts, h = '', order = [], hangs = {};
     layout.stages.forEach(function (c) {
@@ -83,9 +90,6 @@
     ab.subs.forEach(function (b, k) { h += box(ab.label, b, 185 + k * 170, AY + 12, 4, false); });
     h += '<text x="' + (185 + ab.subs.length * 170 + 5) + '" y="' + (AY + 36) + '" font-size="11.5" fill="' + MUTED + '">A demand can be cancelled or closed from any step above.</text>';
     return '<svg viewBox="0 0 990 ' + (AY + 74) + '" width="100%" role="img" aria-label="Workflow diagram" style="min-width:860px">' + h + '</svg>'
-      + '<div class="wf-key">Solid boxes are the normal path, top to bottom then left to right. Dashed boxes are problem states a demand can fall into at that step.'
-      + (cur ? ' ✓ = already passed · ● = where it is now.' : ' The number on a box is how many demands are there now; click a box or a stage to see them.')
-      + ' ⚠ = open escalations at that step.</div>'
       + (cur ? '<div class="wf-esc">' + (o.escalations && o.escalations.length
         ? '<strong>Open escalations:</strong> ' + o.escalations.map(function (e) { return '<span>⚠ ' + esc(e.t) + ' · L' + e.l + (e.l === 2 ? ' overdue' : '') + '</span>'; }).join(' ')
         : 'No open escalations on this demand.') + '</div>' : '');

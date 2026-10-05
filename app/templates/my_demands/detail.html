@@ -19,8 +19,7 @@
 
 <div class="small" style="margin:-6px 0 12px"><a href="#" id="wf-toggle" class="wf-link">Show workflow</a></div>
 <section class="panel panel-body" id="wf-panel" hidden style="margin-bottom:16px">
-  <h2>Workflow</h2>
-  <div class="hint" style="margin-bottom:10px">Every stage and sub-stage, with where this demand is now.</div>
+  <h2 style="margin-bottom:10px">Workflow <span class="info" tabindex="0" role="note" id="wf-tip" data-tip="">i</span></h2>
   <div class="wf-wrap" id="wf-svg"></div>
   <div class="wf-next"><strong>Next:</strong> {{ wf_next }}</div>
 </section>
@@ -30,6 +29,7 @@
   var panel = document.getElementById('wf-panel'), link = document.getElementById('wf-toggle'), drawn = false;
   function show(on) {
     if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }}, escalations: {{ wf_esc | tojson }} }); drawn = true; }
+    document.getElementById('wf-tip').dataset.tip = 'Every stage and sub-stage, with where this demand is now. ' + wfKey(true);
     panel.hidden = !on;
     link.textContent = on ? 'Hide workflow' : 'Show workflow';
   }

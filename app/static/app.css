@@ -417,3 +417,13 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .cost-box label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
 .cost-box input[type=date] { width: 180px; min-height: 40px; }
 @media (max-width: 1100px) { .cost3 { grid-template-columns: 1fr; } }
+
+/* An "i" mark whose explanation shows on hover or focus. */
+.info { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: italic 600 10px/1 Georgia, serif; cursor: help; position: relative; vertical-align: middle; margin-left: 4px; text-transform: none; letter-spacing: 0; }
+.info:hover, .info:focus { border-color: var(--brand); color: var(--brand); outline: none; }
+.info::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: max-content; max-width: 280px; background: var(--ink); color: #fff; font: 400 12px/1.4 'IBM Plex Sans', system-ui, sans-serif; padding: 8px 10px; border-radius: 8px; text-align: left; white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; z-index: 30; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.info:hover::after, .info:focus::after { opacity: 1; visibility: visible; }
+.ov-main > section:first-child .info::after, .ov > .row .info::after, .ov-flow .info::after, #ov-flow .info::after, #wf-panel .info::after, #ov-list .info::after { left: 0; transform: none; }
+.facts4 .fact:nth-last-child(-n+2) .info::after { left: auto; right: 0; transform: none; }
+.facts4 .fact.pick .v::after { content: " ›"; color: var(--muted); font-weight: 400; }
+.ov-legend li { grid-template-columns: 12px 1fr auto 40px; }

@@ -13,6 +13,8 @@
   var $ = function (id) { return document.getElementById(id); };
 
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // An "i" mark: the explanation shows on hover or keyboard focus instead of sitting on the page.
+  function tip(text) { return ' <span class="info" tabindex="0" role="note" aria-label="' + esc(text) + '" data-tip="' + esc(text) + '">i</span>'; }
   function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
   function rowsFor(skip) { return D.filter(function (x) { for (var k in F) { if (k !== skip && x[k] !== F[k]) return false; } return true; }); }
   function count(rows, key) {
@@ -44,7 +46,7 @@
     h += '<text x="100" y="116" text-anchor="middle" class="ov-unit">' + (rows.length < D.length ? 'of ' + D.length + ' positions' : 'positions') + '</text>';
     $('ov-ring').innerHTML = h;
     $('ov-legend').innerHTML = items.map(function (it) {
-      return '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + '</span><span class="num">' + it.n + '</span><span class="pct">' + (total ? Math.round(it.n / total * 100) : 0) + '%</span>' + (MEANS[it.k] ? '<span class="d">' + esc(MEANS[it.k]) + '</span>' : '') + '</li>';
+      return '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (total ? Math.round(it.n / total * 100) : 0) + '%</span>' + '</li>';
     }).join('');
     return rows;
   }
@@ -52,7 +54,7 @@
   function bars(key) {
     var base = rowsFor(key), pairs = count(base, key), max = base.length || 1;
     if (!pairs.length) return '';
-    return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b> · ' + HINT[key] + '</div>' + pairs.map(function (p) {
+    return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div>' + pairs.map(function (p) {
       return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%"></span></span><span class="n">' + p[1] + '</span></div>';
     }).join('') + '</div>';
   }
@@ -60,18 +62,18 @@
   function detail(rows) {
     var lost = 0, late = 0, open = 0, norate = 0, escd = 0, cost = 0, costn = 0, ks = Object.keys(F);
     rows.forEach(function (x) { lost += x.lost || 0; late += x.late ? 1 : 0; open += x.open ? 1 : 0; norate += x.norate ? 1 : 0; escd += x.esc.length ? 1 : 0; cost += x.cost || 0; costn += x.cost_active ? 1 : 0; });
-    var h = '<div class="eyebrow">' + (ks.length ? 'You are looking at · click a tag to remove it' : 'You are looking at') + '</div>';
+    var h = '<div class="eyebrow">You are looking at' + (ks.length ? tip('Click a tag to remove it, or Clear all to see the whole account again.') : '') + '</div>';
     if (ks.length) {
       h += '<div class="chips">' + ks.map(function (k) { return '<button class="chip-x" data-key="' + k + '" data-val="' + esc(F[k]) + '">' + esc(F[k]) + ' ✕</button>'; }).join('') + '<button class="chip-x clear" id="ov-clear">Clear all</button></div>';
     } else {
-      h += '<h2>The whole account</h2><div class="small muted">Click any row below, or a slice, to narrow down.</div>';
+      h += '<h2>The whole account' + tip('Click a slice of the ring, any row below, or a number with an arrow, to narrow down. The numbers and the list of demands follow every click.') + '</h2>';
     }
-    h += '<div class="facts4"><div class="fact"><div class="k">Positions</div><div class="v">' + rows.length + '</div><div class="h">in this view</div></div>'
-      + '<div class="fact"><div class="k">Open</div><div class="v">' + open + '</div><div class="h">nobody has joined yet</div></div>'
-      + '<div class="fact pick' + (F.pstart ? ' on' : '') + '" data-key="pstart" data-val="Past start" role="button" tabindex="0"><div class="k">Past start</div><div class="v">' + late + '</div><div class="h">start date gone, still unfilled · ' + (F.pstart ? 'showing only these' : 'click to see them') + '</div></div>'
-      + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated</div><div class="v">' + escd + '</div><div class="h">with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '</div></div>'
-      + '<div class="fact"><div class="k">Revenue lost</div><div class="v">' + money(lost) + '</div><div class="h">bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '</div></div>'
-      + '<div class="fact pick cost' + (F.costing ? ' on' : '') + '" data-key="costing" data-val="Non-billable cost" role="button" tabindex="0"><div class="k">Non-billable cost</div><div class="v">' + money(cost) + '</div><div class="h">' + costn + ' proactive position' + (costn === 1 ? '' : 's') + ' not billing · ' + (F.costing ? 'showing only these' : 'click to see them') + '</div></div></div>';
+    h += '<div class="facts4"><div class="fact"><div class="k">Positions' + tip('in this view') + '</div><div class="v">' + rows.length + '</div></div>'
+      + '<div class="fact"><div class="k">Open' + tip('nobody has joined yet') + '</div><div class="v">' + open + '</div></div>'
+      + '<div class="fact pick' + (F.pstart ? ' on' : '') + '" data-key="pstart" data-val="Past start" role="button" tabindex="0"><div class="k">Past start' + tip('start date gone, still unfilled · ' + (F.pstart ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + late + '</div></div>'
+      + '<div class="fact pick' + (F.escd ? ' on' : '') + '" data-key="escd" data-val="Escalated" role="button" tabindex="0"><div class="k">Escalated' + tip('with an open escalation · ' + (F.escd ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + escd + '</div></div>'
+      + '<div class="fact"><div class="k">Revenue lost' + tip('bill rate × ' + OV.hours + ' h × working days late' + (norate ? ' · ' + norate + ' with no bill rate' : '') + '') + '</div><div class="v">' + money(lost) + '</div></div>'
+      + '<div class="fact pick cost' + (F.costing ? ' on' : '') + '" data-key="costing" data-val="Non-billable cost" role="button" tabindex="0"><div class="k">Non-billable cost' + tip('' + costn + ' proactive position' + (costn === 1 ? '' : 's') + ' not billing · ' + (F.costing ? 'showing only these' : 'click to see them') + '') + '</div><div class="v">' + money(cost) + '</div></div></div>';
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     if (F.stage) h += bars('sub');
     h += bars(dim === 'stage' ? 'bu' : 'stage');
@@ -89,21 +91,21 @@
       b.n += x.cost_active ? 1 : 0; b.cost += x.cost; b.month += x.cost_month;
     });
     var max = Math.max.apply(null, Object.keys(bu).map(function (k) { return bu[k].cost; })) || 1;
-    var h = '<div class="costing"><div class="ov-listhead"><h2>Costing</h2><span class="small muted">proactive, non-billable positions past their start date</span></div>'
-      + '<div class="cost3"><div><div class="k">Positions not billing</div><div class="v">' + active + '</div><div class="h">the client isn\'t paying for them yet</div></div>'
-      + '<div><div class="k">Cost so far</div><div class="v">' + money(sofar) + '</div><div class="h">cost rate × ' + OV.hours + ' h × working days since the start date</div></div>'
-      + '<div><div class="k">Cost per month from here</div><div class="v">' + money(month) + '</div><div class="h">if nothing changes · ' + OV.month_days + ' working days</div></div></div>';
+    var h = '<div class="costing"><div class="ov-listhead"><h2>Costing' + tip('Proactive, non-billable positions past their start date. They cost the account every working day until the demand owner marks them billable. Never counted as revenue lost.') + '</h2></div>'
+      + '<div class="cost3"><div><div class="k">Positions not billing' + tip('the client isn\'t paying for them yet') + '</div><div class="v">' + active + '</div></div>'
+      + '<div><div class="k">Cost so far' + tip('cost rate × ' + OV.hours + ' h × working days since the start date') + '</div><div class="v">' + money(sofar) + '</div></div>'
+      + '<div><div class="k">Cost per month from here' + tip('if nothing changes · ' + OV.month_days + ' working days') + '</div><div class="v">' + money(month) + '</div></div></div>';
     if (norate) h += '<div class="small late" style="margin-top:8px">' + norate + ' position' + (norate === 1 ? ' has' : 's have') + ' no cost rate: no offer, and no rate card entry for the grade, practice and region.</div>';
     h += '<table class="ov-table"><thead><tr><th>Business unit</th><th class="r">Not billing</th><th>Agreed cap</th><th>Cost so far</th><th class="r">Per month</th></tr></thead><tbody>';
     Object.keys(bu).sort().forEach(function (k) {
       var b = bu[k], cap = OV.caps[k];
       h += '<tr><td>' + esc(k) + '</td><td class="r">' + b.n + '</td><td>' + (cap === null || cap === undefined ? '—' : cap + (b.n > cap ? ' <span class="chip esc">over cap</span>' : '')) + '</td><td><span class="cbar"><i style="width:' + (b.cost / max * 100) + '%"></i></span>' + money(b.cost) + '</td><td class="r">' + money(b.month) + '</td></tr>';
     });
-    return h + '</tbody></table><div class="small muted" style="margin-top:6px">Never counted as revenue lost. Costing stops when the demand owner marks the position billable.</div></div>';
+    return h + '</tbody></table></div>';
   }
 
   function costList(rows, title) {
-    var h = '<div class="ov-listhead"><h2>' + rows.length + ' non-billable position' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span></h2><span class="small muted">What each one has cost the account since its start date.</span></div>';
+    var h = '<div class="ov-listhead"><h2>' + rows.length + ' non-billable position' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('What each one has cost the account since its start date. Greyed rows are already billable: their costing has stopped.') + '</h2></div>';
     h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Position</th><th>Resource</th><th>Owner · BU</th><th>Practice · grade</th><th>Stage</th><th>Start date</th><th class="r">Working days</th><th class="r">Cost / h</th><th class="r">Cost so far</th></tr></thead><tbody>';
     var total = 0;
     h += rows.map(function (x) {
@@ -122,7 +124,7 @@
     }
     var title = ks.map(function (k) { return NAME[k].toLowerCase() + ': ' + F[k]; }).join(' · ');
     if (F.costing) { costList(rows, title); return; }
-    var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span></h2><span class="small muted">These are the demands behind the numbers above.</span></div>';
+    var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('These are the demands behind the numbers above. Click a reference to open the demand.') + '</h2></div>';
     h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Practice</th><th>Stage</th><th>Start</th><th>Joining</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
     h += rows.map(function (x) {
       var on = openRef === x.ref;
@@ -139,7 +141,7 @@
     rows.forEach(function (x) { counts[x.sub] = (counts[x.sub] || 0) + 1; if (x.esc.length) em[x.sub] = (em[x.sub] || 0) + x.esc.length; });
     $('ov-flowlink').textContent = showFlow ? 'Hide workflow' : 'Show workflow';
     $('ov-flow').hidden = !showFlow;
-    if (showFlow) $('ov-flow').innerHTML = '<h2>Workflow</h2><div class="hint" style="margin-bottom:10px">Every stage and sub-stage a demand can be in, with the open escalations at each step.</div><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
+    if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('Every stage and sub-stage a demand can be in. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
   function draw() { var rows = ring(); flow(); detail(rows); list(rows); }

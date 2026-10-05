@@ -25,16 +25,15 @@
 {% endif %}
 
 <div id="ov" class="ov">
-  <div class="ov-how">
-    <div><b>1</b> The ring shows every position as a share. <a href="#" id="ov-flowlink" class="wf-link">Show workflow</a> shows the same positions on the process.</div>
-    <div><b>2</b> Click a slice, or a box in the workflow, to look only at that part.</div>
-    <div><b>3</b> Keep clicking on the right to narrow further. The numbers and the list of demands follow every click.</div>
+  <div class="row small">
+    <a href="#" id="ov-flowlink" class="wf-link">Show workflow</a>
+    <span class="info" tabindex="0" role="note" data-tip="How to read this page: the ring shows every position as a share, and Show workflow shows the same positions on the process. Click a slice, a row beside it, a number with an arrow, or a box in the workflow to look only at that part. Keep clicking to narrow further: the numbers and the list of demands follow every click.">i</span>
   </div>
   <section class="panel panel-body" id="ov-flow" hidden></section>
   <div class="ov-main">
     <section class="panel panel-body">
       <div class="ov-ringhead">
-        <div><h2>All positions</h2><div class="hint">Each slice is a share of the positions</div></div>
+        <h2>All positions <span class="info" tabindex="0" role="note" data-tip="Each slice is a share of the positions in view. Split the ring by stage or by business unit with the buttons on the right.">i</span></h2>
         <div class="ov-tabs" id="ov-tabs" role="group" aria-label="Split the ring by">
           <button type="button" data-d="stage" class="on">By stage</button><button type="button" data-d="bu">By business unit</button>
         </div>
