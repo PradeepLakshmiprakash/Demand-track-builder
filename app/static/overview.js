@@ -49,6 +49,14 @@
     draw();
   }
 
+  // The sub-stages of the stage that is picked, listed under it.
+  function subRows(stage) {
+    var rows = rowsFor('sub').filter(function (x) { return x.stage === stage; });
+    return count(rows, 'sub').map(function (p) {
+      return '<li class="sub-row' + (F.sub === p[0] ? ' on' : '') + '" data-key="sub" data-val="' + esc(p[0]) + '"><span class="sw" style="background:' + (SUB_C[p[0]] || '#8B877E') + '"></span><span>' + esc(p[0]) + '</span><span class="num">' + p[1] + '</span><span class="pct">' + (rows.length ? Math.round(p[1] / rows.length * 100) : 0) + '%</span></li>';
+    }).join('');
+  }
+
   function ring() {
     // The ring is the open positions only. Joined and abandoned ones stay out of it; by stage they are
     // still listed under the ring, so they can be opened.
@@ -71,7 +79,8 @@
     $('ov-ring').innerHTML = h;
     $('ov-legend').innerHTML = items.map(function (it, j) {
       var head = dim !== 'stage' ? '' : j === 0 ? '<li class="grp-l">In progress · lighter to darker as it moves on</li>' : j === 3 ? '<li class="grp-l">Finished · not in the ring</li>' : '';
-      return head + '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (it.out ? '' : (total ? Math.round(it.n / total * 100) : 0) + '%') + '</span>' + '</li>';
+      return head + '<li data-key="' + dim + '" data-val="' + esc(it.k) + '" class="' + (sel === it.k ? 'on' : '') + (it.n ? '' : ' zero') + '"><span class="sw" style="background:' + it.c + '"></span><span>' + esc(it.k) + (MEANS[it.k] ? tip(MEANS[it.k]) : '') + '</span><span class="num">' + it.n + '</span><span class="pct">' + (it.out ? '' : (total ? Math.round(it.n / total * 100) : 0) + '%') + '</span>' + '</li>'
+        + (dim === 'stage' && sel === it.k ? subRows(it.k) : '');
     }).join('');
     return rows;
   }
@@ -88,7 +97,7 @@
   function mini(key) {
     var base = live(rowsFor(key)), pairs = count(base, key), total = base.length;
     if (!pairs.length) return '';
-    var R = 34, LEN = 2 * Math.PI * R, start = 0, sel = F[key];
+    var R = 36, LEN = 2 * Math.PI * R, start = 0, sel = F[key];
     var order = ORDER[key] || [];
     var colour = function (v) {
       var i = order.indexOf(v);
@@ -96,10 +105,10 @@
       if (key === 'sub') return SUB_C[v] || '#8B877E';
       return i < 0 ? '#8B877E' : C[i % C.length];
     };
-    var svg = '<svg viewBox="0 0 100 100" width="104" height="104" role="img" aria-label="By ' + NAME[key].toLowerCase() + '"><g transform="rotate(-90 50 50)" fill="none">';
+    var svg = '<svg viewBox="0 0 100 100" width="170" height="170" role="img" aria-label="By ' + NAME[key].toLowerCase() + '"><g transform="rotate(-90 50 50)" fill="none">';
     pairs.forEach(function (p) {
       var len = p[1] / total * LEN, vis = pairs.length === 1 ? len : Math.max(len - 1.5, 0.8);
-      svg += '<circle class="slice" data-key="' + key + '" data-val="' + esc(p[0]) + '" cx="50" cy="50" r="' + R + '" stroke="' + colour(p[0]) + '" stroke-width="' + (sel === p[0] ? 17 : 13) + '" opacity="' + (sel && sel !== p[0] ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"></circle>';
+      svg += '<circle class="slice" data-key="' + key + '" data-val="' + esc(p[0]) + '" cx="50" cy="50" r="' + R + '" stroke="' + colour(p[0]) + '" stroke-width="' + (sel === p[0] ? 16 : 12) + '" opacity="' + (sel && sel !== p[0] ? .35 : 1) + '" stroke-dasharray="' + vis.toFixed(2) + ' ' + (LEN - vis).toFixed(2) + '" stroke-dashoffset="' + (-start).toFixed(2) + '"></circle>';
       start += len;
     });
     svg += '</g><text x="50" y="55" text-anchor="middle" class="mini-total">' + total + '</text></svg>';
