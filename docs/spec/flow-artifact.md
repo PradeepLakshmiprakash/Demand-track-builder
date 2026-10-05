@@ -2,7 +2,7 @@
 
 Version 1.6 · 1 Oct 2026 — Phase 8 plus the 1 Oct review changes: see §17–§18, which supersede §9 (escalations) and the role names used above.
 Scope: tracking client positions (demands) from the moment a demand owner raises them until the candidate is onboarded and billing starts. Built for Discover NA first, but every client-specific rule is account configuration so the same app works for any client.
-Design decisions behind each rule are numbered D1–D79 in `docs/decisions.md`.
+Design decisions behind each rule are numbered D1–D82 in `docs/decisions.md`.
 
 ---
 
@@ -456,7 +456,7 @@ Where this section differs from the text above, this section is what is built. "
 
 | Main stage | Sub-stage | Set by |
 |---|---|---|
-| Coverage Required | Draft | Demand owner |
+| Resourcing In Progress | Draft | Demand owner |
 | | GTD creation pending | Submitted; in the morning reminder until created on GTD |
 | | Correction required | Sent back to the owner |
 | | GTD approval pending | GTD admin team links the requisition ID |

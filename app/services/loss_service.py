@@ -122,6 +122,8 @@ class Overview:
     by_bu: list[Slice]
     hours_per_day: float
     period: Period
+    demands: list[Demand]  # everything in view, for the page to slice
+    loss_of: dict[int, Loss]
     archived: int  # finished demands left out because they are older than the period shows
 
 
@@ -134,7 +136,7 @@ def overview(db: Session, account_id: int, today: date, period: Period | None = 
         db.scalars(
             select(Demand)
             .where(Demand.account_id == account_id, Demand.status != DemandStatus.DRAFT.value)
-            .options(selectinload(Demand.business_unit))
+            .options(selectinload(Demand.business_unit), selectinload(Demand.owner))
         )
     )
     finished = finished_dates(db, everything)
@@ -190,6 +192,8 @@ def overview(db: Session, account_id: int, today: date, period: Period | None = 
         by_bu=slices(lambda d: d.business_unit.name),
         hours_per_day=account.settings.billable_hours_per_day,
         period=period,
+        demands=demands,
+        loss_of={x.demand.id: x for x in loss},
         archived=sum(period.archived(finished.get(d.id)) for d in everything if d.id not in shown),
     )
 

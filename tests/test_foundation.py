@@ -59,7 +59,7 @@ def test_rows_and_summary_for_priya(db: Session) -> None:
         "alloc_done": 1,
         "abandoned": 0,
     }
-    assert by_ref["DM-000142"].main.label == "Coverage Required"  # main stage; the sub-stage is the label
+    assert by_ref["DM-000142"].main.label == "Resourcing In Progress"  # the sub-stage is the label
 
 
 def test_seed_has_two_accounts(db: Session) -> None:

@@ -14,7 +14,7 @@
 
 <div class="cards" style="grid-template-columns:repeat({{ 6 if my_loss is not none else 5 }},minmax(0,1fr))">
   <div class="card"><div class="k">Open demands</div><div class="v">{{ stats.open }}</div></div>
-  <div class="card"><div class="k">Coverage Required</div><div class="v">{{ stats.coverage }}</div><div class="s">Raising, GTD and sourcing</div></div>
+  <div class="card"><div class="k">Resourcing In Progress</div><div class="v">{{ stats.coverage }}</div><div class="s">Raising, GTD and sourcing</div></div>
   <div class="card"><div class="k">Selection In Progress</div><div class="v">{{ stats.selection }}</div><div class="s">Panel and client interviews</div></div>
   <div class="card"><div class="k">Allocation Pending</div><div class="v">{{ stats.alloc_pending }}</div><div class="s">Offer approval, joining awaited</div></div>
   <div class="card warn"><div class="k">Needs attention</div><div class="v">{{ stats.attention }}</div><div class="s">Missing, escalated or past start</div></div>

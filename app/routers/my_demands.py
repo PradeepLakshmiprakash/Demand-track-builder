@@ -25,6 +25,7 @@ from app.services import (
     margin_service,
     notify_service,
     pipeline_service,
+    workflow_service,
 )
 from app.services.account_service import get_account
 from app.services.demand_service import (
@@ -156,6 +157,9 @@ def demand_page(
         ),
         sees_escalations=actor.role in (Role.ADMIN, Role.ADMIN_TEAM, Role.LEADERSHIP),
         respond=_to_respond(db, actor, demand),
+        wf_layout=workflow_service.layout(),
+        wf_at=workflow_service.position(demand),
+        wf_next=workflow_service.next_step(demand),
         can_revise_dates=demand_service.can_revise_dates(actor, demand),
         candidates=interview_service.for_demand(db, demand.id),
         decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,

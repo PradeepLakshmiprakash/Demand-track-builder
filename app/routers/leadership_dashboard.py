@@ -1,7 +1,6 @@
 """Leadership and the GTD team admin: account overview. Fill speed, pipeline, and revenue lost
 to missed start dates."""
 
-from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -10,12 +9,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.enums import EscalationStatus, Role
+from app.core.enums import EscalationStatus, MainStage, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, OfferApproval
-from app.services import chart_service, loss_service, reconcile_service
+from app.services import loss_service, reconcile_service, workflow_service
+from app.services.account_service import get_account
 from app.services.demand_service import account_today, period_for
+from app.services.escalation_service import current_doj
 
 router = APIRouter(tags=["leadership"])
 guard = require_screen("overview")
@@ -61,52 +62,61 @@ def overview_page(
         latest=reconcile_service.latest_import(db, actor.account_id),
         escalations=_open_escalations(db, actor.account_id),
         offers_waiting=waiting or 0,
-        max_group=max((n for _, _, n in o.pipeline), default=1) or 1,
         nb=loss_service.non_billable_by_bu(db, actor.account_id),
-        charts=_charts(o),
+        ov=_page_data(db, o),
         sets_caps=actor.role is Role.ADMIN,
     )
 
 
-def _money(v: Decimal) -> str:
-    return f"${v:,.0f}"
+# What each main stage means, in plain words, under its name on the overview.
+MEANS = {
+    MainStage.COVERAGE: "Raised, not yet with a candidate: being approved on GTD, or profiles being sourced",
+    MainStage.SELECTION: "Candidates are in panel or client interviews",
+    MainStage.ALLOC_PENDING: "A candidate is chosen: offer being approved, or joining awaited",
+    MainStage.ALLOC_DONE: "The candidate has joined",
+    MainStage.ABANDONED: "Cancelled or closed without a hire",
+}
 
 
-def _short_money(v: Decimal) -> str:
-    """For the middle of a donut, where a full figure doesn't fit: $80,856 → $81K."""
-    if v >= 1_000_000:
-        return f"${v / 1_000_000:.1f}M"
-    return f"${v / 1000:.0f}K" if v >= 10_000 else _money(v)
-
-
-def _charts(o: loss_service.Overview) -> list[chart_service.Donut]:
-    """The high-level picture: positions by stage, where the money is being lost, and the demand mix."""
-    by_bu = sorted(o.by_bu, key=lambda s: s.name)  # a BU keeps its colour whatever its rank
-    open_positions = sum(o.mix.values())
-    return [
-        chart_service.donut(
-            "Positions by stage",
-            "By main stage. Click a stage for its sub-stages.",
-            [(label, n, str(n)) for _, label, n in o.pipeline],
-            str(o.live),
-            "positions",
-            parts={label: [(name, str(c)) for name, c in o.subs.get(k, [])] for k, label, _ in o.pipeline},
-        ),
-        chart_service.donut(
-            "Revenue lost by business unit",
-            "Lost to date on positions unfilled past their start.",
-            [(s.name, s.lost, _money(s.lost)) for s in by_bu],
-            _short_money(o.lost_to_date),
-            "lost to date",
-        ),
-        chart_service.donut(
-            "Open positions by type",
-            "New or replacement, billable or non-billable.",
-            [(label, n, str(n)) for label, n in o.mix.items()],
-            str(open_positions),
-            "open positions",
-        ),
-    ]
+def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
+    """Everything static/overview.js needs: one row per position in view, and the order things show in."""
+    account = get_account(db, o.demands[0].account_id) if o.demands else None
+    doj = current_doj(db, account.id) if account else {}
+    rows = []
+    for d in sorted(o.demands, key=lambda d: d.app_ref):
+        loss = o.loss_of.get(d.id)
+        kind = "Replacement" if d.type == "Replacement" else "New"
+        rows.append(
+            {
+                "ref": d.app_ref,
+                "req": d.gtd_req_id,
+                "name": d.name,
+                "stage": d.status_enum.main.label,
+                "sub": d.status_enum.label,
+                "bu": d.business_unit.name,
+                "owner": d.owner.name,
+                "practice": d.practice or "—",
+                "type": f"{kind} · {'non-billable' if d.position_type == 'Non-billable' else 'billable'}",
+                "start": f"{d.start_date:%d %b %Y}" if d.start_date else None,
+                "joining": f"{doj[d.id]:%d %b %Y}" if doj.get(d.id) else None,
+                "open": d.status_enum.main.value in loss_service.OPEN_GROUPS,
+                "late": loss is not None and not loss.filled,
+                "lost": float(loss.lost) if loss is not None and loss.lost is not None else 0,
+                "norate": loss is not None and loss.lost is None,
+            }
+        )
+    return {
+        "rows": rows,
+        "order": {
+            "stage": [m.label for m in MainStage],
+            "bu": sorted({r["bu"] for r in rows}),
+            "type": list(loss_service.MIX),
+            "practice": list(account.settings.practices) if account else [],
+        },
+        "means": {m.label: text for m, text in MEANS.items()},
+        "layout": workflow_service.layout(),
+        "hours": f"{o.hours_per_day:g}",
+    }
 
 
 @router.post("/overview/nb-caps")

@@ -1,33 +1,56 @@
+"""Account overview: one ring that narrows on every click, and the workflow diagram."""
+
+import json
+import re
 from datetime import date
-from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.services import chart_service, loss_service
+from app.core.enums import DemandStatus, MainStage
+from app.services import loss_service, workflow_service
 from tests.conftest import Client
 
 
-def test_donut_slices_cover_the_whole_ring() -> None:
-    c = chart_service.donut("T", "h", [("A", 3, "3"), ("B", 0, "0"), ("C", 1, "1")], "4", "things")
-    assert [s.pct for s in c.slices] == [75, 0, 25] and [s.label for s in c.drawn] == ["A", "C"]
-    assert c.slices[2].color == chart_service.SLOTS[2]  # colour follows the position, not the rank
-    assert abs(-c.drawn[1].offset - 0.75 * chart_service.CIRCUMFERENCE) < 0.01
+def page_data(html: str) -> dict:  # type: ignore[type-arg]
+    m = re.search(r"window\.OV = (\{.*?\});</script>", html, re.S)
+    assert m, "the overview page carries its data"
+    return json.loads(m.group(1))  # type: ignore[no-any-return]
 
 
-def test_donut_never_has_more_than_five_slices() -> None:
-    c = chart_service.donut("T", "h", [(str(i), Decimal(1), "1") for i in range(8)], "8", "things")
-    assert len(c.slices) == 5 and c.slices[-1].label == "Other" and c.slices[-1].display == "4 more"
+def test_every_status_is_a_box_in_the_workflow() -> None:
+    lay = workflow_service.layout()
+    boxes = {b for s in lay["stages"] for b in s["subs"]} | {
+        p[0] for s in lay["stages"] for p in s["problems"]
+    }
+    boxes |= set(lay["abandoned"]["subs"])
+    assert boxes == {s.label for s in DemandStatus}
+    assert [s["label"] for s in lay["stages"]][0] == "Resourcing In Progress"
+    assert set(workflow_service.NEXT) == set(DemandStatus)
+    for stage, path in workflow_service.PATH.items():
+        assert all(s.main is stage for s in path)
 
 
-def test_donut_with_nothing_draws_nothing() -> None:
-    assert chart_service.donut("T", "h", [("A", 0, "0")], "0", "things").drawn == []
-
-
-def test_overview_shows_the_three_charts(client: Client, db: Session) -> None:
-    page = client.as_user("sanjay").get("/overview").text
-    for title in ("Positions by stage", "Revenue lost by business unit", "Open positions by type"):
-        assert title in page
-    assert "Click a stage for its sub-stages" in page and '<details id="parts-0-0">' in page
-    assert "GTD approval pending" in page  # a sub-stage of Coverage Required, behind the click
+def test_overview_page_carries_every_position(client: Client, db: Session) -> None:
+    html = client.as_user("sanjay").get("/overview").text
+    assert "Show workflow" in html and "/static/overview.js" in html and "/static/workflow.js" in html
+    assert "Coverage Required" not in html
+    data = page_data(html)
     o = loss_service.overview(db, 1, date.today())
-    assert sum(o.mix.values()) == o.open and sum(n for _, _, n in o.pipeline) == o.live
+    assert len(data["rows"]) == o.live and sum(r["open"] for r in data["rows"]) == o.open
+    assert sum(r["late"] for r in data["rows"]) == len(o.at_risk)
+    assert round(sum(r["lost"] for r in data["rows"]), 2) == float(o.lost_to_date)
+    assert data["order"]["stage"] == [m.label for m in MainStage]
+    assert {r["type"] for r in data["rows"]} <= set(data["order"]["type"])
+    row = data["rows"][0]
+    assert {"ref", "name", "stage", "sub", "bu", "owner", "practice", "type", "start", "lost"} <= set(row)
+
+
+def test_overview_is_not_for_demand_owners(client: Client) -> None:
+    assert client.as_user("priya").get("/overview").status_code == 403
+
+
+def test_demand_page_has_its_workflow(client: Client) -> None:
+    html = client.as_user("priya").get("/demands/DM-000121").text
+    assert "Show workflow" in html and "wfDiagram(" in html
+    assert '"sub": "Offer approval pending"' in html and '"stage": "Allocation Pending"' in html
+    assert "<strong>Next:</strong> The offer is approved" in html

@@ -113,7 +113,7 @@ class DemandStatus(StrEnum):
 
     @property
     def full(self) -> str:
-        """Main stage and sub-stage together: "Coverage Required · GTD approval pending"."""
+        """Main stage and sub-stage together: "Resourcing In Progress · GTD approval pending"."""
         return f"{MAIN_OF[self].label} · {STATUS_META[self][0]}"
 
 
@@ -164,7 +164,7 @@ class MainStage(StrEnum):
 
 
 MAIN_STAGE_META = {
-    MainStage.COVERAGE: ("Coverage Required", "teal"),
+    MainStage.COVERAGE: ("Resourcing In Progress", "teal"),
     MainStage.SELECTION: ("Selection In Progress", "blue"),
     MainStage.ALLOC_PENDING: ("Allocation Pending", "blue"),
     MainStage.ALLOC_DONE: ("Allocation Completed", "done"),

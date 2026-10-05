@@ -438,7 +438,7 @@ status is a sub-stage of one of them:
 
 | Main stage | Sub-stages |
 |---|---|
-| Coverage Required | Draft · GTD creation pending · Correction required · GTD approval pending · GTD approval overdue · Removed from sheet · Marked incorrect · GTD approved · Sourcing profiles |
+| Resourcing In Progress | Draft · GTD creation pending · Correction required · GTD approval pending · GTD approval overdue · Removed from sheet · Marked incorrect · GTD approved · Sourcing profiles |
 | Selection In Progress | Panel interview · Panel selected · Client interview in progress |
 | Allocation Pending | Offer approval pending · Offer made, joining awaited |
 | Allocation Completed | Joined |
@@ -497,3 +497,20 @@ where the whole demand is in front of them, or from the Escalations screen, whic
 (or the GTD team admin) can still change the start date and, for a replacement, the leaver's last
 working day, on the demand page; the GTD team admin is mailed the change. Not on a finished demand.
 The demand page shows the demand owner's name with the position details.
+
+## Round of 5 Oct
+
+**D80. "Resourcing In Progress"** replaces "Coverage Required" as the first main stage, everywhere in
+the app. (The BCM sheet's own status text "Coverage Required" is unchanged: that is the sheet's word.)
+
+**D81. Account overview.** One ring over every position in view, split by stage or by business unit.
+Every click narrows the page: a slice, a row beside it (sub-stage, business unit or stage, type,
+practice), or a box in the workflow; the tags show what is chosen. The four numbers (positions, open,
+past start, revenue lost) follow, and the demands behind them are listed only once something is
+narrowed. Revenue at risk and the non-billable caps stay below. The date filter still applies.
+
+**D82. Workflow diagram.** "Show workflow" (a link) on the overview, on each listed demand and on the
+demand page draws every main stage as a container and every sub-stage as a box inside it, problem
+states dashed beside the step they belong to, Abandoned along the bottom. On the overview each box
+carries its number of demands and is clickable; for one demand the steps passed are ticked, the current
+one is filled in, and a "Next" line says who acts.

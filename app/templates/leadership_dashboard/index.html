@@ -1,21 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Account overview{% endblock %}
-{% macro breakdown(title, head, slices) %}
-<section class="panel">
-  <div class="panel-head"><h2>{{ title }}</h2></div>
-  <div class="tbl slices">
-    <div class="tr th"><div>{{ head }}</div><div>Mix</div><div class="num">Demands</div><div class="num">Revenue lost</div></div>
-    {% for s in slices %}
-    <div class="tr">
-      <div class="title">{{ s.name }}</div>
-      <div class="small muted">{{ s.mix }}</div>
-      <div class="num">{{ s.total }}</div>
-      <div class="num">{{ s.lost | money if s.lost else '—' }}</div>
-    </div>
-    {% endfor %}
-  </div>
-</section>
-{% endmacro %}
 {% block main %}
 <div class="head">
   <div>
@@ -33,15 +17,6 @@
   {% if o.period.chosen %}<a class="small" href="/overview">Clear dates</a>{% endif %}
 </form>
 
-<div class="cards">
-  <div class="card"><div class="k">Open demands</div><div class="v">{{ o.open }}</div><div class="s">of {{ o.live }} past draft{% if latest %} · {{ latest.row_count }} in the sheet{% endif %}</div></div>
-  <div class="card"><div class="k">Still need coverage</div><div class="v">{{ o.need_coverage }}</div><div class="s">No profile with the client yet</div></div>
-  <div class="card {{ 'warn' if o.at_risk }}"><div class="k">Past start date, unfilled</div><div class="v">{{ o.at_risk | length }}</div>
-    <div class="s">{% if o.at_risk %}{{ o.at_risk | map(attribute='days_late') | min }} to {{ o.at_risk | map(attribute='days_late') | max }} days late{% else %}None{% endif %}</div></div>
-  <div class="card {{ 'warn' if o.lost_to_date }}"><div class="k">Revenue lost to date</div><div class="v">{{ o.lost_to_date | money }}</div>
-    <div class="s">Hourly bill rate × {{ '%g' % o.hours_per_day }} h × working days late{% if o.projected %} · {{ o.projected | money }} more by the DOJs set{% endif %}{% if o.missing_rates %} · {{ o.missing_rates }} late demand{{ 's' if o.missing_rates > 1 }} with no bill rate{% endif %}</div></div>
-</div>
-
 {% if escalations or offers_waiting %}
 <div class="row small">
   {% if escalations %}<a class="pill" href="/escalations?level=2">{{ escalations.get(2, 0) }} escalation{{ 's' if escalations.get(2, 0) != 1 }} at L2 · {{ escalations.get(1, 0) }} at L1</a>{% endif %}
@@ -49,64 +24,32 @@
 </div>
 {% endif %}
 
-<div class="donuts">
-  {% for c in charts %}
-  {% set ci = loop.index0 %}
-  <section class="panel panel-body donut-card">
-    <h2>{{ c.title }}</h2>
-    <div class="hint">{{ c.hint }}</div>
-    {% if c.drawn %}
-    <div class="donut-body">
-      <svg viewBox="0 0 140 140" width="168" height="168" role="img" aria-label="{{ c.title }}: {% for s in c.slices if s.dash %}{{ s.label }} {{ s.display }}{{ ', ' if not loop.last }}{% endfor %}">
-        <g transform="rotate(-90 70 70)" fill="none" stroke-width="22">
-          {% for s in c.slices if s.dash %}
-          <circle class="slice{{ ' opens' if s.parts }}" {% if s.parts %}onclick="var d=document.getElementById('parts-{{ ci }}-{{ loop.index0 }}');d.open=!d.open" {% endif %}cx="70" cy="70" r="54" stroke="{{ s.color }}" stroke-dasharray="{{ s.dash }}" stroke-dashoffset="{{ '%.2f' % s.offset }}"><title>{{ s.label }}: {{ s.display }} ({{ s.pct }}%)</title></circle>
-          {% endfor %}
-        </g>
-        <text x="70" y="68" text-anchor="middle" class="donut-total">{{ c.center }}</text>
-        <text x="70" y="86" text-anchor="middle" class="donut-unit">{{ c.center_label }}</text>
-      </svg>
-      <ul class="donut-legend">
-        {% for s in c.slices if s.dash %}
-        <li>
-          {% if s.parts %}
-          <details id="parts-{{ ci }}-{{ loop.index0 }}">
-            <summary class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></summary>
-            <ul class="donut-parts">
-              {% for name, shown in s.parts %}<li><span>{{ name }}</span><span class="val">{{ shown }}</span></li>{% endfor %}
-            </ul>
-          </details>
-          {% else %}
-          <div class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></div>
-          {% endif %}
-        </li>
-        {% endfor %}
-        {% for s in c.slices if not s.dash %}
-        <li class="zero"><div class="row"><span class="swatch" style="background:{{ s.color }}"></span><span class="name">{{ s.label }}</span><span class="val">{{ s.display }}</span><span class="pct">{{ s.pct }}%</span></div></li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% else %}
-    <div class="empty">Nothing to show yet.</div>
-    {% endif %}
-  </section>
-  {% endfor %}
-</div>
-
-<section class="panel panel-body">
-  <h2>Pipeline by stage</h2>
-  <div class="hint" style="margin-top:4px">Every demand past draft, by main stage, with the sub-stages inside each.</div>
-  <div class="bars" role="list" aria-label="Demands by stage">
-    {% for key, label, n in o.pipeline %}
-    <div class="bar-row" role="listitem" title="{{ label }}: {{ n }} demand{{ 's' if n != 1 }}">
-      <div class="bar-label">{{ label }}</div>
-      <div class="bar-track"><div class="bar {{ 'bar-risk' if key == 'abandoned' }}" style="width: {{ (100 * n / max_group) | round(1) }}%"></div></div>
-      <div class="bar-value">{{ n }}</div>
-    </div>
-    {% if o.subs.get(key) %}<div class="bar-subs small muted">{% for name, c in o.subs[key] %}{{ c }} {{ name }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
-    {% endfor %}
+<div id="ov" class="ov">
+  <div class="ov-how">
+    <div><b>1</b> The ring shows every position as a share. <a href="#" id="ov-flowlink" class="wf-link">Show workflow</a> shows the same positions on the process.</div>
+    <div><b>2</b> Click a slice, or a box in the workflow, to look only at that part.</div>
+    <div><b>3</b> Keep clicking on the right to narrow further. The numbers and the list of demands follow every click.</div>
   </div>
-</section>
+  <section class="panel panel-body" id="ov-flow" hidden></section>
+  <div class="ov-main">
+    <section class="panel panel-body">
+      <div class="ov-ringhead">
+        <div><h2>All positions</h2><div class="hint">Each slice is a share of the positions</div></div>
+        <div class="ov-tabs" id="ov-tabs" role="group" aria-label="Split the ring by">
+          <button type="button" data-d="stage" class="on">By stage</button><button type="button" data-d="bu">By business unit</button>
+        </div>
+      </div>
+      <div class="ov-ringwrap"><svg id="ov-ring" viewBox="0 0 200 200" width="240" height="240" role="img" aria-label="Positions, by stage or business unit"></svg></div>
+      <ul class="ov-legend" id="ov-legend"></ul>
+    </section>
+    <section class="panel panel-body" id="ov-detail"></section>
+  </div>
+  <section class="panel panel-body" id="ov-list"></section>
+  <noscript><div class="flash bad">This page needs JavaScript to draw the ring and the workflow.</div></noscript>
+</div>
+<script>window.OV = {{ ov | tojson }};</script>
+<script src="/static/workflow.js"></script>
+<script src="/static/overview.js"></script>
 
 <section class="panel">
   <div class="panel-head"><div><h2>Revenue at risk · past start date</h2><div class="hint">Open demands whose requested start has passed with no DOJ on or before it. Days late count to today.</div></div></div>
@@ -146,8 +89,4 @@
   </form>
 </section>
 
-<div class="grid2 align-start">
-  {{ breakdown('By practice', 'Practice', o.by_practice) }}
-  {{ breakdown('By business unit', 'BU', o.by_bu) }}
-</div>
 {% endblock %}
