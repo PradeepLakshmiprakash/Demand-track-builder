@@ -184,6 +184,129 @@ def offerings(db: Session, account_id: int, bill: Decimal, hold: Decimal, on: da
     return out
 
 
+# --- Team and pod contribution margin ------------------------------------------------------------------
+
+MONTH_DAYS = 21  # working days in a month, for monthly figures
+
+
+@dataclass
+class Member:
+    """One line of a team or a pod: so many people of a grade in a practice."""
+
+    practice: str
+    grade: str
+    count: int
+    rate: Decimal | None = None  # team: what the client pays per hour for each of them
+    allocation: Decimal = Decimal(100)  # pod: the share of their time on the pod, per cent
+    cost: Decimal | None = None  # per hour each, from the rate card; None when the card has none
+
+    @property
+    def fte(self) -> Decimal:
+        return self.count * self.allocation / 100
+
+    @property
+    def revenue(self) -> Decimal | None:
+        return self.rate * self.count if self.rate is not None else None
+
+    @property
+    def total_cost(self) -> Decimal | None:
+        return self.cost * self.fte if self.cost is not None else None
+
+    @property
+    def margin_pct(self) -> Decimal | None:
+        if self.rate is None or self.cost is None or not self.rate:
+            return None
+        return margin_pct(self.rate, self.cost)
+
+    @property
+    def priced(self) -> bool:
+        return self.cost is not None
+
+
+@dataclass
+class Contribution:
+    """A team's or a pod's figures, per hour unless said otherwise."""
+
+    members: list[Member]
+    revenue: Decimal
+    cost: Decimal
+    hours_per_month: Decimal
+    threshold: Decimal
+
+    @property
+    def margin(self) -> Decimal:
+        return self.revenue - self.cost
+
+    @property
+    def margin_pct(self) -> Decimal | None:
+        return margin_pct(self.revenue, self.cost) if self.revenue > 0 else None
+
+    @property
+    def fits(self) -> bool:
+        return self.margin_pct is not None and self.margin_pct >= self.threshold
+
+    @property
+    def headcount(self) -> Decimal:
+        return sum((m.fte for m in self.members), Decimal(0))
+
+    @property
+    def unpriced(self) -> list[Member]:
+        return [m for m in self.members if not m.priced]
+
+    def monthly(self, per_hour: Decimal) -> Decimal:
+        return (per_hour * self.hours_per_month).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def target_revenue(self) -> Decimal | None:
+        """The revenue per hour at which this cost leaves exactly the account's margin."""
+        if self.threshold >= 100:
+            return None
+        return (self.cost / (1 - self.threshold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def cost_members(db: Session, account_id: int, members: list[Member], on: date) -> list[Member]:
+    """Fill each line's cost per hour from the rate card."""
+    card = grid(db, account_id, on)
+    for m in members:
+        rate = card.get((m.grade, m.practice)) or card.get((m.grade, None))
+        m.cost = Decimal(rate.cost_rate) if rate is not None else None
+    return members
+
+
+def team_contribution(db: Session, account: Account, members: list[Member], on: date) -> Contribution:
+    """Team contribution margin: each role has its own client rate; the team's margin is everything
+    billed less everything it costs, over everything billed. Lines without a cost or a rate are left out
+    of the totals (and listed, so the gap is visible)."""
+    cost_members(db, account.id, members, on)
+    counted = [m for m in members if m.cost is not None and m.rate is not None]
+    hours = Decimal(str(account.settings.billable_hours_per_day)) * MONTH_DAYS
+    return Contribution(
+        members,
+        revenue=sum((m.rate * m.count for m in counted if m.rate is not None), Decimal(0)),
+        cost=sum((m.cost * m.count for m in counted if m.cost is not None), Decimal(0)),
+        hours_per_month=hours,
+        threshold=Decimal(account.margin_threshold),
+    )
+
+
+def pod_contribution(
+    db: Session, account: Account, members: list[Member], price_per_month: Decimal, on: date
+) -> Contribution:
+    """Pod contribution margin: the client pays one price a month for the whole pod; people can be on
+    it part-time. The pod's cost is each member's cost for their share of time; its margin is the price
+    less that cost, over the price."""
+    cost_members(db, account.id, members, on)
+    hours = Decimal(str(account.settings.billable_hours_per_day)) * MONTH_DAYS
+    cost = sum((m.cost * m.fte for m in members if m.cost is not None), Decimal(0))
+    return Contribution(
+        members,
+        revenue=price_per_month / hours if hours else Decimal(0),
+        cost=cost,
+        hours_per_month=hours,
+        threshold=Decimal(account.margin_threshold),
+    )
+
+
 @dataclass
 class Suggestion:
     offering: Offering

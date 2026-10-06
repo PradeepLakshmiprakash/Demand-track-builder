@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Pod contribution margin{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ account.name }}</div>
+    <h1>Margin calculator</h1>
+    <div class="lede">Pod contribution margin: the client pays one price a month for a whole pod, whose members can be on it part-time. It reads the rate card in use on {{ today | d }} and the {{ '%g' % threshold }}% margin the approvals use. Nothing is saved.</div>
+  </div>
+  <span class="chip done">Account margin {{ '%g' % threshold }}%</span>
+</div>
+{% include "margin_calculator/_tabs.html" %}
+{% if problems %}<div class="flash bad" role="alert">{% for p in problems %}{{ p }}{{ ' ' if not loop.last }}{% endfor %}</div>{% endif %}
+
+<section class="panel">
+  <div class="panel-head"><div><h2>The pod</h2><div class="hint">The price the client pays for the pod each month, and who is in it. Allocation is the share of a person's time on the pod. Leave a line empty to ignore it.</div></div></div>
+  <form method="get">
+    <div class="panel-body" style="padding-bottom:0">
+      <label class="f" style="max-width:320px">Pod price, per month ($)
+        <input type="number" name="price" min="1" step="1" value="{{ price }}" placeholder="e.g. 60000" required>
+      </label>
+    </div>
+    <div class="tbl plain">
+      <div class="tr th teamrow"><div>Practice</div><div>Grade / designation</div><div>People</div><div>Allocation (%)</div></div>
+      {% macro line(m, n) %}
+      <div class="tr teamrow">
+        <select name="practice" aria-label="Practice, line {{ n }}"><option value="">Practice…</option>{% for p in cfg.practices %}<option {{ 'selected' if m and m.practice == p }}>{{ p }}</option>{% endfor %}</select>
+        <select name="grade" aria-label="Grade, line {{ n }}"><option value="">Grade…</option>{% for g in cfg.grades %}<option {{ 'selected' if m and m.grade == g }}>{{ g }}</option>{% endfor %}</select>
+        <input type="number" name="count" min="1" max="200" step="1" value="{{ m.count if m else '' }}" placeholder="1" aria-label="People, line {{ n }}">
+        <input type="number" name="allocation" min="1" max="100" step="1" value="{{ '%g' % m.allocation if m else '' }}" placeholder="100" aria-label="Allocation, line {{ n }}">
+      </div>
+      {% endmacro %}
+      {% for m in members %}{{ line(m, loop.index) }}{% endfor %}
+      {% for i in range(blanks) %}{{ line(none, members | length + loop.index) }}{% endfor %}
+    </div>
+    <div class="panel-body row"><button class="btn primary">Calculate pod margin</button>{% if members %}<a class="small" href="/margin-calculator/pod">Start again</a>{% endif %}</div>
+  </form>
+</section>
+
+{% if r %}
+<section class="panel panel-body">
+  <div class="calc-result">
+    <div><div class="k">Pod margin</div><div class="v {{ 'low' if not r.fits }}">{{ ('%.1f' % r.margin_pct ~ '%') if r.margin_pct is not none else '—' }}</div></div>
+    <div><div class="k">Margin per month</div><div class="v">{{ r.monthly(r.margin) | money }}</div></div>
+    <div><div class="k">Pod price per month</div><div class="v">{{ r.monthly(r.revenue) | money }}</div></div>
+    <div><div class="k">Pod cost per month</div><div class="v">{{ r.monthly(r.cost) | money }}</div></div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>Who the pod is made of</h2><div class="hint">Each member's cost for their share of time, at {{ '%g' % r.hours_per_month }} hours a month for a full-time person.</div></div></div>
+  <div class="tbl plain">
+    <div class="tr th podout"><div>Role</div><div>People</div><div>Allocation</div><div>Full-time equivalent</div><div>Cost / h each</div><div>Cost per month</div><div>Share of pod cost</div></div>
+    {% for m in r.members %}
+    <div class="tr podout">
+      <div><strong>{{ m.grade }}</strong> in {{ m.practice }}</div>
+      <div>{{ m.count }}</div>
+      <div>{{ '%g' % m.allocation }}%</div>
+      <div>{{ '%g' % m.fte }}</div>
+      {% if m.priced %}
+      <div>{{ m.cost | money(true) }}</div>
+      <div>{{ r.monthly(m.total_cost) | money }}</div>
+      <div>{% if r.cost > 0 %}{{ '%.0f' % (m.total_cost / r.cost * 100) }}%{% else %}—{% endif %}</div>
+      {% else %}
+      <div class="sev-high" style="grid-column: span 3">No cost on the rate card for this practice and grade: left out of the pod's cost.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="tr podout total">
+      <div><strong>Pod</strong></div><div></div><div></div><div><strong>{{ '%g' % r.headcount }}</strong></div><div></div>
+      <div><strong>{{ r.monthly(r.cost) | money }}</strong></div><div></div>
+    </div>
+  </div>
+</section>
+
+{% if r.margin_pct is not none %}
+<section class="panel panel-body">
+  <p class="calc-answer">A pod of {{ '%g' % r.headcount }} full-time equivalents priced at {{ r.monthly(r.revenue) | money }} a month costs {{ r.monthly(r.cost) | money }} a month, a pod contribution margin of <strong>{{ '%.1f' % r.margin_pct }}%</strong> ({{ r.monthly(r.margin) | money }} a month).
+    {% if r.fits %}That is at or above the account's {{ '%g' % threshold }}% margin.{% else %}That is below the account's {{ '%g' % threshold }}% margin: at this cost the pod needs a price of {{ r.monthly(r.target_revenue) | money }} a month to reach it.{% endif %}
+    {% if r.unpriced %} {{ r.unpriced | length }} role{{ 's are' if r.unpriced | length != 1 else ' is' }} left out because the rate card has no cost for {{ 'them' if r.unpriced | length != 1 else 'it' }}, so the real margin is lower.{% endif %}</p>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

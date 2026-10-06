@@ -1,0 +1,5 @@
+<nav class="calc-tabs" aria-label="Margin calculator pages">
+  <a class="{{ 'on' if tab == 'individual' }}" href="/margin-calculator" {% if tab == 'individual' %}aria-current="page"{% endif %}>Individual contribution margin</a>
+  <a class="{{ 'on' if tab == 'team' }}" href="/margin-calculator/team" {% if tab == 'team' %}aria-current="page"{% endif %}>Team contribution margin</a>
+  <a class="{{ 'on' if tab == 'pod' }}" href="/margin-calculator/pod" {% if tab == 'pod' %}aria-current="page"{% endif %}>Pod contribution margin</a>
+</nav>

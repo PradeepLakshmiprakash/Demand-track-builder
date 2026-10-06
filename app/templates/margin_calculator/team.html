@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Team contribution margin{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ account.name }}</div>
+    <h1>Margin calculator</h1>
+    <div class="lede">Team contribution margin: several roles, each billed at its own client rate, and the blended margin of the whole team. It reads the rate card in use on {{ today | d }} and the {{ '%g' % threshold }}% margin the approvals use. Nothing is saved.</div>
+  </div>
+  <span class="chip done">Account margin {{ '%g' % threshold }}%</span>
+</div>
+{% include "margin_calculator/_tabs.html" %}
+{% if problems %}<div class="flash bad" role="alert">{% for p in problems %}{{ p }}{{ ' ' if not loop.last }}{% endfor %}</div>{% endif %}
+
+<section class="panel">
+  <div class="panel-head"><div><h2>The team</h2><div class="hint">One line per role. Leave a line empty to ignore it; two more empty lines appear each time you calculate.</div></div></div>
+  <form method="get">
+    <div class="tbl plain">
+      <div class="tr th teamrow"><div>Practice</div><div>Grade / designation</div><div>People</div><div>Client rate / h ($)</div></div>
+      {% macro line(m, n) %}
+      <div class="tr teamrow">
+        <select name="practice" aria-label="Practice, line {{ n }}"><option value="">Practice…</option>{% for p in cfg.practices %}<option {{ 'selected' if m and m.practice == p }}>{{ p }}</option>{% endfor %}</select>
+        <select name="grade" aria-label="Grade, line {{ n }}"><option value="">Grade…</option>{% for g in cfg.grades %}<option {{ 'selected' if m and m.grade == g }}>{{ g }}</option>{% endfor %}</select>
+        <input type="number" name="count" min="1" max="200" step="1" value="{{ m.count if m else '' }}" placeholder="1" aria-label="People, line {{ n }}">
+        <input type="number" name="rate" min="0" step="0.01" value="{{ m.rate if m and m.rate is not none else '' }}" placeholder="e.g. 100" aria-label="Client rate, line {{ n }}">
+      </div>
+      {% endmacro %}
+      {% for m in members %}{{ line(m, loop.index) }}{% endfor %}
+      {% for i in range(blanks) %}{{ line(none, members | length + loop.index) }}{% endfor %}
+    </div>
+    <div class="panel-body row"><button class="btn primary">Calculate team margin</button>{% if members %}<a class="small" href="/margin-calculator/team">Start again</a>{% endif %}</div>
+  </form>
+</section>
+
+{% if r %}
+<section class="panel panel-body">
+  <div class="calc-result">
+    <div><div class="k">Team margin</div><div class="v {{ 'low' if not r.fits }}">{{ ('%.1f' % r.margin_pct ~ '%') if r.margin_pct is not none else '—' }}</div></div>
+    <div><div class="k">Margin per month</div><div class="v">{{ r.monthly(r.margin) | money }}</div></div>
+    <div><div class="k">Billing per month</div><div class="v">{{ r.monthly(r.revenue) | money }}</div></div>
+    <div><div class="k">Cost per month</div><div class="v">{{ r.monthly(r.cost) | money }}</div></div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>Role by role</h2><div class="hint">Per hour. A role can be under the {{ '%g' % threshold }}% margin while the team as a whole clears it, and the other way round.</div></div></div>
+  <div class="tbl plain">
+    <div class="tr th teamout"><div>Role</div><div>People</div><div>Client rate / h</div><div>Cost / h</div><div>Margin</div><div>Billing / h</div><div>Cost / h (all)</div><div>Share of team margin</div></div>
+    {% for m in r.members %}
+    <div class="tr teamout">
+      <div><strong>{{ m.grade }}</strong> in {{ m.practice }}</div>
+      <div>{{ m.count }}</div>
+      <div>{{ m.rate | money(true) }}</div>
+      {% if m.priced %}
+      <div>{{ m.cost | money(true) }}</div>
+      <div><strong class="{{ 'sev-high' if m.margin_pct < threshold }}">{{ '%.1f' % m.margin_pct }}%</strong></div>
+      <div>{{ m.revenue | money(true) }}</div>
+      <div>{{ m.total_cost | money(true) }}</div>
+      <div>{% if r.margin > 0 %}{{ '%.0f' % ((m.revenue - m.total_cost) / r.margin * 100) }}%{% else %}—{% endif %}</div>
+      {% else %}
+      <div class="sev-high" style="grid-column: span 5">No cost on the rate card for this practice and grade: left out of the totals.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="tr teamout total">
+      <div><strong>Team</strong></div><div><strong>{{ '%g' % r.headcount }}</strong></div><div></div><div></div>
+      <div><strong>{{ ('%.1f' % r.margin_pct ~ '%') if r.margin_pct is not none else '—' }}</strong></div>
+      <div><strong>{{ r.revenue | money(true) }}</strong></div><div><strong>{{ r.cost | money(true) }}</strong></div><div></div>
+    </div>
+  </div>
+</section>
+
+{% if r.margin_pct is not none %}
+<section class="panel panel-body">
+  <p class="calc-answer">A team of {{ '%g' % r.headcount }} bills {{ r.revenue | money(true) }} an hour and costs {{ r.cost | money(true) }} an hour, a team contribution margin of <strong>{{ '%.1f' % r.margin_pct }}%</strong> ({{ r.monthly(r.margin) | money }} a month at {{ '%g' % r.hours_per_month }} hours each).
+    {% if r.fits %}That is at or above the account's {{ '%g' % threshold }}% margin.{% else %}That is below the account's {{ '%g' % threshold }}% margin: at this cost the team needs to bill {{ r.target_revenue | money(true) }} an hour in total to reach it.{% endif %}
+    {% if r.unpriced %} {{ r.unpriced | length }} role{{ 's are' if r.unpriced | length != 1 else ' is' }} left out because the rate card has no cost for {{ 'them' if r.unpriced | length != 1 else 'it' }}.{% endif %}</p>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

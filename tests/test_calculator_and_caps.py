@@ -149,3 +149,54 @@ def test_gtd_team_admin_sets_caps_and_leadership_sees_them(client: Client, db: S
     assert "Non-billable positions against the agreed cap" in page and "over cap" in page
     assert "2 Cloud-Java" in page and "Save caps" in page
     assert "err=" in client.post("/overview/nb-caps", data={f"cap_{pay}": "many"}).headers["location"]
+
+
+def test_calculator_has_three_pages(client: Client) -> None:
+    c = client.as_user("kavya")
+    for path in ("/margin-calculator", "/margin-calculator/team", "/margin-calculator/pod"):
+        page = c.get(path).text
+        for name in ("Individual contribution margin", "Team contribution margin", "Pod contribution margin"):
+            assert name in page
+    assert client.as_user("farah").get("/margin-calculator/team").status_code == 403
+
+
+def test_team_contribution_margin(client: Client, db: Session) -> None:
+    from datetime import date as day
+    from decimal import Decimal
+
+    from app.services import rate_card_service as rc
+    from app.services.rate_card_service import Member
+
+    acc = db.get_one(Account, 1)
+    team = [Member("CCA-FS", "C2", 2, rate=Decimal("100")), Member("TES-FS", "B1", 1, rate=Decimal("50"))]
+    r = rc.team_contribution(db, acc, team, day(2026, 9, 1))
+    # 2 × $100 + 1 × $50 = $250 billed; 2 × $68 + 1 × $40.50 = $176.50 cost → 29.4%.
+    assert (r.revenue, r.cost, r.margin_pct) == (Decimal("250"), Decimal("176.50"), Decimal("29.40"))
+    assert not r.fits and r.target_revenue == Decimal("252.14") and r.headcount == 3
+    assert team[0].margin_pct == Decimal("32.00") and team[1].margin_pct == Decimal("19.00")
+    url = "/margin-calculator/team?practice=CCA-FS&grade=C2&count=2&rate=100"
+    url += "&practice=TES-FS&grade=B1&count=1&rate=50"
+    page = client.as_user("kavya").get(url).text
+    assert "29.4%" in page and "below the account" in page and "$252.14" in page and "Role by role" in page
+    bad = client.as_user("kavya").get("/margin-calculator/team?practice=CCA-FS&grade=C2&count=2&rate=").text
+    assert "enter the client rate per hour for C2 in CCA-FS" in bad
+
+
+def test_pod_contribution_margin(client: Client, db: Session) -> None:
+    from datetime import date as day
+    from decimal import Decimal
+
+    from app.services import rate_card_service as rc
+    from app.services.rate_card_service import Member
+
+    acc = db.get_one(Account, 1)
+    pod = [Member("CCA-FS", "C2", 2), Member("TES-FS", "B1", 1, allocation=Decimal("50"))]
+    r = rc.pod_contribution(db, acc, pod, Decimal("40000"), day(2026, 9, 1))
+    # 2 × $68 + 0.5 × $40.50 = $156.25 an hour; × 168 hours = $26,250 a month against $40,000 → 34.4%.
+    assert r.cost == Decimal("156.25") and r.monthly(r.cost) == Decimal("26250.00")
+    assert r.margin_pct == Decimal("34.38") and r.fits and r.headcount == Decimal("2.5")
+    url = "/margin-calculator/pod?price=40000&practice=CCA-FS&grade=C2&count=2&allocation=100"
+    url += "&practice=TES-FS&grade=B1&count=1&allocation=50"
+    page = client.as_user("sanjay").get(url).text
+    assert "34.4%" in page and "$26,250" in page and "Who the pod is made of" in page
+    assert "Pod price, per month" in client.as_user("sanjay").get("/margin-calculator/pod").text

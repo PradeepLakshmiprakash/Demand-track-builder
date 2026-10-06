@@ -529,3 +529,13 @@ button.quick { font: inherit; font-size: 13px; cursor: pointer; min-height: 0; }
 .tr.calc.rec { grid-template-columns: 2fr 1fr .6fr .8fr .7fr .8fr 1.1fr; }
 .calc-answer { font-size: 16px; }
 .stacks .tr { display: grid; grid-template-columns: 160px minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: center; }
+
+/* Margin calculator: its three pages, and the team and pod tables. */
+.calc-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin: 0 0 18px; flex-wrap: wrap; }
+.calc-tabs a { padding: 10px 16px; text-decoration: none; color: var(--muted); font-weight: 500; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 6px 6px 0 0; }
+.calc-tabs a:hover { color: var(--ink); background: var(--brand-tint); }
+.calc-tabs a.on { color: var(--brand); border-bottom-color: var(--brand); font-weight: 700; }
+.tr.teamrow { display: grid; grid-template-columns: 1.4fr 1fr .6fr 1fr; gap: 12px; align-items: center; }
+.tr.teamout { display: grid; grid-template-columns: 1.6fr .5fr .9fr .8fr .7fr .9fr 1fr 1fr; gap: 12px; align-items: center; }
+.tr.podout { display: grid; grid-template-columns: 1.6fr .5fr .7fr 1fr .9fr 1fr 1fr; gap: 12px; align-items: center; }
+.tr.total { background: var(--brand-tint); }
