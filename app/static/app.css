@@ -738,3 +738,6 @@ fieldset[data-kind=special] .tick { display: flex; }
 .wx.demand .wx-step.ex.later .wx-num { background: #A6ACB5; }
 .wx.demand .wx-exlink.off { border-color: #C7CCD3; }
 .wx.demand .wx-exlink.off::after { border-left-color: #C7CCD3; }
+/* sub-stage bars keep their own colour when picked, and the track shows against a hover */
+.ov .bar[data-key=sub] .track { height: 10px; }
+.ov .bar[data-key=sub].on .fill { outline: 2px solid var(--ink); outline-offset: 1px; }

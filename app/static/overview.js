@@ -114,7 +114,8 @@
     var base = live(rowsFor(key)), pairs = count(base, key), max = base.length || 1;
     if (!pairs.length) return '';
     return '<div class="grp"><div class="t"><b>By ' + NAME[key].toLowerCase() + '</b>' + tip(HINT[key]) + '</div>' + pairs.map(function (p) {
-      return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%"></span></span><span class="n">' + p[1] + '</span></div>';
+      var own = key === 'sub' ? ';background:' + (SUB_C[p[0]] || '#888F9A') : '';  // a sub-stage keeps its stage's colour
+      return '<div class="bar ' + (F[key] === p[0] ? 'on' : '') + '" data-key="' + key + '" data-val="' + esc(p[0]) + '"><span>' + esc(p[0]) + '</span><span class="track"><span class="fill" style="width:' + (p[1] / max * 100) + '%' + own + '"></span></span><span class="n">' + p[1] + '</span></div>';
     }).join('') + '</div>';
   }
 
@@ -150,9 +151,8 @@
     }
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     // Sub-stage is always shown; picking one there also narrows to its stage.
-    // One small ring only: the sub-stage cut of what the main ring shows. A second ring on a different
-    // footing (business unit beside stage, or the reverse) invited comparisons that don't hold.
-    h += '<div class="minis one">' + mini('sub') + '</div>';
+    // Plain bars: the sub-stage cut of what the ring shows, then type and practice.
+    h += bars('sub');
     h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
     $('ov-detail').innerHTML = h;
   }
