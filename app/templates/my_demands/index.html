@@ -31,9 +31,13 @@
     <form method="get" class="row" style="gap:10px;flex-wrap:wrap">
       <input type="hidden" name="filter" value="{{ active_filter }}">
       <span class="row small" role="group" aria-label="Period shortcuts" style="gap:6px">{% for n in (30, 60) %}<a class="quick {{ 'on' if period.past_days == n }}" href="?filter={{ active_filter }}{% if active_bu %}&bu={{ active_bu }}{% endif %}&days={{ n }}">Past {{ n }} days</a>{% endfor %}</span>
-      <label class="row small muted">From <input type="date" name="start" value="{{ (period.start or '') if not period.past_days else '' }}" style="width:auto;min-height:40px"></label>
-      <label class="row small muted">To <input type="date" name="end" value="{{ (period.end or '') if not period.past_days else '' }}" style="width:auto;min-height:40px"></label>
-      <button class="btn small">Show</button>
+      {% set custom = period.chosen and not period.past_days %}
+      <button type="button" class="quick {{ 'on' if custom }}" aria-expanded="{{ 'true' if custom else 'false' }}" onclick="var r=this.nextElementSibling;r.hidden=!r.hidden;this.setAttribute('aria-expanded',!r.hidden);if(!r.hidden)r.querySelector('input').focus()">Custom</button>
+      <span class="custom-range" {{ '' if custom else 'hidden' }}>
+        <label class="row small muted">From <input type="date" name="start" value="{{ (period.start or '') if custom else '' }}" style="width:auto;min-height:40px"></label>
+        <label class="row small muted">To <input type="date" name="end" value="{{ (period.end or '') if custom else '' }}" style="width:auto;min-height:40px"></label>
+        <button class="btn small">Show</button>
+      </span>
       {% if period.chosen %}<a class="small" href="?filter={{ active_filter }}{% if active_bu %}&bu={{ active_bu }}{% endif %}">Clear dates</a>{% endif %}
       {% if bus %}
       <label class="row small muted">Business unit

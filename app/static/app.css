@@ -516,3 +516,6 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .calc-answer { margin: 0; font-size: 18px; line-height: 1.5; }
 .tr.calc.best { background: var(--brand-tint); }
 @media (max-width: 1100px) { .pay-settings { grid-template-columns: 1fr; } }
+button.quick { font: inherit; font-size: 13px; cursor: pointer; min-height: 0; }
+.custom-range { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.custom-range label { display: inline-flex; gap: 6px; align-items: center; }

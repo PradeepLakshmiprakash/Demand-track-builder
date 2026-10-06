@@ -20,10 +20,14 @@
       <a class="quick {{ 'on' if not o.period.chosen }}" href="/overview">Current</a>
       {% for n in (30, 60) %}<a class="quick {{ 'on' if o.period.past_days == n }}" href="/overview?days={{ n }}">Past {{ n }} days</a>{% endfor %}
     </div>
+    {% set custom = o.period.chosen and not o.period.past_days %}
     <form method="get" class="grp">
-      <label>From <input type="date" name="start" value="{{ (o.period.start or '') if not o.period.past_days else '' }}"></label>
-      <label>To <input type="date" name="end" value="{{ (o.period.end or '') if not o.period.past_days else '' }}"></label>
-      <button class="btn small primary">Show period</button>
+      <button type="button" class="quick {{ 'on' if custom }}" aria-expanded="{{ 'true' if custom else 'false' }}" onclick="var r=this.nextElementSibling;r.hidden=!r.hidden;this.setAttribute('aria-expanded',!r.hidden);if(!r.hidden)r.querySelector('input').focus()">Custom</button>
+      <span class="custom-range" {{ '' if custom else 'hidden' }}>
+        <label>From <input type="date" name="start" value="{{ (o.period.start or '') if custom else '' }}"></label>
+        <label>To <input type="date" name="end" value="{{ (o.period.end or '') if custom else '' }}"></label>
+        <button class="btn small primary">Show period</button>
+      </span>
     </form>
     <span class="sep"></span>
     <div class="grp">
