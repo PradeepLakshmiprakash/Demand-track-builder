@@ -4,7 +4,7 @@ from datetime import date
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
 
@@ -13,7 +13,7 @@ from app.core.db import get_db
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import ExcelImport
-from app.services import import_service, reconcile_service
+from app.services import import_service, reconcile_service, trial_sheet_service
 from app.services.demand_service import account_today
 from app.services.import_service import SheetImportError
 
@@ -77,6 +77,17 @@ async def upload(
         f"Imported {s.rows} rows: {s.in_sheet} in sheet, {len(s.missing)} missing, {s.needs_person} to match"
     )
     return RedirectResponse(f"/reconciliation?msg={quote(msg)}", status_code=303)
+
+
+@router.get("/imports/trial-sheet")
+def trial_sheet(actor: Actor = Depends(guard), db: Session = Depends(get_db)) -> Response:
+    """A sheet to try the import with, built from the account's demands as they are now."""
+    sheet = trial_sheet_service.build(db, actor.account_id, account_today(db, actor.account_id))
+    return Response(
+        sheet.data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{sheet.filename}"'},
+    )
 
 
 @router.get("/imports/{import_id}/file")

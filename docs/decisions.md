@@ -628,3 +628,9 @@ back to, the escalation that fires there, the escalation ladder, what runs throu
 and responsible parties read from the account's settings. It is animated, and Play walks one demand
 along the path. A demand's page has Simple only. Kept as backups: the earlier diagram
 (`/overview/workflow/classic`) and Detailed without animation (`?motion=off`).
+
+**D101. Trial BCM sheet and sample demands.** BCM sheet import offers "Download the trial sheet": a
+sheet built from the account's demands as they are, most requisitions one step further on, one left out
+and one row that belongs to no demand; its second tab says what each row should do. Uploading it is an
+ordinary import. `python -m seed.flavors` adds sample demands so every workflow step has one, and gives
+seeded demands a dated history; it adds to the data and can be run again safely.
