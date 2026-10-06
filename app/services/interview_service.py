@@ -525,7 +525,7 @@ def _send_invite(db: Session, account: Account, iv: Interview) -> None:
     text = "\n".join(x for x in lines if x is not None)
     html = "<p style='font:15px sans-serif'>" + "<br>".join(escape(x) for x in lines if x) + "</p>"
     html = html.replace(escape(feedback_link(iv) or ""), f"<a href='{feedback_link(iv)}'>Give feedback</a>")
-    mail.send(
+    mail.notify(
         mail.Mail(to=[who.email], subject=f"[{req} | {ref}] {iv.round} – {c.name}", text=text, html=html)
     )
 
@@ -544,7 +544,7 @@ def _mail_owner_about_request(db: Session, account: Account, req: Interview) -> 
         + (f"Why: {req.request_note}\n" if req.request_note else "")
         + f"Approve or decline: {link}"
     )
-    mail.send(
+    mail.notify(
         mail.Mail(
             to=[owner.email],
             subject=f"[{d.gtd_req_id or d.app_ref} | {d.app_ref}] {req.round} requested for {c.name}",

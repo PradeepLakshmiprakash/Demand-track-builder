@@ -72,3 +72,15 @@ def send(mail: Mail) -> None:
     else:
         raise NotImplementedError(f"Mail backend {s.mail_backend!r} arrives in Phase 7")
     sent.append(mail)
+
+
+def notify(mail: Mail) -> bool:
+    """Send a mail that tells someone about an action already taken. If the mail server refuses, the
+    action still stands: the failure is logged and the caller carries on. Jobs that retry (the daily
+    admin mail, the escalation sweep) call send() instead, so a failure is seen and tried again."""
+    try:
+        send(mail)
+    except Exception:
+        log.exception("Mail not sent: %s", mail.subject)
+        return False
+    return True

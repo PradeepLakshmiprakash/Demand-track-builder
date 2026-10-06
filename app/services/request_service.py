@@ -320,7 +320,7 @@ def raise_request(db: Session, actor: Actor, kind: str, details: str) -> AdminRe
     account = db.get_one(Account, actor.account_id)
     admins = [u.email for u in db.scalars(select(User).where(member_of(account.id, Role.ADMINISTRATOR)))]
     link = f"{get_settings().app_base_url}/requests"
-    mail.send(
+    mail.notify(
         mail.Mail(
             to=admins,
             cc=[actor.email],
@@ -351,7 +351,7 @@ def handle(db: Session, actor: Actor, request_id: int, status: str, note: str | 
     req.handled_by, req.handled_at = actor.id, datetime.now(UTC)
     requester = db.get_one(User, req.requested_by)
     account = db.get_one(Account, req.account_id)
-    mail.send(
+    mail.notify(
         mail.Mail(
             to=[requester.email],
             subject=f"[{account.name}] Request #{req.id} {status}",

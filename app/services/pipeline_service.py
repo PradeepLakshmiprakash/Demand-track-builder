@@ -310,7 +310,7 @@ def _tell_owner(db: Session, demand: Demand, ev: Evidence) -> None:
         return
     req = demand.gtd_req_id or "no GTD ID"
     link = f"{get_settings().app_base_url}/demands/{demand.app_ref}"
-    mail.send(
+    mail.notify(
         mail.Mail(
             to=[owner.email],
             subject=f"[{req} | {demand.app_ref}] {ev.selected.name} selected by the panel",

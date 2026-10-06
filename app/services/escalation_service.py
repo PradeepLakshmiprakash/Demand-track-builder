@@ -870,7 +870,7 @@ def _mail_owner_returned(db: Session, demand: Demand, reason: str, comment: str 
         + (f"\nWhat to fix: {comment}" if comment else "")
         + f"\n\nCorrect it and resubmit; it then goes back to the GTD admin team for GTD:\n{link}"
     )
-    mail.send(
+    mail.notify(
         mail.Mail(to=[owner.email], subject=f"[{demand.app_ref}] Please correct and resubmit", text=text)
     )
 

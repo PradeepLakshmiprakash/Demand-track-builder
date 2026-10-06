@@ -120,7 +120,7 @@ def _mail_raised(
     to = to or admins
     cc = sorted(({owner.email} if owner.active else set()) | set(admins) - set(to))
     ref = f"{demand.gtd_req_id} | {demand.app_ref}" if demand.gtd_req_id else demand.app_ref
-    mail.send(
+    mail.notify(
         mail.Mail(
             to=to,
             cc=[c for c in cc if c not in to],
@@ -283,7 +283,7 @@ def _mail_decision(
         else "Staffing goes back to the other candidates.\n"
     )
     text += f"\n{get_settings().app_base_url}/demands/{demand.app_ref}"
-    mail.send(mail.Mail(to=sorted(to), subject=f"[{ref}] Offer for {cand.name} {word}", text=text))
+    mail.notify(mail.Mail(to=sorted(to), subject=f"[{ref}] Offer for {cand.name} {word}", text=text))
 
 
 @dataclass

@@ -77,3 +77,17 @@ def test_morning_reminder_until_created_then_a_completion_email(client: Client, 
     mail.sent.clear()
     notify_service.send_daily_admin_mail(db, 1, force=True)  # no more reminders for it
     assert all(ref not in m.text for m in mail.sent)
+
+
+def test_a_refused_mail_does_not_fail_the_action(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The mail server closing the connection must not turn a saved action into an error page."""
+
+    def refuse(_: mail.Mail) -> None:
+        raise ConnectionError("Connection unexpectedly closed")
+
+    monkeypatch.setattr(mail, "send", refuse)
+    r = client.as_user("kavya").post(
+        "/requests", data={"kind": "settings", "st_what": "grace", "st_value": "5"}
+    )
+    assert r.status_code == 303 and "sent" in r.headers["location"]
+    assert mail.notify(mail.Mail(to=["a@example.com"], subject="x", text="y")) is False
