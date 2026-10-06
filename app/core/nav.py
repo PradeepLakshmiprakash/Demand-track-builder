@@ -51,7 +51,7 @@ NAV: tuple[NavItem, ...] = (
     NavItem(
         "requests",
         "/requests",
-        _same("Requests to administrator", DO, AD, AT, LD, IV) | {ADM: "Requests"},
+        _same("Raise a request", DO, AD, AT, LD, IV) | {ADM: "Requests"},
         phase=8,
         ready=True,
     ),

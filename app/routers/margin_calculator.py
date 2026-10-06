@@ -78,7 +78,7 @@ def calculator(
     )
 
 
-ROWS_MIN, ROWS_MAX = 5, 12
+ROWS_MAX = 40  # lines read from one form
 
 
 def _num(raw: str, lo: Decimal, hi: Decimal) -> Decimal | None:
@@ -129,7 +129,8 @@ def _members(request: Request, cfg: AccountConfig, *, with_rate: bool) -> tuple[
 
 
 def _blank_rows(members: list[Member]) -> int:
-    return max(ROWS_MIN, min(ROWS_MAX, len(members) + 2)) - len(members)
+    """Empty lines to start with; after that the Add button adds them."""
+    return 0 if members else 3
 
 
 @router.get("/margin-calculator/team", response_class=HTMLResponse)

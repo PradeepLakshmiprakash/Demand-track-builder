@@ -4,7 +4,7 @@
 <div class="head">
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
-    <h1>{{ 'Requests to the Administrator' if can_raise else 'Requests' }}</h1>
+    <h1>{{ 'Raise a request' if can_raise else 'Requests' }}</h1>
     <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Ask for what your role needs here: they get an email, make the change and mark it done, and you are told.{% else %}Changes people in this account have asked for. Make the change on the matching screen, then mark the request done here: the requester is emailed.{% endif %}</div>
   </div>
 </div>

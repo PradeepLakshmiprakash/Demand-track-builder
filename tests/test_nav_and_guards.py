@@ -24,7 +24,7 @@ def test_demand_owner_menu(client: Client) -> None:
         "My escalations",
         "Offer approvals",
         "Margin calculator",
-        "Requests to administrator",
+        "Raise a request",
     ]
 
 
@@ -36,7 +36,7 @@ def test_admin_menu(client: Client) -> None:
         "BCM sheet import",
         "Reconciliation",
         "Escalations",
-        "Requests to administrator",
+        "Raise a request",
     ):
         assert expected in items
     # The app's controls belong to the Administrator, who in turn has no demand screens.
@@ -65,7 +65,7 @@ def test_leadership_menu(client: Client) -> None:
         "Escalations",
         "Offer approvals",
         "Margin calculator",
-        "Requests to administrator",
+        "Raise a request",
     ]
 
 
@@ -77,13 +77,13 @@ def test_admin_team_menu(client: Client) -> None:
         "Reconciliation",
         "Escalations",
         "Candidates",
-        "Requests to administrator",
+        "Raise a request",
     ]
 
 
 def test_interviewer_menu_and_home(client: Client) -> None:
     client.as_user("vikram")
-    assert menu(client) == ["My interviews", "Requests to administrator"]
+    assert menu(client) == ["My interviews", "Raise a request"]
     r = client.get("/", follow_redirects=False)
     assert r.headers["location"] == "/interviews"
 

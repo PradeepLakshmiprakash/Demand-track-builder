@@ -1,5 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Team contribution margin{% endblock %}
+{% block title %}Team contribution margin
+<script>
+(function () {
+  var box = document.getElementById('lines'), tpl = document.getElementById('line-tpl');
+  function renumber() {
+    var rows = box.querySelectorAll('.teamrow');
+    rows.forEach(function (r) { r.querySelector('.rm').disabled = rows.length === 1; });
+  }
+  document.getElementById('add-line').addEventListener('click', function () {
+    box.appendChild(tpl.content.cloneNode(true));
+    renumber();
+    box.lastElementChild.querySelector('select').focus();
+  });
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('.rm');
+    if (!b) return;
+    b.closest('.teamrow').remove();
+    renumber();
+  });
+  renumber();
+})();
+</script>
+{% endblock %}
 {% block main %}
 <div class="head">
   <div>
@@ -7,28 +29,31 @@
     <h1>Margin calculator</h1>
     <div class="lede">Team contribution margin: several roles, each billed at its own client rate, and the blended margin of the whole team. It reads the rate card in use on {{ today | d }} and the {{ '%g' % threshold }}% margin the approvals use. Nothing is saved.</div>
   </div>
-  <span class="chip done">Account margin {{ '%g' % threshold }}%</span>
 </div>
 {% include "margin_calculator/_tabs.html" %}
 {% if problems %}<div class="flash bad" role="alert">{% for p in problems %}{{ p }}{{ ' ' if not loop.last }}{% endfor %}</div>{% endif %}
 
 <section class="panel">
-  <div class="panel-head"><div><h2>The team</h2><div class="hint">One line per role. Leave a line empty to ignore it; two more empty lines appear each time you calculate.</div></div></div>
+  <div class="panel-head"><div><h2>The team</h2><div class="hint">One line per role. Add or remove lines with the buttons; an empty line is ignored.</div></div></div>
   <form method="get">
     <div class="tbl plain">
-      <div class="tr th teamrow"><div>Practice</div><div>Grade / designation</div><div>People</div><div>Client rate / h ($)</div></div>
+      <div class="tr th teamrow"><div>Practice</div><div>Grade / designation</div><div>People</div><div>Client rate / h ($)</div><div></div></div>
       {% macro line(m, n) %}
       <div class="tr teamrow">
         <select name="practice" aria-label="Practice, line {{ n }}"><option value="">Practice…</option>{% for p in cfg.practices %}<option {{ 'selected' if m and m.practice == p }}>{{ p }}</option>{% endfor %}</select>
         <select name="grade" aria-label="Grade, line {{ n }}"><option value="">Grade…</option>{% for g in cfg.grades %}<option {{ 'selected' if m and m.grade == g }}>{{ g }}</option>{% endfor %}</select>
         <input type="number" name="count" min="1" max="200" step="1" value="{{ m.count if m else '' }}" placeholder="1" aria-label="People, line {{ n }}">
         <input type="number" name="rate" min="0" step="0.01" value="{{ m.rate if m and m.rate is not none else '' }}" placeholder="e.g. 100" aria-label="Client rate, line {{ n }}">
+        <button type="button" class="btn small rm" aria-label="Remove this role">Remove</button>
       </div>
       {% endmacro %}
+      <div id="lines">
       {% for m in members %}{{ line(m, loop.index) }}{% endfor %}
       {% for i in range(blanks) %}{{ line(none, members | length + loop.index) }}{% endfor %}
+      </div>
+      <template id="line-tpl">{{ line(none, 0) }}</template>
     </div>
-    <div class="panel-body row"><button class="btn primary">Calculate team margin</button>{% if members %}<a class="small" href="/margin-calculator/team">Start again</a>{% endif %}</div>
+    <div class="panel-body row"><button type="button" class="btn" id="add-line">+ Add a role</button><button class="btn primary">Calculate team margin</button>{% if members %}<a class="small" href="/margin-calculator/team">Start again</a>{% endif %}</div>
   </form>
 </section>
 
@@ -78,4 +103,26 @@
 </section>
 {% endif %}
 {% endif %}
+
+<script>
+(function () {
+  var box = document.getElementById('lines'), tpl = document.getElementById('line-tpl');
+  function renumber() {
+    var rows = box.querySelectorAll('.teamrow');
+    rows.forEach(function (r) { r.querySelector('.rm').disabled = rows.length === 1; });
+  }
+  document.getElementById('add-line').addEventListener('click', function () {
+    box.appendChild(tpl.content.cloneNode(true));
+    renumber();
+    box.lastElementChild.querySelector('select').focus();
+  });
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('.rm');
+    if (!b) return;
+    b.closest('.teamrow').remove();
+    renumber();
+  });
+  renumber();
+})();
+</script>
 {% endblock %}
