@@ -7,24 +7,23 @@ never part of revenue lost.
 
     cost so far = cost rate × billable hours a day × working days from the start date
 
-The cost rate is the one on the candidate's offer when there is one; until then, the rate card's rate
-for the position's grade, practice and region (the highest across supply channels, so the cost isn't
-understated).
+The cost rate is the rate card's cost per hour for the position's practice and grade (an offer on the
+position carries the same figure, as priced on its date).
 """
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core import mail
 from app.core.config import get_settings
 from app.core.enums import Decision, DemandStatus, Role
 from app.core.security import Actor
-from app.models import Account, Candidate, Demand, OfferApproval, RateCard, User, member_of
-from app.services import notify_service
+from app.models import Account, Candidate, Demand, OfferApproval, User, member_of
+from app.services import notify_service, rate_card_service
 from app.services.demand_service import account_today
 from app.services.loss_service import working_days
 
@@ -54,24 +53,10 @@ class Cost:
 
 
 def _rate_card_rate(db: Session, d: Demand, on: date) -> Decimal | None:
-    if not d.grade or not d.region:
+    if not d.grade:
         return None
-    rows = db.scalars(
-        select(RateCard).where(
-            RateCard.account_id == d.account_id,
-            RateCard.grade == d.grade,
-            RateCard.region == d.region,
-            or_(RateCard.practice == d.practice, RateCard.practice.is_(None)),
-            RateCard.effective_from <= on,
-            or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on),
-        )
-    ).all()
-    by_channel: dict[str, RateCard] = {}
-    for r in rows:  # within a channel the practice-specific rate wins, as in rate_card_service.lookup
-        cur = by_channel.get(r.channel)
-        if cur is None or (cur.practice is None and r.practice is not None):
-            by_channel[r.channel] = r
-    return max((r.cost_rate for r in by_channel.values()), default=None)
+    rate = rate_card_service.lookup(db, d.account_id, grade=d.grade, practice=d.practice, on=on)
+    return Decimal(rate.cost_rate) if rate is not None else None
 
 
 def costs(db: Session, account_id: int, today: date | None = None) -> dict[int, Cost]:

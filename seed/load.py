@@ -125,22 +125,18 @@ def load(db: Session, now: datetime | None = None) -> None:
             db.add(EscalationEvent(escalation_id=esc.id, kind="promoted", level=2, at=due - timedelta(days=3),
                                    note="L1 due date passed"))  # fmt: skip
 
-    for channel, factor in data.CHANNEL_FACTOR.items():
-        for region, rf in data.REGION_FACTOR.items():
-            for grade, base in data.GRADE_COST.items():
-                cost = Decimal(str(round(base * factor * rf, 2)))
-                db.add(
-                    RateCard(
-                        account_id=account.id,
-                        grade=grade,
-                        practice=None,
-                        region=region,
-                        channel=channel,
-                        cost_rate=cost,
-                        effective_from=data.RATES_FROM,
-                        created_by=admin.id,
-                    )
+    for practice, factor in data.PRACTICE_FACTOR.items():
+        for grade, base in data.GRADE_COST.items():
+            db.add(
+                RateCard(
+                    account_id=account.id,
+                    grade=grade,
+                    practice=practice,
+                    cost_rate=Decimal(str(round(base * factor, 2))),
+                    effective_from=data.RATES_FROM,
+                    created_by=admin.id,
                 )
+            )
 
     for ref, cand, rnd, iv_key, when in data.INTERVIEWS:
         d = demands[ref]
@@ -242,15 +238,13 @@ def load_acme(db: Session, discover_users: dict[str, User], now: datetime) -> No
                 )
             )
 
-    for channel, factor in acme.CHANNEL_FACTOR.items():
+    for practice, factor in acme.PRACTICE_FACTOR.items():
         for grade, base in acme.GRADE_COST.items():
             db.add(
                 RateCard(
                     account_id=account.id,
                     grade=grade,
-                    practice=None,
-                    region="US",
-                    channel=channel,
+                    practice=practice,
                     cost_rate=Decimal(str(round(base * factor, 2))),
                     effective_from=acme.RATES_FROM,
                     created_by=admin.id,

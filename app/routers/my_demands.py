@@ -194,7 +194,6 @@ def demand_page(
             if pipeline_service.can_record_client(actor, demand) and demand.client_interview_required
             else []
         ),
-        channels={c.key: c.label for c in get_account(db, actor.account_id).settings.supply_channels},
     )
 
 

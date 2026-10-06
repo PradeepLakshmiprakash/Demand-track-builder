@@ -218,7 +218,7 @@ input.invalid { border-color: var(--esc-ink); background: #FBF2F3; }
 
 /* Rate card and approvals */
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.rates .tr { grid-template-columns: 1.3fr 70px 70px 1fr 110px 120px 120px 150px; }
+.rates .tr { grid-template-columns: 1.2fr 90px 110px 130px 130px 160px; }
 .rates .tr.past { color: #6E7480; }
 .end-rate summary { cursor: pointer; color: var(--brand); }
 .offer { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 16px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line-soft); }
@@ -317,7 +317,7 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .sev-low { color: var(--muted); }
 .esc-rules .tr { display: grid; grid-template-columns: 130px 36px 150px 104px 1fr 1fr; gap: 12px; align-items: start; }
 .esc-rules textarea { min-height: 56px; }
-.tr.calc { display: grid; grid-template-columns: 1.3fr 1fr .8fr 1.1fr 1.3fr; gap: 12px; align-items: center; }
+.tr.calc { display: grid; grid-template-columns: 1.3fr 1fr .8fr 1fr .8fr 1.2fr; gap: 12px; align-items: center; }
 .bar-subs { margin: -2px 0 8px 0; padding-left: 2px; }
 
 /* An escalation answered on the demand's own page. */
@@ -505,3 +505,14 @@ main.public { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
 .costing .k { font-size: 12px; color: var(--muted); }
 .costing .v { font-size: 26px; font-weight: 600; margin-top: 2px; }
 .info::after { max-width: 340px; }
+
+/* Rate card and calculator, after Acquisition Central's. */
+.pay-settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.pay-settings .n { font-size: 20px; font-weight: 600; margin: 2px 0; }
+.pay-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pay-table th, .pay-table td { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); text-align: left; white-space: nowrap; }
+.pay-table th { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pay-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.calc-answer { margin: 0; font-size: 18px; line-height: 1.5; }
+.tr.calc.best { background: var(--brand-tint); }
+@media (max-width: 1100px) { .pay-settings { grid-template-columns: 1fr; } }

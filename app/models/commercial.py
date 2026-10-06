@@ -16,15 +16,13 @@ class RateCard(Base):
     __table_args__ = (
         CheckConstraint("effective_to IS NULL OR effective_to >= effective_from", name="dates_ordered"),
         CheckConstraint("cost_rate >= 0", name="cost_positive"),
-        Index("ix_rate_cards_lookup", "account_id", "grade", "practice", "region", "channel"),
+        Index("ix_rate_cards_lookup", "account_id", "grade", "practice"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     grade: Mapped[str] = mapped_column(String(10))
-    practice: Mapped[str | None] = mapped_column(String(40))  # null = any practice
-    region: Mapped[str] = mapped_column(String(10))
-    channel: Mapped[str] = mapped_column(String(40))  # supply channel key (account settings)
+    practice: Mapped[str | None] = mapped_column(String(40))  # null = any practice (older cards only)
     cost_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     effective_from: Mapped[date] = mapped_column(Date)
     effective_to: Mapped[date | None] = mapped_column(Date)

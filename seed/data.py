@@ -334,14 +334,14 @@ DEMANDS = [
     ),
 ]
 
-# Vendor cost per hour: base by grade × channel factor, US; CA a little lower. Made-up numbers.
+# Cost per hour by practice and grade: a base by grade × a factor for the practice. Made-up numbers.
 GRADE_COST = {"A5": 35, "B1": 45, "B2": 52, "C1": 60, "C2": 68, "D1": 80, "D2": 92, "E1": 105}
-CHANNEL_FACTOR = {"gtd_supply": 0.85, "sogeti": 1.0, "subcon_vms": 1.05, "fte": 0.95}
-REGION_FACTOR = {"US": 1.0, "CA": 0.9}
+PRACTICE_FACTOR = {"CCA-FS": 1.0, "DCX-FS": 1.05, "DMN-FS": 1.0, "TES-FS": 0.9, "ADM-FS": 0.85,
+                   "Cloud-Java": 1.02, "Cloud-MF": 0.94, "Cloud-APM": 0.97}  # fmt: skip
 RATES_FROM = date(2026, 1, 1)
 
 # Client bill rates per hour where they differ from the default. Chosen so the two offers in process
-# land on either side of the 30% cut-off: DIT7AF (C2 subcon) below, BPTONE (B1 Sogeti) above.
+# land on either side of the 30% cut-off: DIT7AF (C2 in DCX-FS) below, BPTONE (B1 in DMN-FS) above.
 BILL_RATES = {"DM-000121": 95, "DM-000131": 80, "DM-000142": 125, "DM-000146": 125, "DM-000151": 125,
               "DM-000118": 88, "DM-000117": 88, "DM-000116": 88, "DM-000126": 90}  # fmt: skip
 

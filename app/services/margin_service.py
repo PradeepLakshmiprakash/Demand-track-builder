@@ -6,7 +6,7 @@ with the cost from the rate card in force on the offer date. At or above the acc
 Discover) the GTD team admin approves or declines; below it, leadership decides at their
 discretion (confirmed 24 Sep). Every decision records approver, margin and time.
 
-An offer whose bill rate, supply channel or rate card entry is missing waits unpriced, with the reason
+An offer whose bill rate or rate card entry is missing waits unpriced, with the reason
 shown, and is re-priced whenever the approvals screen loads or the rate card changes.
 """
 
@@ -56,24 +56,13 @@ def price(db: Session, account: Account, approval: OfferApproval, demand: Demand
     approval.priced_on = on
     approval.bill_rate = demand.client_rate
     approval.cost_rate = approval.margin_pct = approval.route = None
-    cfg = account.settings
-    channel_label = next(
-        (c.label for c in cfg.supply_channels if c.key == approval.channel), approval.channel
-    )
     if not demand.client_rate:
         approval.blocked_reason = "The demand has no client bill rate. Add it on the demand."
         return
-    if not approval.channel:
-        approval.blocked_reason = "The supply channel isn't known. Set it on this offer."
-        return
-    rate = rate_card_service.lookup(
-        db, account.id, grade=demand.grade or "", practice=demand.practice, region=demand.region or "",
-        channel=approval.channel, on=on,
-    )  # fmt: skip
+    rate = rate_card_service.lookup(db, account.id, grade=demand.grade or "", practice=demand.practice, on=on)
     if rate is None:
         approval.blocked_reason = (
-            f"No rate card entry for {demand.grade} · {demand.practice} · {demand.region} · {channel_label} "
-            f"on {on:%d %b %Y}."
+            f"The rate card has no cost for {demand.grade} in {demand.practice} on {on:%d %b %Y}."
         )
         return
     bill = Decimal(demand.client_rate)
@@ -147,7 +136,15 @@ def _mail_raised(
     )
 
 
-def request(db: Session, actor: Actor, demand_id: int, candidate_name: str, channel: str) -> OfferApproval:
+def known_channel(account: Account, channel: str | None) -> str | None:
+    """The supply channel is kept as information about where a candidate comes from. It no longer
+    prices anything, so an unknown or missing one is simply not recorded."""
+    return channel if channel in {c.key for c in account.settings.supply_channels} else None
+
+
+def request(
+    db: Session, actor: Actor, demand_id: int, candidate_name: str, channel: str = ""
+) -> OfferApproval:
     """The admin raises an approval by hand (e.g. the BCM sheet row had no candidate name)."""
     demand = db.get(Demand, demand_id)
     if demand is None or demand.account_id != actor.account_id:
@@ -155,9 +152,7 @@ def request(db: Session, actor: Actor, demand_id: int, candidate_name: str, chan
     if demand.status_enum not in OFFER_STAGES:
         raise ApprovalError(f"{demand.app_ref} isn't at the offer stage.")
     account = db.get_one(Account, actor.account_id)
-    if channel not in {c.key for c in account.settings.supply_channels}:
-        raise ApprovalError("Choose the supply channel.")
-    approval = ensure_offer(db, account, demand, candidate_name, channel)
+    approval = ensure_offer(db, account, demand, candidate_name, known_channel(account, channel))
     if approval is None:
         raise ApprovalError("Enter the candidate's name (an approval for that candidate already exists?).")
     db.commit()
@@ -185,7 +180,7 @@ def askable(db: Session, demand: Demand) -> list[Candidate]:
     return out
 
 
-def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: str) -> OfferApproval:
+def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: str = "") -> OfferApproval:
     """The demand owner raises the offer approval for a selected candidate, instead of waiting for
     the BCM sheet to show the offer. It is priced and routed like any other (ensure_offer mails it)."""
     if demand.account_id != actor.account_id or actor.id != demand.owner_id:
@@ -194,21 +189,9 @@ def ask(db: Session, actor: Actor, demand: Demand, candidate_id: int, channel: s
     if cand is None:
         raise ApprovalError("Pick a candidate the panel has selected, with no approval yet.")
     account = db.get_one(Account, actor.account_id)
-    if channel not in {c.key for c in account.settings.supply_channels}:
-        raise ApprovalError("Choose the supply channel the candidate comes through.")
-    approval = ensure_offer(db, account, demand, cand.name, channel)
+    approval = ensure_offer(db, account, demand, cand.name, known_channel(account, channel) or cand.channel)
     if approval is None:
         raise ApprovalError("An approval for this candidate already exists.")
-    db.commit()
-    return approval
-
-
-def set_channel(db: Session, actor: Actor, approval_id: int, channel: str) -> OfferApproval:
-    approval, demand, account = _pending(db, actor, approval_id)
-    if channel not in {c.key for c in account.settings.supply_channels}:
-        raise ApprovalError("Choose the supply channel.")
-    approval.channel = channel
-    price(db, account, approval, demand)
     db.commit()
     return approval
 
@@ -451,49 +434,3 @@ def set_joining_date(db: Session, actor: Actor, demand: Demand, when: date | Non
         ),
     )
     db.commit()
-
-
-# --- Margin calculator (what-if) ------------------------------------------------------------------------
-
-
-@dataclass
-class WhatIf:
-    channel: str
-    label: str
-    cost: Decimal | None  # None: no rate card entry for this combination today
-    margin_pct: Decimal | None
-    decides: str | None  # who would approve an offer at this margin
-    min_bill: Decimal | None  # lowest bill rate that still meets the account's margin cut-off
-
-
-def what_if(
-    db: Session,
-    account: Account,
-    *,
-    grade: str,
-    practice: str | None,
-    region: str,
-    bill: Decimal | None,
-    on: date,
-) -> list[WhatIf]:
-    """For each supply channel: today's vendor cost, the margin at this bill rate, who would approve
-    an offer at that margin, and the lowest bill rate that reaches the cut-off."""
-    threshold = Decimal(account.margin_threshold)
-    out = []
-    for c in account.settings.supply_channels:
-        rate = rate_card_service.lookup(
-            db, account.id, grade=grade, practice=practice or None, region=region, channel=c.key, on=on
-        )
-        if rate is None:
-            out.append(WhatIf(c.key, c.label, None, None, None, None))
-            continue
-        cost = Decimal(rate.cost_rate)
-        margin = decides = None
-        if bill:
-            margin = ((bill - cost) / bill * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            decides = "Demand owner" if margin >= threshold else "Leadership"
-        min_bill = None
-        if threshold < 100:
-            min_bill = (cost / (1 - threshold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        out.append(WhatIf(c.key, c.label, cost, margin, decides, min_bill))
-    return out

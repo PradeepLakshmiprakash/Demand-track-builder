@@ -189,7 +189,7 @@ DEFAULTS = {
 }
 
 GRADE_COST = {"L2": 40, "L3": 50, "L4": 62, "L5": 75, "L6": 90}
-CHANNEL_FACTOR = {"bench": 0.8, "partner": 1.0, "contract": 1.1}
+PRACTICE_FACTOR = {"APP-ENG": 1.05, "DATA-ENG": 1.1, "QA-AUTO": 1.0}
 RATES_FROM = date(2026, 1, 1)
 
 # demand ref, candidate placeholder, round, interviewer key, scheduled (y, m, d, h, min) in UTC

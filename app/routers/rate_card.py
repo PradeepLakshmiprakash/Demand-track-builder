@@ -28,18 +28,19 @@ def rate_card_page(
     cfg = account.settings
     today = account_today(db, actor.account_id)
     history = request.query_params.get("history") == "1"
-    rows = rate_card_service.listing(db, actor.account_id, on=today, include_history=history)
-    rows.sort(
-        key=lambda r: (r.channel, r.region, cfg.grade_rank(r.grade), r.practice or "", r.effective_from)
-    )
+    rows = rate_card_service.listing(db, actor.account_id, on=today, include_history=True)
+    rows.sort(key=lambda r: (r.practice or "", cfg.grade_rank(r.grade), r.effective_from))
+    card = rate_card_service.grid(db, actor.account_id, today)
     return render(
         request,
         "rate_card/index.html",
         actor,
         db,
-        rows=rows,
         cfg=cfg,
-        channels={c.key: c.label for c in cfg.supply_channels},
+        account=account,
+        card=card,
+        upcoming=[r for r in rows if r.effective_from > today],
+        past=[r for r in rows if r.effective_to is not None and r.effective_to < today],
         today=today,
         history=history,
         upload_columns=rate_card_service.UPLOAD_COLUMNS,
@@ -66,8 +67,6 @@ async def add(
             actor.id,
             grade=str(f.get("grade") or ""),
             practice=str(f.get("practice") or ""),
-            region=str(f.get("region") or ""),
-            channel=str(f.get("channel") or ""),
             cost_rate=str(f.get("cost_rate") or ""),
             effective_from=start,
             effective_to=_date(f.get("effective_to")),
@@ -76,7 +75,7 @@ async def add(
         db.rollback()
         return RedirectResponse(f"/rate-card?err={quote(str(e))}", status_code=303)
     changed = margin_service.reprice_pending(db, actor.account_id)
-    msg = f"Rate added: {row.grade} {row.channel} {row.region} {row.cost_rate}/h"
+    msg = f"Rate set: {row.grade} in {row.practice} costs {row.cost_rate}/h"
     msg += f" from {row.effective_from:%d %b %Y}"
     if changed:
         msg += f". {changed} waiting offer(s) re-priced"
@@ -120,11 +119,10 @@ async def upload(
 
 @router.get("/rate-card/export.csv")
 def export(request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)) -> Response:
-    cfg = db.get_one(Account, actor.account_id).settings
     history = request.query_params.get("history") == "1"
     rows = rate_card_service.listing(
         db, actor.account_id, on=account_today(db, actor.account_id), include_history=history
     )
-    body = rate_card_service.export_csv(rows, {c.key: c.label for c in cfg.supply_channels})
+    body = rate_card_service.export_csv(rows)
     headers = {"Content-Disposition": 'attachment; filename="rate-card.csv"'}
     return Response(body, media_type="text/csv; charset=utf-8", headers=headers)

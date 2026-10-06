@@ -53,7 +53,7 @@ def test_accounts_do_not_see_each_other(client: Client) -> None:
     page = client.as_user("rosa").get("/settings").text  # Acme's Administrator
     assert "Req #" in page and "Offer Pending" in page and "Code Requisition" not in page
     rates = client.get("/rate-card").text
-    assert "Partner network" in rates and "Sogeti" not in rates
+    assert "QA-AUTO" in rates and "CCA-FS" not in rates  # its own practices across the card
 
 
 def test_someone_outside_an_account_cannot_switch_into_it(client: Client) -> None:
@@ -170,7 +170,7 @@ def test_acme_reads_its_own_sheet_format_and_rate_card(client: Client, db: Sessi
     offer = db.scalars(
         select(OfferApproval).where(OfferApproval.demand_id == demand(db, "DM-000103").id)
     ).one()
-    # L5 through the partner network: cost 75, bill 100 → 25%, which is Acme's cut-off → admin decides.
+    # L5 in QA-AUTO: cost 75, bill 100 → 25%, which is Acme's cut-off → the demand owner decides.
     assert (offer.channel, offer.cost_rate, offer.margin_pct) == (
         "partner",
         Decimal("75.00"),
@@ -283,9 +283,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
         "/rate-card",
         {
             "grade": "G2",
-            "practice": "",
-            "region": "UK",
-            "channel": "agency",
+            "practice": "RETAIL-APPS",
             "cost_rate": "50",
             "effective_from": "2026-01-01",
         },

@@ -4,7 +4,7 @@
 <div class="offer" id="a{{ a.id }}">
   <div class="offer-main">
     <div class="title">{{ c.name }} · <a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a></div>
-    <div class="note">{{ d.name }} · {{ d.grade }} · {{ d.region }} · {{ channels.get(a.channel, a.channel or 'channel unknown') }}</div>
+    <div class="note">{{ d.name }} · {{ d.practice }} · {{ d.grade }}</div>
     {% if a.route %}
     <div class="note">Bill {{ a.bill_rate | money(true) }}/h · cost {{ a.cost_rate | money(true) }}/h · rate card on {{ a.priced_on | d }}</div>
     {% endif %}
@@ -52,15 +52,9 @@
   <div class="offer">
     <div class="offer-main">
       <div class="title">{{ c.name }} · <a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a></div>
-      <div class="note">{{ d.name }} · {{ d.grade }} · {{ d.region }}</div>
+      <div class="note">{{ d.name }} · {{ d.practice }} · {{ d.grade }}</div>
       <div class="note" style="color:var(--esc-ink)">{{ a.blocked_reason }}</div>
     </div>
-    {% if is_admin and not a.channel %}
-    <form method="post" action="/approvals/{{ a.id }}/channel" class="decide">
-      <select name="channel" aria-label="Supply channel for {{ c.name }}" required><option value="">Supply channel…</option>{% for k, label in channels.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
-      <button class="btn small">Set</button>
-    </form>
-    {% endif %}
   </div>
   {% endfor %}
 </section>
@@ -72,10 +66,9 @@
   {% for d in b.without_request %}
   <form method="post" action="/approvals/request" class="offer">
     <input type="hidden" name="demand_id" value="{{ d.id }}">
-    <div class="offer-main"><div class="title"><a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a> {{ d.name }}</div><div class="note">{{ d.grade }} · {{ d.region }}</div></div>
+    <div class="offer-main"><div class="title"><a class="mono" href="/demands/{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }}</a> {{ d.name }}</div><div class="note">{{ d.practice }} · {{ d.grade }}</div></div>
     <div class="decide">
       <input type="text" name="candidate" placeholder="Candidate name" aria-label="Candidate for {{ d.app_ref }}" required>
-      <select name="channel" aria-label="Supply channel for {{ d.app_ref }}" required><option value="">Channel…</option>{% for k, label in channels.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
       <button class="btn small">Raise</button>
     </div>
   </form>

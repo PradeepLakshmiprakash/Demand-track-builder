@@ -1,15 +1,19 @@
-"""Vendor rate card (flow-artifact §8.1): cost per hour by grade, practice, region and supply channel.
+"""Rate card: what a resource costs per hour, by practice and grade.
+
+The same concept as Acquisition Central's cost card: the client's rate belongs to each position, the
+cost comes from this card for the position's practice and grade, and one margin threshold decides who
+approves an offer. There is one card for the account: supply channel and region don't change the cost.
 
 Rates are dated and never edited in place, so an old offer's margin can always be recomputed with the
-rate that applied then. Adding a rate for a key that already has one open-ended row closes that row the
-day before the new one starts. A blank practice means "any practice"; a practice-specific rate wins.
+rate that applied then. Adding a rate for a practice and grade that already has an open-ended one closes
+that one the day before the new one starts.
 """
 
 import csv
 import io
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 import openpyxl
 from sqlalchemy import ColumnElement, or_, select
@@ -26,23 +30,21 @@ class RateCardError(ValueError):
 class RateKey:
     grade: str
     practice: str | None
-    region: str
-    channel: str
 
 
-def lookup(
-    db: Session, account_id: int, *, grade: str, practice: str | None, region: str, channel: str, on: date
-) -> RateCard | None:
-    """The rate in force on `on`: practice-specific first, then the any-practice row."""
+def _in_force(on: date) -> list[ColumnElement[bool]]:
+    return [RateCard.effective_from <= on, or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on)]
+
+
+def lookup(db: Session, account_id: int, *, grade: str, practice: str | None, on: date) -> RateCard | None:
+    """The cost in force on `on` for this practice and grade. A rate entered for "any practice" (kept
+    from older cards) applies where the practice has none of its own."""
     rows = db.scalars(
         select(RateCard).where(
             RateCard.account_id == account_id,
             RateCard.grade == grade,
-            RateCard.region == region,
-            RateCard.channel == channel,
             or_(RateCard.practice == practice, RateCard.practice.is_(None)),
-            RateCard.effective_from <= on,
-            or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on),
+            *_in_force(on),
         )
     ).all()
     specific = [r for r in rows if r.practice is not None]
@@ -50,11 +52,15 @@ def lookup(
     return candidates[0] if candidates else None
 
 
+def grid(db: Session, account_id: int, on: date) -> dict[tuple[str, str | None], RateCard]:
+    """Every rate in force on `on`, by (grade, practice); practice None is the "any practice" rate."""
+    rows = db.scalars(select(RateCard).where(RateCard.account_id == account_id, *_in_force(on)))
+    return {(r.grade, r.practice): r for r in rows}
+
+
 def _same_key(key: RateKey) -> list[ColumnElement[bool]]:
     return [
         RateCard.grade == key.grade,
-        RateCard.region == key.region,
-        RateCard.channel == key.channel,
         RateCard.practice.is_(None) if key.practice is None else RateCard.practice == key.practice,
     ]
 
@@ -66,8 +72,6 @@ def add_rate(
     *,
     grade: str,
     practice: str | None,
-    region: str,
-    channel: str,
     cost_rate: str,
     effective_from: date,
     effective_to: date | None = None,
@@ -77,22 +81,20 @@ def add_rate(
     practice = practice or None
     if grade not in cfg.grades:
         raise RateCardError(f"Grade '{grade}' isn't in the account's list.")
-    if practice is not None and practice not in cfg.practices:
+    if practice is None:
+        raise RateCardError("Choose the practice: the cost is set by practice and grade.")
+    if practice not in cfg.practices:
         raise RateCardError(f"Practice '{practice}' isn't in the account's list.")
-    if region not in cfg.regions:
-        raise RateCardError(f"Region '{region}' isn't in the account's list.")
-    if channel not in {c.key for c in cfg.supply_channels}:
-        raise RateCardError("Choose a supply channel.")
     try:
         cost = Decimal(cost_rate).quantize(Decimal("0.01"))
     except (InvalidOperation, ValueError) as e:
-        raise RateCardError("Cost rate must be a number.") from e
+        raise RateCardError("Cost per hour must be a number.") from e
     if cost < 0 or cost > 10000:
-        raise RateCardError("Cost rate must be between 0 and 10,000 per hour.")
+        raise RateCardError("Cost per hour must be between 0 and 10,000.")
     if effective_to is not None and effective_to < effective_from:
         raise RateCardError("The end date is before the start date.")
 
-    key = RateKey(grade, practice, region, channel)
+    key = RateKey(grade, practice)
     existing = list(db.scalars(select(RateCard).where(RateCard.account_id == account_id, *_same_key(key))))
     for r in existing:
         starts_before = r.effective_from < effective_from
@@ -112,8 +114,6 @@ def add_rate(
         account_id=account_id,
         grade=grade,
         practice=practice,
-        region=region,
-        channel=channel,
         cost_rate=cost,
         effective_from=effective_from,
         effective_to=effective_to,
@@ -143,18 +143,49 @@ def listing(db: Session, account_id: int, *, on: date, include_history: bool = F
     stmt = select(RateCard).where(RateCard.account_id == account_id)
     if not include_history:
         stmt = stmt.where(or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on))
-    return list(
-        db.scalars(
-            stmt.order_by(
-                RateCard.channel, RateCard.region, RateCard.grade, RateCard.practice, RateCard.effective_from
-            )
-        )
-    )
+    return list(db.scalars(stmt.order_by(RateCard.practice, RateCard.grade, RateCard.effective_from)))
+
+
+# --- The calculator: what a client rate affords ------------------------------------------------------
+
+
+@dataclass
+class Offering:
+    practice: str
+    grade: str
+    cost: Decimal
+    margin_pct: Decimal
+    fits: bool  # clears the margin being held
+
+
+def margin_pct(bill: Decimal, cost: Decimal) -> Decimal:
+    """margin % = (client rate − cost) ÷ client rate"""
+    return ((bill - cost) / bill * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def ceiling(bill: Decimal, hold: Decimal) -> Decimal:
+    """The highest cost per hour that still keeps `hold` per cent on this client rate."""
+    return (bill * (1 - hold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def offerings(db: Session, account_id: int, bill: Decimal, hold: Decimal, on: date) -> list[Offering]:
+    """Every practice and grade on the card, priced against this client rate."""
+    cfg = db.get_one(Account, account_id).settings
+    card = grid(db, account_id, on)
+    out = []
+    for practice in cfg.practices:
+        for grade in cfg.grades:
+            rate = card.get((grade, practice)) or card.get((grade, None))
+            if rate is None:
+                continue
+            m = margin_pct(bill, Decimal(rate.cost_rate))
+            out.append(Offering(practice, grade, Decimal(rate.cost_rate), m, m >= hold))
+    return out
 
 
 # --- Bulk upload -----------------------------------------------------------------------------------
 
-UPLOAD_COLUMNS = ["Channel", "Region", "Grade", "Practice", "Cost per hour", "From", "Until"]
+UPLOAD_COLUMNS = ["Practice", "Grade", "Cost per hour", "From", "Until"]
 
 
 def _cell_date(v: object) -> date | None:
@@ -201,8 +232,7 @@ def import_rates(db: Session, account_id: int, actor_id: int, filename: str, dat
     if missing:
         raise RateCardError(f"Missing columns: {', '.join(missing)}. Expected: {', '.join(UPLOAD_COLUMNS)}.")
     cfg = db.get_one(Account, account_id).settings
-    channel_of = {c.key.casefold(): c.key for c in cfg.supply_channels}
-    channel_of |= {c.label.casefold(): c.key for c in cfg.supply_channels}
+    practice_of = {p.casefold(): p for p in cfg.practices}
     errors: list[str] = []
     for n, row in enumerate(rows, start=2):  # row 1 is the header
 
@@ -221,9 +251,7 @@ def import_rates(db: Session, account_id: int, actor_id: int, filename: str, dat
                 account_id,
                 actor_id,
                 grade=col("Grade").upper(),
-                practice=None if practice.casefold() in ("", "any") else practice,
-                region=col("Region").upper(),
-                channel=channel_of.get(col("Channel").casefold(), ""),
+                practice=practice_of.get(practice.casefold(), practice),
                 cost_rate=col("Cost per hour").lstrip("$"),
                 effective_from=start,
                 effective_to=_cell_date(row.get(columns["until"])) if "until" in columns else None,
@@ -239,15 +267,12 @@ def import_rates(db: Session, account_id: int, actor_id: int, filename: str, dat
     return len(rows)
 
 
-def export_csv(rows: list[RateCard], channel_labels: dict[str, str]) -> str:
+def export_csv(rows: list[RateCard]) -> str:
     """The same columns the upload reads, so an export is also the template."""
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(UPLOAD_COLUMNS)
     for r in rows:
         until = r.effective_to.isoformat() if r.effective_to else ""
-        label = channel_labels.get(r.channel, r.channel)
-        w.writerow(
-            [label, r.region, r.grade, r.practice or "Any", r.cost_rate, r.effective_from.isoformat(), until]
-        )
+        w.writerow([r.practice or "Any", r.grade, r.cost_rate, r.effective_from.isoformat(), until])
     return out.getvalue()

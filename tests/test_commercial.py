@@ -51,54 +51,57 @@ def offer_for(db: Session, ref: str) -> OfferApproval:
 
 
 def add(db: Session, **kw: object) -> RateCard:
-    base: dict[str, object] = {"grade": "C1", "practice": "", "region": "US", "channel": "sogeti",
-                               "cost_rate": "61", "effective_from": date(2026, 10, 1)}  # fmt: skip
+    base: dict[str, object] = {"grade": "C1", "practice": "CCA-FS", "cost_rate": "61",
+                               "effective_from": date(2026, 10, 1)}  # fmt: skip
     base.update(kw)
     return rate_card_service.add_rate(db, 1, user_id("kavya"), **base)  # type: ignore[arg-type]
+
+
+def cost_on(db: Session, day: date, grade: str = "C1", practice: str = "CCA-FS") -> Decimal | None:
+    r = rate_card_service.lookup(db, 1, grade=grade, practice=practice, on=day)
+    return r.cost_rate if r else None
 
 
 def test_new_rate_takes_over_and_closes_the_old_one(db: Session) -> None:
     add(db)
     old = db.scalars(
         select(RateCard).where(
-            RateCard.grade == "C1",
-            RateCard.channel == "sogeti",
-            RateCard.region == "US",
-            RateCard.effective_from == date(2026, 1, 1),
-        )  # fmt: skip
+            RateCard.grade == "C1", RateCard.practice == "CCA-FS", RateCard.effective_from == date(2026, 1, 1)
+        )
     ).one()
     assert old.effective_to == date(2026, 9, 30)
-
-    def cost_on(day: date) -> Decimal | None:
-        r = rate_card_service.lookup(db, 1, grade="C1", practice=None, region="US", channel="sogeti", on=day)
-        return r.cost_rate if r else None
-
-    assert cost_on(date(2026, 9, 30)) == Decimal("60.00")
-    assert cost_on(date(2026, 10, 1)) == Decimal("61.00")
+    assert cost_on(db, date(2026, 9, 30)) == Decimal("60.00")
+    assert cost_on(db, date(2026, 10, 1)) == Decimal("61.00")
 
 
 def test_overlapping_rates_are_refused(db: Session) -> None:
-    # A practice-specific key has no seeded rate, so only these two rows exist for it.
-    add(db, effective_from=date(2026, 10, 1), effective_to=date(2026, 10, 31), practice="DMN-FS")
+    # A bounded rate can't be dropped into the middle of the open-ended one already there.
     with pytest.raises(RateCardError, match="Overlaps"):
-        add(db, effective_from=date(2026, 10, 15), effective_to=date(2026, 11, 15), practice="DMN-FS")
-    # A bounded rate can't be dropped into the middle of an open-ended one either.
+        add(db, effective_from=date(2026, 10, 1), effective_to=date(2026, 10, 31))
+    add(db, effective_from=date(2027, 1, 1))  # closes the 2026 rate on 31 Dec
     with pytest.raises(RateCardError, match="Overlaps"):
-        add(db, effective_from=date(2026, 10, 1), effective_to=date(2026, 10, 31), grade="D2")
+        add(db, effective_from=date(2026, 12, 15), effective_to=date(2027, 1, 15))
 
 
-def test_practice_specific_rate_wins(db: Session) -> None:
-    add(db, practice="DMN-FS", cost_rate="50", effective_from=date(2026, 1, 1))
-    kw = {"grade": "C1", "region": "US", "channel": "sogeti", "on": date(2026, 9, 1)}
-    assert rate_card_service.lookup(db, 1, practice="DMN-FS", **kw).cost_rate == Decimal("50.00")  # type: ignore[union-attr, arg-type]
-    assert rate_card_service.lookup(db, 1, practice="CCA-FS", **kw).cost_rate == Decimal("60.00")  # type: ignore[union-attr, arg-type]
+def test_the_practice_sets_the_rate(db: Session) -> None:
+    day = date(2026, 9, 1)
+    assert cost_on(db, day, practice="CCA-FS") == Decimal("60.00")
+    assert cost_on(db, day, practice="DCX-FS") == Decimal("63.00")  # same grade, another practice
+    assert cost_on(db, day, practice="TES-FS") == Decimal("54.00")
+    assert cost_on(db, day, practice="Not a practice") is None
+    # An older "any practice" rate still applies where a practice has none of its own.
+    db.add(RateCard(account_id=1, grade="F9", practice=None, cost_rate=Decimal("10"),
+                    effective_from=date(2026, 1, 1)))  # fmt: skip
+    db.commit()
+    assert cost_on(db, day, grade="F9", practice="CCA-FS") == Decimal("10.00")
 
 
 @pytest.mark.parametrize(
     ("change", "message"),
     [
         ({"grade": "Z9"}, "Grade"),
-        ({"channel": "carrier pigeon"}, "supply channel"),
+        ({"practice": ""}, "Choose the practice"),
+        ({"practice": "Carrier pigeons"}, "Practice"),
         ({"cost_rate": "abc"}, "number"),
         ({"cost_rate": "-5"}, "between"),
         ({"effective_to": date(2026, 9, 1)}, "before the start"),
@@ -110,7 +113,7 @@ def test_rate_validation(db: Session, change: dict[str, object], message: str) -
 
 
 def test_end_a_rate(db: Session) -> None:
-    row = add(db, grade="E1", channel="fte", cost_rate="99", effective_from=date(2027, 1, 1))
+    row = add(db, grade="E1", cost_rate="99", effective_from=date(2027, 1, 1))
     rate_card_service.end_rate(db, 1, row.id, date(2027, 6, 30))
     assert db.get_one(RateCard, row.id).effective_to == date(2027, 6, 30)
     with pytest.raises(RateCardError, match="before it starts"):
@@ -119,11 +122,24 @@ def test_end_a_rate(db: Session) -> None:
 
 def test_rate_card_screen(client: Client) -> None:
     client.as_user("anil")
-    assert "Sogeti" in client.get("/rate-card").text
-    r = client.post("/rate-card", data={"channel": "fte", "region": "CA", "grade": "E1", "practice": "",
-                                        "cost_rate": "120", "effective_from": "2027-01-01"})  # fmt: skip
-    assert "msg=Rate+added" in r.headers["location"] or "msg=Rate%20added" in r.headers["location"]
-    assert client.as_user("farah").get("/rate-card").status_code == 403  # GTD team admin only
+    page = client.get("/rate-card").text
+    assert "Cost per hour by grade and practice" in page and "CCA-FS" in page and "$71.40" in page
+    assert "Supply channel" not in page and "Region" not in page  # neither prices anything now
+    r = client.post("/rate-card", data={"grade": "E1", "practice": "DCX-FS", "cost_rate": "120",
+                                        "effective_from": "2027-01-01"})  # fmt: skip
+    assert "msg=Rate%20set" in r.headers["location"]
+    assert "Rates still to start" in client.get("/rate-card").text
+    assert client.as_user("farah").get("/rate-card").status_code == 403  # the Administrator's screen
+
+
+def test_calculator_offerings(db: Session) -> None:
+    rows = rate_card_service.offerings(db, 1, Decimal("100"), Decimal("30"), date(2026, 9, 1))
+    by = {(r.practice, r.grade): r for r in rows}
+    assert by[("CCA-FS", "C2")].cost == Decimal("68.00") and by[("CCA-FS", "C2")].margin_pct == Decimal(
+        "32.00"
+    )
+    assert by[("CCA-FS", "C2")].fits and not by[("DCX-FS", "C2")].fits  # 71.40 leaves 28.6%
+    assert rate_card_service.ceiling(Decimal("100"), Decimal("30")) == Decimal("70.00")
 
 
 # --- Offer approvals ------------------------------------------------------------------------------
@@ -204,21 +220,15 @@ def test_unpriced_offer_waits_then_reprices(client: Client, db: Session) -> None
 
 
 def test_missing_rate_card_entry_blocks_until_added(client: Client, db: Session) -> None:
-    for r in db.scalars(select(RateCard).where(RateCard.grade == "B1", RateCard.channel == "sogeti")):
+    for r in db.scalars(select(RateCard).where(RateCard.grade == "B1", RateCard.practice == "DMN-FS")):
         db.delete(r)
     db.commit()
     import_sample(client)
     a = offer_for(db, "DM-000131")
-    assert "No rate card entry for B1" in (a.blocked_reason or "")
+    assert "The rate card has no cost for B1 in DMN-FS" in (a.blocked_reason or "")
     client.as_user("anil").post(
         "/rate-card",
-        data={
-            "channel": "sogeti",
-            "region": "US",
-            "grade": "B1",
-            "cost_rate": "44",
-            "effective_from": "2026-01-01",
-        },
+        data={"practice": "DMN-FS", "grade": "B1", "cost_rate": "44", "effective_from": "2026-01-01"},
     )
     a = offer_for(db, "DM-000131")
     assert a.route == "admin" and a.cost_rate == Decimal("44.00")
@@ -228,7 +238,7 @@ def test_margin_uses_the_rate_on_the_offer_date(client: Client, db: Session) -> 
     import_sample(client)
     offered_on = offer_for(db, "DM-000131").priced_on
     assert offered_on is not None
-    add(db, grade="B1", channel="sogeti", cost_rate="70", effective_from=offered_on + timedelta(days=1))
+    add(db, grade="B1", practice="DMN-FS", cost_rate="70", effective_from=offered_on + timedelta(days=1))
     margin_service.reprice_pending(db, 1)
     assert offer_for(db, "DM-000131").cost_rate == Decimal("45.00")  # later rate doesn't touch this offer
 
@@ -369,26 +379,17 @@ def test_billable_hours_is_an_account_setting(client: Client, db: Session) -> No
 
 # --- Rate card bulk upload --------------------------------------------------------------------------
 
-UPLOAD = (
-    "Channel,Region,Grade,Practice,Cost per hour,From,Until\n"
-    "Sogeti,US,C1,Any,$63.50,2027-01-01,\n"
-    "subcon_vms,US,C2,DMN-FS,70,2027-01-01,2027-12-31\n"
-)
+UPLOAD = "Practice,Grade,Cost per hour,From,Until\ncca-fs,C1,$63.50,2027-01-01,\nDMN-FS,C2,70,2027-06-01,\n"
 
 
 def test_upload_rates_csv(client: Client, db: Session) -> None:
     client.as_user("anil")
     r = client.post("/rate-card/upload", files={"file": ("rates.csv", UPLOAD.encode(), "text/csv")})
     assert "2+rates+imported" in r.headers["location"] or "2%20rates%20imported" in r.headers["location"]
-    kw = {"region": "US", "on": date(2027, 2, 1)}
-    c1 = rate_card_service.lookup(db, 1, grade="C1", practice=None, channel="sogeti", **kw)  # type: ignore[arg-type]
-    assert c1 is not None and c1.cost_rate == Decimal("63.50")
-    old = rate_card_service.lookup(
-        db, 1, grade="C1", practice=None, channel="sogeti", region="US", on=date(2026, 12, 31)
-    )
+    c1 = rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=date(2027, 2, 1))
+    assert c1 is not None and c1.cost_rate == Decimal("63.50")  # the practice is matched whatever its case
+    old = rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=date(2026, 12, 31))
     assert old is not None and old.effective_to == date(2026, 12, 31)  # superseded, not edited
-    dmn = rate_card_service.lookup(db, 1, grade="C2", practice="DMN-FS", channel="subcon_vms", **kw)  # type: ignore[arg-type]
-    assert dmn is not None and dmn.effective_to == date(2027, 12, 31)
 
 
 def test_upload_rates_xlsx(client: Client, db: Session) -> None:
@@ -399,20 +400,18 @@ def test_upload_rates_xlsx(client: Client, db: Session) -> None:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.append(rate_card_service.UPLOAD_COLUMNS)
-    ws.append(["FTE external hire", "CA", "E1", "Any", 101, date(2027, 3, 1), None])
+    ws.append(["TES-FS", "E1", 101, date(2027, 3, 1), None])
     buf = io.BytesIO()
     wb.save(buf)
     client.as_user("anil").post(
         "/rate-card/upload", files={"file": ("rates.xlsx", buf.getvalue(), "application/octet-stream")}
     )
-    r = rate_card_service.lookup(
-        db, 1, grade="E1", practice=None, channel="fte", region="CA", on=date(2027, 3, 1)
-    )
+    r = rate_card_service.lookup(db, 1, grade="E1", practice="TES-FS", on=date(2027, 3, 1))
     assert r is not None and r.cost_rate == Decimal("101.00")
 
 
 def test_upload_is_all_or_nothing(client: Client, db: Session) -> None:
-    bad = UPLOAD + "Carrier pigeon,US,C1,Any,10,2027-01-01,\nSogeti,US,Z9,Any,10,2027-01-01,\n"
+    bad = UPLOAD + "Carrier pigeons,C1,10,2027-01-01,\nCCA-FS,Z9,10,2027-01-01,\n"
     before = db.scalar(select(func.count()).select_from(RateCard))
     r = client.as_user("anil").post(
         "/rate-card/upload", files={"file": ("rates.csv", bad.encode(), "text/csv")}
@@ -435,4 +434,4 @@ def test_export_is_the_upload_template(client: Client) -> None:
     r = client.as_user("anil").get("/rate-card/export.csv")
     lines = r.text.splitlines()
     assert lines[0] == ",".join(rate_card_service.UPLOAD_COLUMNS)
-    assert "Sogeti,US,C1,Any,60.00,2026-01-01," in lines
+    assert "CCA-FS,C1,60.00,2026-01-01," in lines

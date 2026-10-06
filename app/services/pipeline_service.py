@@ -218,9 +218,7 @@ def record_client_decision(
         raise ClientDecisionError("Say whether the client selected the candidate or not.")
     account = db.get_one(Account, demand.account_id)
     selected = outcome == InterviewOutcome.SELECT.value
-    channel = channel or cand.channel or ""
-    if selected and channel not in {c.key for c in account.settings.supply_channels}:
-        raise ClientDecisionError("Choose the supply channel the candidate comes through.")
+    known = margin_service.known_channel(account, channel) or cand.channel
     if not selected and not note.strip():
         raise ClientDecisionError("Add a short note on why the client did not select the candidate.")
 
@@ -229,9 +227,9 @@ def record_client_decision(
     cand.client_decided_by = actor.id
     cand.client_note = note.strip() or None
     if selected:
-        cand.channel = channel
+        cand.channel = known
         record_stage(db, demand, DemandStatus.OFFER_IN_PROCESS, actor.id, StageOrigin.APP)
-        margin_service.ensure_offer(db, account, demand, cand.name, channel)  # mails whoever decides it
+        margin_service.ensure_offer(db, account, demand, cand.name, known)  # mails whoever decides it
         outcome_text = "selected by the client · offer approval raised"
     else:
         cand.current_stage = "Not selected by the client"

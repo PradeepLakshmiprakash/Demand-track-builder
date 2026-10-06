@@ -57,20 +57,6 @@ async def decide(
     return _back(f"Offer {a.decision} at {a.margin_pct}% margin")
 
 
-@router.post("/approvals/{approval_id}/channel")
-async def set_channel(
-    approval_id: int, request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
-) -> RedirectResponse:
-    if actor.role is not Role.ADMIN:
-        return _back(err="Only the GTD team admin changes an offer's details.")
-    try:
-        margin_service.set_channel(db, actor, approval_id, str((await request.form()).get("channel") or ""))
-    except ApprovalError as e:
-        db.rollback()
-        return _back(err=str(e))
-    return _back("Supply channel set and offer re-priced")
-
-
 @router.post("/approvals/request")
 async def request_approval(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)

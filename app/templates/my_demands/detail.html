@@ -141,10 +141,6 @@
         <form method="post" action="/demands/{{ d.app_ref }}/client-decision" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
           <input type="hidden" name="candidate_id" value="{{ c.id }}">
           <div class="title" style="flex:1 1 100%">{{ c.name }} <span class="small muted">· waiting for the client's decision</span></div>
-          <select name="channel" aria-label="Supply channel for {{ c.name }}" style="width:auto;min-height:38px">
-            <option value="">Supply channel…</option>
-            {% for k, label in channels.items() %}<option value="{{ k }}" {{ 'selected' if c.channel == k }}>{{ label }}</option>{% endfor %}
-          </select>
           <input type="text" name="note" placeholder="Note (required if not selected)" aria-label="Note on the client's decision for {{ c.name }}" style="flex:1 1 200px;min-height:38px">
           <button class="btn small primary" name="outcome" value="select">Client selected</button>
           <button class="btn small danger" name="outcome" value="reject">Client did not select</button>
@@ -166,10 +162,6 @@
         <form method="post" action="/demands/{{ d.app_ref }}/offers" class="cand-mini row" style="gap:8px;flex-wrap:wrap">
           <input type="hidden" name="candidate_id" value="{{ c.id }}">
           <div class="title" style="flex:1 1 200px">{{ c.name }} <span class="small muted">· selected by the panel, no approval yet</span></div>
-          <select name="channel" required aria-label="Supply channel for {{ c.name }}" style="width:auto;min-height:38px">
-            <option value="">Supply channel…</option>
-            {% for k, label in channels.items() %}<option value="{{ k }}" {{ 'selected' if c.channel == k }}>{{ label }}</option>{% endfor %}
-          </select>
           <button class="btn small primary">Ask for offer approval</button>
         </form>
       {% endfor %}

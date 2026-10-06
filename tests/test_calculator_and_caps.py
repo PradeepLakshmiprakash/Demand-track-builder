@@ -15,21 +15,24 @@ def clear_outbox() -> None:
     mail.sent.clear()
 
 
-def test_calculator_shows_cost_margin_and_who_approves_per_channel(client: Client) -> None:
+def test_calculator_says_what_a_client_rate_affords(client: Client) -> None:
     c = client.as_user("kavya")
-    page = c.get("/margin-calculator?grade=C2&region=US&bill_rate=95").text
-    # C2 US: Sogeti cost 68 → 28.4%, below 30%: leadership. Lowest bill for 30% = 68 / 0.7 = 97.14
-    assert "Sogeti" in page and "$68.00" in page and "28.4%" in page and "Leadership" in page
-    assert "$97.14" in page
-    # GTD supply costs 57.80 → 39.2%: the demand owner approves
-    assert "39.2%" in page and "Demand owner" in page
-    assert "Calculate" in c.get("/margin-calculator").text  # empty form opens fine
-    assert "number above 0" in c.get("/margin-calculator?grade=C2&bill_rate=abc").text
+    page = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS").text
+    # At $100 and 30%, the most a position can cost is $70: in CCA-FS that is C2 ($68, 32%).
+    assert "put forward <strong>C2 in CCA-FS</strong>" in page and "$68.00" in page and "32.0%" in page
+    assert "$70.00" in page and "Grades around this rate in CCA-FS" in page
+    assert "D1" in page and "Leadership" in page  # the next grade up costs $80: under the margin
+    best = c.get("/margin-calculator?bill_rate=100").text  # no practice: the best of each
+    assert "The best each practice can do" in best and "DCX-FS" in best and "Supply channel" not in best
+    assert "Work it out" in c.get("/margin-calculator").text  # opens on $100 with the account's margin
+    assert "number above 0" in c.get("/margin-calculator?bill_rate=abc").text
+    tried = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&hold=40").text
+    assert "Trying 40%, not the 30% margin" in tried and "put forward <strong>C1 in CCA-FS</strong>" in tried
 
 
-def test_calculator_says_when_the_rate_card_has_no_entry(client: Client) -> None:
-    page = client.as_user("sanjay").get("/margin-calculator?grade=C2&region=XX&bill_rate=95").text
-    assert "No rate card entry for this combination" in page
+def test_calculator_says_when_nothing_fits(client: Client) -> None:
+    page = client.as_user("sanjay").get("/margin-calculator?bill_rate=30&practice=CCA-FS").text
+    assert "Nothing in <strong>CCA-FS</strong> clears 30%" in page
 
 
 @pytest.mark.parametrize("who", ["farah", "vikram", "anil"])

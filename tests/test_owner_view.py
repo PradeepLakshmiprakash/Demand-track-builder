@@ -82,7 +82,6 @@ def test_only_the_owner_asks_and_only_for_a_selected_candidate(client: Client, d
         assert "err=" in r.headers["location"]
     assert client.as_user("priya").post("/demands/DM-000146/offers", data=form).status_code == 404
     neha = client.as_user("neha")
-    assert "err=" in neha.post("/demands/DM-000146/offers", data={**form, "channel": ""}).headers["location"]
     assert (
         "err="
         in neha.post("/demands/DM-000146/offers", data={**form, "candidate_id": "999"}).headers["location"]
