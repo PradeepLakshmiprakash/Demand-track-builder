@@ -118,13 +118,13 @@ def test_owner_records_the_joining_date_after_approval(client: Client, db: Sessi
     r = client.as_user("neha").post("/demands/DM-000146/joining-date", data={"expected_doj": when})
     assert "msg=" in r.headers["location"]
     d = demand(db, "DM-000146")
-    assert d.expected_doj is not None and d.status == "offer_in_market"  # Allocation Pending · offer made
+    assert d.expected_doj is not None and d.status == "offer_in_market"  # offer made, joining awaited
     [m] = mail.sent
     assert m.to == ["kavya.r@example.com"] and "Offer accepted, joining" in m.subject
     page = client.get("/demands/DM-000146").text
-    assert "expected, entered by the demand owner" in page and "Allocation Pending" in page
+    assert "expected, entered by the demand owner" in page and "Client Onboarding In Progress" in page
     row = next(x for x in client.get("/api/demands").json() if x["app_ref"] == "DM-000146")
-    assert row["joining_date"] == when and row["main_stage"] == "Allocation Pending"
+    assert row["joining_date"] == when and row["main_stage"] == "Client Onboarding In Progress"
 
     # The next BCM sheet still says "Coverage Required" for it: the owner's progress isn't undone.
     files = {"file": ("dp.xlsx", sample_sheet.build(), "application/octet-stream")}

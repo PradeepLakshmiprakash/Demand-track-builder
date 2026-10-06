@@ -45,7 +45,7 @@ def test_owner_records_that_the_client_selected(client: Client, db: Session) -> 
     mail.sent.clear()
     assert "msg=" in decide(client, "neha", c, "select", channel="sogeti")
     d = by_ref(db, "DM-000146")
-    assert d.status == "offer_in_process" and d.status_enum.main.label == "Allocation Pending"
+    assert d.status == "offer_in_process" and d.status_enum.main.label == "Client Onboarding In Progress"
     offer = db.scalars(select(OfferApproval).where(OfferApproval.demand_id == d.id)).one()
     assert offer.candidate_id == c.id and offer.channel == "sogeti"
     assert any("Client interview: Chosen One selected" in m.subject for m in mail.sent)

@@ -29,7 +29,7 @@
   var panel = document.getElementById('wf-panel'), link = document.getElementById('wf-toggle'), drawn = false;
   function show(on) {
     if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }}, escalations: {{ wf_esc | tojson }} }); drawn = true; }
-    document.getElementById('wf-tip').dataset.tip = 'Every stage and sub-stage, with where this demand is now. ' + wfKey(true);
+    document.getElementById('wf-tip').dataset.tip = 'The end-to-end demand fulfilment process, with the current position of this demand. ' + wfKey(true);
     panel.hidden = !on;
     link.textContent = on ? 'Hide workflow' : 'Show workflow';
   }

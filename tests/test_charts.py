@@ -58,6 +58,6 @@ def test_overview_is_not_for_demand_owners(client: Client) -> None:
 def test_demand_page_has_its_workflow(client: Client) -> None:
     html = client.as_user("priya").get("/demands/DM-000121").text
     assert "Show workflow" in html and "wfDiagram(" in html
-    assert '"sub": "Offer approval pending"' in html and '"stage": "Allocation Pending"' in html
+    assert '"sub": "Offer approval pending"' in html and '"stage": "Client Onboarding In Progress"' in html
     assert "<strong>Next:</strong> The offer is approved" in html
     assert '"t": "Past start date"' in html  # its open escalation rides on the diagram

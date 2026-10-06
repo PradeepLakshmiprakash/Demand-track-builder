@@ -17,7 +17,7 @@ from app.services import import_service, reconcile_service
 from app.services.demand_service import account_today
 from app.services.import_service import SheetImportError
 
-router = APIRouter(tags=["dp sheet import"])
+router = APIRouter(tags=["bcm sheet import"])
 guard = require_screen("import")
 
 

@@ -1,4 +1,4 @@
-"""Reads a DP coverage sheet into clean rows.
+"""Reads a BCM coverage sheet into clean rows.
 
 Which header holds which field is account configuration (`AccountConfig.dp_columns`), so a renamed
 column is a settings change, not a code change. Headers match ignoring case and spacing. Missing

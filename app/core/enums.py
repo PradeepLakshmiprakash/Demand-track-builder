@@ -166,7 +166,7 @@ class MainStage(StrEnum):
 MAIN_STAGE_META = {
     MainStage.COVERAGE: ("Resourcing In Progress", "teal"),
     MainStage.SELECTION: ("Selection In Progress", "blue"),
-    MainStage.ALLOC_PENDING: ("Allocation Pending", "blue"),
+    MainStage.ALLOC_PENDING: ("Client Onboarding In Progress", "blue"),
     MainStage.ALLOC_DONE: ("Allocation Completed", "done"),
     MainStage.ABANDONED: ("Abandoned", "gray"),
 }

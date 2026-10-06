@@ -57,7 +57,7 @@ def test_overview_keeps_to_the_period(client: Client, db: Session) -> None:
     wide = loss_service.overview(db, 1, today, period_for(db, 1, (today - timedelta(days=90)).isoformat()))
     assert wide.live == before.live and wide.archived == 0
     page = client.as_user("sanjay").get("/overview").text
-    assert "finished in the last 30 days" in page and "1 older finished demand not shown" in page
+    assert "finished in the last 30 days" in page and "1 demand fulfilled or abandoned before the selected period is excluded" in page
     page = client.as_user("sanjay").get(f"/overview?start={today - timedelta(days=90)}").text
     assert "Live at any time from" in page and ">Current</a>" in page
 

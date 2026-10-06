@@ -72,11 +72,23 @@ def overview_page(
 
 # What each main stage means, in plain words, under its name on the overview.
 MEANS = {
-    MainStage.COVERAGE: "Raised, not yet with a candidate: being approved on GTD, or profiles being sourced",
-    MainStage.SELECTION: "Candidates are in panel or client interviews",
-    MainStage.ALLOC_PENDING: "A candidate is chosen: offer being approved, or joining awaited",
-    MainStage.ALLOC_DONE: "The candidate has joined",
-    MainStage.ABANDONED: "Cancelled or closed without a hire",
+    MainStage.COVERAGE: (
+        "The requisition has been raised and is progressing through GTD creation and approval, or suitable "
+        "profiles are being sourced. No candidate has entered the selection process yet."
+    ),
+    MainStage.SELECTION: (
+        "One or more candidates are under evaluation, either by the internal interview panel or by the "
+        "client, and a selection decision is awaited."
+    ),
+    MainStage.ALLOC_PENDING: (
+        "A candidate has been selected. The offer is awaiting commercial approval, or has been accepted "
+        "and the candidate's date of joining is awaited."
+    ),
+    MainStage.ALLOC_DONE: "The selected candidate has joined and the position is fulfilled.",
+    MainStage.ABANDONED: (
+        "The requisition was cancelled in the BCM sheet, or closed by the demand owner or the GTD team, "
+        "without a candidate being placed."
+    ),
 }
 
 

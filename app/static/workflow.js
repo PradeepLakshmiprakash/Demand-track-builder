@@ -47,9 +47,9 @@
 
   /* How to read the diagram, for an info mark beside its heading. */
   window.wfKey = function (single) {
-    return 'Solid boxes are the normal path, top to bottom then left to right. Dashed boxes are problem states a demand can fall into at that step.'
-      + (single ? ' ✓ = already passed · ● = where it is now.' : ' The number on a box is how many demands are there now; click a box or a stage to see them.')
-      + ' ⚠ = open escalations at that step.';
+    return 'Solid boxes represent the standard path, read top to bottom within a stage and then left to right across stages. Dashed boxes represent exception states that a demand may enter at the corresponding step.'
+      + (single ? ' A tick marks a step already completed; the filled box marks the current step.' : ' The figure on each box is the number of demands currently at that step; select a box or a stage header to list them.')
+      + ' A warning badge shows the number of open escalations at that step.';
   };
 
   window.wfDiagram = function (layout, o) {

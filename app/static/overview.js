@@ -13,8 +13,13 @@
   var WFC = wfColours(L), SUB_C = WFC.sub;
   ORDER.sub = WFC.order;
   var NAME = { stage: 'Stage', sub: 'Sub-stage', bu: 'Business unit', type: 'Type', practice: 'Practice', pstart: 'Timing', escd: 'Escalations', costing: 'Costing' };
-  var HINT = { sub: 'where exactly inside this stage', bu: 'which business unit they belong to', stage: 'how far along they are',
-    type: 'new or replacement, billable or not', practice: 'the skill area' };
+  var HINT = {
+    sub: 'Distribution of the open positions in view across the detailed workflow sub-stages. Each sub-stage carries the colour of its parent stage. Select a slice or a row to restrict the page to that sub-stage.',
+    bu: 'Distribution of the positions in view across business units.',
+    stage: 'Distribution of the positions in view across the main workflow stages.',
+    type: 'Classification of the open positions in view by demand type (new or replacement) and commercial type (billable or non-billable). Select a row to restrict the page to that classification.',
+    practice: 'Distribution of the open positions in view by delivery practice, as recorded on each demand. Select a row to restrict the page to that practice.'
+  };
   var dim = 'stage', F = {}, openRef = null, showFlow = location.hash === '#workflow';
   var $ = function (id) { return document.getElementById(id); };
 
@@ -126,26 +131,28 @@
       escd += x.esc.length ? 1 : 0; overdue += x.esc.some(function (e) { return e.l === 2; }) ? 1 : 0;
       cost += x.cost || 0; costn += x.cost_active ? 1 : 0;
     });
-    var more = function (on) { return on ? ' Showing only these; click again to go back.' : ' Click to see them.'; };
-    $('ov-kpis').innerHTML = kpi('Positions', 'Positions in this view.', rows.length)
-      + kpi('Open', 'Nobody has joined yet.', open)
-      + kpi('Past start', 'Start date gone, still unfilled.' + more(F.pstart), late, late ? 'amber' : '', late ? 'needs action' : '', 'pstart', 'Past start')
-      + kpi('Escalated', 'Demands with an open escalation.' + more(F.escd), escd, overdue ? 'red' : escd ? 'amber' : '', overdue ? overdue + ' overdue' : '', 'escd', 'Escalated')
-      + kpi('Revenue lost', 'Bill rate × ' + OV.hours + ' h × working days late, on billable positions.' + (norate ? ' ' + norate + ' with no bill rate.' : ''), money(lost), lost ? 'red' : '')
-      + kpi('Non-billable cost', 'What proactive, non-billable positions have cost the account since their start date.' + more(F.costing), money(cost), '', costn ? costn + ' not billing' : '', 'costing', 'Non-billable cost');
+    var more = function (on) { return on ? ' The page is currently restricted to these positions; select the figure again to remove the restriction.' : ' Select the figure to list these positions.'; };
+    $('ov-kpis').innerHTML = kpi('Positions', 'Total number of positions in the current view: every demand past draft that is open, or that was fulfilled or abandoned within the selected period.', rows.length)
+      + kpi('Open', 'Positions not yet fulfilled: no candidate has joined and the demand has not been abandoned.', open)
+      + kpi('Past start', 'Open positions whose requested start date has passed without a candidate having joined. These positions are accruing revenue loss.' + more(F.pstart), late, late ? 'amber' : '', late ? 'needs action' : '', 'pstart', 'Past start')
+      + kpi('Escalated', 'Positions with at least one open escalation. An escalation becomes overdue (Level 2) when the responsible party has not responded within the agreed response time; leadership and the delivery head are then informed.' + more(F.escd), escd, overdue ? 'red' : escd ? 'amber' : '', overdue ? overdue + ' overdue' : '', 'escd', 'Escalated')
+      + kpi('Revenue lost', 'Estimated revenue forgone on billable positions that remain unfilled after their requested start date. Calculated as the client bill rate per hour × ' + OV.hours + ' billable hours per day × working days elapsed since the start date.' + (norate ? ' ' + norate + ' position' + (norate === 1 ? ' has' : 's have') + ' no client bill rate recorded and ' + (norate === 1 ? 'is' : 'are') + ' excluded.' : ''), money(lost), lost ? 'red' : '')
+      + kpi('Non-billable cost', 'Cost incurred to the account by proactive, non-billable positions since their start date. Calculated as the rate card cost per hour for the practice and grade × ' + OV.hours + ' hours per day × working days elapsed, until the demand owner confirms that client billing has started. Reported separately from revenue lost.' + more(F.costing), money(cost), '', costn ? costn + ' not billing' : '', 'costing', 'Non-billable cost');
   }
 
   function detail(rows) {
     var ks = Object.keys(F);
-    var h = '<div class="eyebrow">You are looking at' + (ks.length ? tip('Click a tag to remove it, or Clear all to see the whole account again.') : '') + '</div>';
+    var h = '<div class="eyebrow">You are looking at' + (ks.length ? tip('The filters currently applied to this page. Select a filter tag to remove it individually, or select Clear all to return to the full account view.') : '') + '</div>';
     if (ks.length) {
       h += '<div class="chips">' + ks.map(function (k) { return '<button class="chip-x" data-key="' + k + '" data-val="' + esc(F[k]) + '">' + esc(F[k]) + ' ✕</button>'; }).join('') + '<button class="chip-x clear" id="ov-clear">Clear all</button></div>';
     } else {
-      h += '<h2>The whole account' + tip('Click a slice of the ring, any row below, or a number with an arrow, to narrow down. The numbers and the list of demands follow every click.') + '</h2>';
+      h += '<h2>The whole account' + tip('No filter is applied: every figure on this page reflects the full account for the selected period. Select a slice of the chart, a row in a breakdown, or a headline figure marked with an arrow to restrict the page. All figures and the demand list update with each selection.') + '</h2>';
     }
     if (F.costing) h += costing(rows);  // the breakdown opens only when the Non-billable cost number is clicked
     // Sub-stage is always shown; picking one there also narrows to its stage.
-    h += '<div class="minis">' + mini('sub') + mini(dim === 'stage' ? 'bu' : 'stage') + '</div>';
+    // One small ring only: the sub-stage cut of what the main ring shows. A second ring on a different
+    // footing (business unit beside stage, or the reverse) invited comparisons that don't hold.
+    h += '<div class="minis one">' + mini('sub') + '</div>';
     h += '<div class="two">' + bars('type') + bars('practice') + '</div>';
     $('ov-detail').innerHTML = h;
   }
@@ -153,35 +160,22 @@
   function costing(rows) {
     var c = rows.filter(function (x) { return x.costing; });
     if (!c.length) return '';
-    var active = 0, sofar = 0, month = 0, norate = 0, bu = {};
-    c.forEach(function (x) {
-      active += x.cost_active ? 1 : 0; sofar += x.cost; month += x.cost_month; norate += x.cost_rate === null ? 1 : 0;
-      var b = bu[x.bu] || (bu[x.bu] = { n: 0, cost: 0, month: 0 });
-      b.n += x.cost_active ? 1 : 0; b.cost += x.cost; b.month += x.cost_month;
-    });
-    var max = Math.max.apply(null, Object.keys(bu).map(function (k) { return bu[k].cost; })) || 1;
-    var h = '<div class="costing"><div class="ov-listhead"><h2>Costing' + tip('Proactive, non-billable positions past their start date. They cost the account every working day until the demand owner marks them billable. Never counted as revenue lost.') + '</h2></div>'
-      + '<div class="cost3"><div><div class="k">Positions not billing' + tip('the client isn\'t paying for them yet') + '</div><div class="v">' + active + '</div></div>'
-      + '<div><div class="k">Cost so far' + tip('cost rate × ' + OV.hours + ' h × working days since the start date') + '</div><div class="v">' + money(sofar) + '</div></div>'
-      + '<div><div class="k">Cost per month from here' + tip('if nothing changes · ' + OV.month_days + ' working days') + '</div><div class="v">' + money(month) + '</div></div></div>';
-    if (norate) h += '<div class="small late" style="margin-top:8px">' + norate + ' position' + (norate === 1 ? ' has' : 's have') + ' no cost rate: no offer, and no rate card entry for the grade, practice and region.</div>';
-    h += '<table class="ov-table"><thead><tr><th>Business unit</th><th class="r">Not billing</th><th>Agreed cap</th><th>Cost so far</th><th class="r">Per month</th></tr></thead><tbody>';
-    Object.keys(bu).sort().forEach(function (k) {
-      var b = bu[k], cap = OV.caps[k];
-      h += '<tr><td>' + esc(k) + '</td><td class="r">' + b.n + '</td><td>' + (cap === null || cap === undefined ? '—' : cap + (b.n > cap ? ' <span class="chip esc">over cap</span>' : '')) + '</td><td><span class="cbar"><i style="width:' + (b.cost / max * 100) + '%"></i></span>' + money(b.cost) + '</td><td class="r">' + money(b.month) + '</td></tr>';
-    });
-    return h + '</tbody></table></div>';
+    var sofar = 0, norate = 0;
+    c.forEach(function (x) { sofar += x.cost; norate += x.cost_rate === null ? 1 : 0; });
+    var h = '<div class="costing"><div class="k">Non-billable cost so far' + tip('Total cost incurred to date by the proactive, non-billable positions in view. Calculated as the rate card cost per hour for each position\'s practice and grade × ' + OV.hours + ' hours per day × working days elapsed since its start date. Accrual stops on the date the demand owner confirms that client billing has started.') + '</div><div class="v">' + money(sofar) + '</div>';
+    if (norate) h += '<div class="small late" style="margin-top:6px">' + norate + ' position' + (norate === 1 ? ' has' : 's have') + ' no rate card entry for the practice and grade, and ' + (norate === 1 ? 'is' : 'are') + ' not included.</div>';
+    return h + '</div>';
   }
 
   function costList(rows, title) {
-    var h = '<div class="ov-listhead"><h2>' + rows.length + ' non-billable position' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('What each one has cost the account since its start date. Greyed rows are already billable: their costing has stopped.') + '</h2></div>';
-    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Position</th><th>Resource</th><th>Owner · BU</th><th>Practice · grade</th><th>Stage</th><th>Start date</th><th class="r">Working days</th><th class="r">Cost / h</th><th class="r">Cost so far</th></tr></thead><tbody>';
+    var h = '<div class="ov-listhead"><h2>' + rows.length + ' non-billable position' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('Proactive, non-billable positions and the cost each has incurred to the account since its start date, calculated as the rate card cost per hour for the practice and grade, multiplied by billable hours per day and the working days elapsed. Rows shown in grey have since been marked billable and no longer accrue cost.') + '</h2></div>';
+    h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>Position</th><th>Business unit</th><th>Practice</th><th>Grade</th><th class="r">Cost so far</th></tr></thead><tbody>';
     var total = 0;
     h += rows.map(function (x) {
-      if (x.cost_active) total += x.cost;
-      return '<tr' + (x.cost_active ? '' : ' class="stopped"') + '><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a></td><td>' + esc(x.name) + '<div class="small muted">' + (x.cost_until ? 'Billable since ' + esc(x.cost_until) : esc(x.type)) + '</div></td><td>' + esc(x.resource || 'Not named yet') + '</td><td>' + esc(x.owner) + '<div class="small muted">' + esc(x.bu) + '</div></td><td>' + esc(x.practice) + ' · ' + esc(x.grade) + '</td><td>' + esc(x.stage) + '<div class="small muted">' + esc(x.sub) + '</div></td><td>' + esc(x.start || '—') + '</td><td class="r">' + x.cost_days + '</td><td class="r">' + (x.cost_rate === null ? '<span class="late">none</span>' : '$' + x.cost_rate.toFixed(2) + '<div class="small muted">' + esc(x.cost_source) + '</div>') + '</td><td class="r"><strong>' + (x.cost_rate === null ? '—' : money(x.cost)) + '</strong>' + (x.cost_active ? '' : '<div class="small muted">costing stopped</div>') + '</td></tr>';
+      total += x.cost;
+      return '<tr' + (x.cost_active ? '' : ' class="stopped"') + '><td><a class="mono" href="/demands/' + esc(x.ref) + '">' + esc(x.req || x.ref) + '</a> ' + esc(x.name) + (x.cost_until ? '<div class="small muted">Billable since ' + esc(x.cost_until) + '</div>' : '') + '</td><td>' + esc(x.bu) + '</td><td>' + esc(x.practice) + '</td><td>' + esc(x.grade) + '</td><td class="r"><strong>' + (x.cost_rate === null ? '—' : money(x.cost)) + '</strong></td></tr>';
     }).join('');
-    h += '</tbody><tfoot><tr><td colspan="9" class="r"><strong>Still costing</strong></td><td class="r"><strong>' + money(total) + '</strong></td></tr></tfoot></table></div>';
+    h += '</tbody><tfoot><tr><td colspan="4" class="r"><strong>Total</strong></td><td class="r"><strong>' + money(total) + '</strong></td></tr></tfoot></table></div>';
     $('ov-list').innerHTML = h;
   }
 
@@ -192,7 +186,7 @@
       return (late2(b) - late2(a)) || (b.days_late - a.days_late) || (a.ref < b.ref ? -1 : 1);
     });
     var total = rows.length; rows = rows.slice(0, 10);
-    var h = '<div class="ov-listhead"><h2>Most urgent <span class="small muted">· ' + (total > rows.length ? rows.length + ' of ' + total : total) + '</span>' + tip('Demands with an overdue (L2) escalation first, then those past their start date, longest first. Narrow down above to list any other demands.') + '</h2></div>';
+    var h = '<div class="ov-listhead"><h2>Most urgent <span class="small muted">· ' + (total > rows.length ? rows.length + ' of ' + total : total) + '</span>' + tip('Demands requiring immediate attention when no filter is applied. Demands with an overdue (Level 2) escalation are listed first, followed by demands whose requested start date has passed, in order of longest delay. Apply a filter above to list any other set of demands.') + '</h2></div>';
     if (!rows.length) { $('ov-list').innerHTML = h + '<div class="empty">Nothing is overdue or past its start date. Click a slice, a row or a number above to list demands.</div>'; return; }
     h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Stage</th><th>Start</th><th>Why it is here</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
     h += rows.map(function (x) {
@@ -209,7 +203,7 @@
     if (!ks.length) { urgent(); return; }
     var title = ks.map(function (k) { return NAME[k].toLowerCase() + ': ' + F[k]; }).join(' · ');
     if (F.costing) { costList(rows, title); return; }
-    var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('These are the demands behind the numbers above. Click a reference to open the demand.') + '</h2></div>';
+    var h = '<div class="ov-listhead"><h2>' + rows.length + ' demand' + (rows.length === 1 ? '' : 's') + ' <span class="small muted">· ' + esc(title) + '</span>' + tip('The individual demands that make up the figures shown above for the current selection. Select a reference to open the full demand record, or Show workflow to see its position in the process.') + '</h2></div>';
     h += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>App ref</th><th>Demand</th><th>Owner · BU</th><th>Practice</th><th>Stage</th><th>Start</th><th>Joining</th><th class="r">Revenue lost</th><th></th></tr></thead><tbody>';
     h += rows.map(function (x) {
       var on = openRef === x.ref;
@@ -227,7 +221,7 @@
     $('ov-flowlink').textContent = showFlow ? 'Hide workflow' : 'Show workflow';
     $('ov-flowlink').setAttribute('aria-expanded', showFlow ? 'true' : 'false');
     $('ov-flow').hidden = !showFlow;
-    if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('Every stage and sub-stage a demand can be in. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
+    if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('The end-to-end demand fulfilment process, showing every main stage and sub-stage. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
   function draw() {

@@ -16,7 +16,7 @@
   <div class="card"><div class="k">Open demands</div><div class="v">{{ stats.open }}</div></div>
   <div class="card"><div class="k">Resourcing In Progress</div><div class="v">{{ stats.coverage }}</div><div class="s">Raising, GTD and sourcing</div></div>
   <div class="card"><div class="k">Selection In Progress</div><div class="v">{{ stats.selection }}</div><div class="s">Panel and client interviews</div></div>
-  <div class="card"><div class="k">Allocation Pending</div><div class="v">{{ stats.alloc_pending }}</div><div class="s">Offer approval, joining awaited</div></div>
+  <div class="card"><div class="k">Client Onboarding In Progress</div><div class="v">{{ stats.alloc_pending }}</div><div class="s">Offer approval, joining awaited</div></div>
   <div class="card warn"><div class="k">Needs attention</div><div class="v">{{ stats.attention }}</div><div class="s">Missing, escalated or past start</div></div>
   {% if my_loss is not none %}<div class="card {{ 'warn' if my_loss.late }}"><div class="k">Revenue lost to date</div><div class="v">{{ my_loss.total | money }}</div><div class="s">{{ my_loss.late }} of my demands unfilled past their start{% if my_loss.unknown %} · {{ my_loss.unknown }} without a bill rate{% endif %}</div></div>{% endif %}
 </div>
