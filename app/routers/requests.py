@@ -1,5 +1,6 @@
 """Requests to the Administrator: raised by the lead admin, carried out by the Administrator."""
 
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,12 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.enums import Role
+from app.core.enums import EscalationType, MainStage, Responsible, Role, Severity
 from app.core.security import Actor, require_screen
 from app.core.templating import render
-from app.models import User, UserAccount
+from app.models import BusinessUnit, Demand, User, UserAccount
 from app.models.admin_request import KINDS
-from app.services import request_service
+from app.services import rate_card_service, request_service
+from app.services.account_service import get_account
+from app.services.demand_service import account_today, visible_demands
 from app.services.request_service import RequestError
 
 router = APIRouter(tags=["requests"])
@@ -38,7 +41,8 @@ def requests_page(
         people=people,
         kinds=KINDS,
         kinds_offered=request_service.kinds_for(actor.role),
-        examples=request_service.KINDS_FOR.get(actor.role, {}),
+        picked_kind=request.query_params.get("kind", ""),
+        **_form_context(db, actor),
         can_raise=actor.role is not Role.ADMINISTRATOR,
         can_handle=actor.role is Role.ADMINISTRATOR,
         sees_all=everyone,
@@ -56,6 +60,46 @@ def requests_page(
     )
 
 
+def _form_context(db: Session, actor: Actor) -> dict[str, Any]:
+    """What the request form offers, and what the person already has."""
+    if actor.role is Role.ADMINISTRATOR:
+        return {}
+    account = get_account(db, actor.account_id)
+    cfg = account.settings
+    held = {r.details for r in request_service.special_access(db, actor.account_id, actor.id)}
+    people = request_service.interviewers(db, actor.account_id)
+    mine = next(((u, p) for u, p in people if u.id == actor.id), None)
+    today = account_today(db, actor.account_id)
+    return {
+        "cfg": cfg,
+        "today": today,
+        "all_bus": list(
+            db.scalars(
+                select(BusinessUnit.name)
+                .where(BusinessUnit.account_id == actor.account_id)
+                .order_by(BusinessUnit.name)
+            )
+        ),
+        "role_options": request_service.ASSIGNABLE_ROLES,
+        "special_options": [(s, s in held) for s in request_service.SPECIAL.get(actor.role, ())],
+        "settings_options": request_service.SETTINGS,
+        "stages": list(MainStage),
+        "triggers": [(t, cfg.rule_for(t.value)) for t in EscalationType],
+        "severities": list(Severity),
+        "responsibles": list(Responsible),
+        "interviewers": people,
+        "my_profile": mine[1] if mine else None,
+        "skill_options": request_service.skill_options(db, actor.account_id),
+        "demands": [
+            d
+            for d in db.scalars(visible_demands(actor).order_by(Demand.app_ref.desc()))
+            if d.status != "draft"
+        ][:200],
+        "data_fields": request_service.DATA_FIELDS,
+        "card": rate_card_service.grid(db, actor.account_id, today),
+    }
+
+
 @router.post("/requests")
 async def raise_request(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
@@ -63,12 +107,17 @@ async def raise_request(
     if actor.role is Role.ADMINISTRATOR:
         raise HTTPException(403, "The Administrator carries requests out; they don't raise them.")
     f = await request.form()
+    kind = str(f.get("kind") or "")
     try:
-        req = request_service.raise_request(db, actor, str(f.get("kind") or ""), str(f.get("details") or ""))
+        made = [
+            request_service.raise_request(db, actor, kind, details)
+            for details in request_service.compose(db, actor, kind, f)
+        ]
     except RequestError as e:
         db.rollback()
-        return RedirectResponse(f"/requests?err={quote(str(e))}", status_code=303)
-    msg = f"Request #{req.id} sent to the Administrator"
+        return RedirectResponse(f"/requests?err={quote(str(e))}&kind={quote(kind)}#new", status_code=303)
+    numbers = ", ".join(f"#{r.id}" for r in made)
+    msg = f"Request{'s' if len(made) > 1 else ''} {numbers} sent to the Administrator"
     return RedirectResponse(f"/requests?msg={quote(msg)}", status_code=303)
 
 

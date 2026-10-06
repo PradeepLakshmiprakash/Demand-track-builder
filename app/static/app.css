@@ -558,3 +558,27 @@ button.quick { font: inherit; font-size: 13px; cursor: pointer; min-height: 0; }
 .fb-confirm::backdrop { background: rgba(18, 26, 56, .45); }
 .fb-confirm h3 { margin: 0 0 8px; font-size: 18px; }
 .fb-confirm p { margin: 0 0 10px; }
+
+/* Raise a request: what you have, and choices instead of free text. */
+.access-now { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
+.access-now .k { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.req-kinds { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.req-kinds legend { padding: 0 0 8px; font-weight: 500; }
+.req-kind { position: relative; display: block; }
+.req-kind input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.req-kind span { display: block; border: 1px solid var(--field); border-radius: 10px; padding: 10px 12px; background: #fff; height: 100%; }
+.req-kind small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; font-weight: 400; }
+.req-kind input:checked + span { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; background: var(--brand-tint); }
+.req-kind input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
+.req-body { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0; }
+.req-body[hidden] { display: none; }
+.req-body fieldset { border: 0; padding: 0; margin: 0; }
+.req-body legend { padding: 0 0 8px; font-weight: 500; }
+.ticks { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.tick { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; background: #fff; cursor: pointer; font-weight: 400; font-size: 14px; }
+.tick input { width: 17px; height: 17px; accent-color: var(--brand); }
+.tick:has(input:checked) { border-color: var(--brand); background: var(--brand-tint); }
+.tick.held { cursor: default; }
+fieldset[data-kind=special] { display: flex; flex-direction: column; gap: 8px; }
+fieldset[data-kind=special] .tick { display: flex; }
+@media (max-width: 900px) { .access-now { grid-template-columns: 1fr; } }

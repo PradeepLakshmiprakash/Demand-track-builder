@@ -1,42 +1,141 @@
 {% extends "base.html" %}
-{% block title %}Requests{% endblock %}
+{% block title %}{{ 'Raise a request' if can_raise else 'Requests' }}{% endblock %}
 {% block main %}
 <div class="head">
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
     <h1>{{ 'Raise a request' if can_raise else 'Requests' }}</h1>
-    <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Ask for what your role needs here: they get an email, make the change and mark it done, and you are told.{% else %}Changes people in this account have asked for. Make the change on the matching screen, then mark the request done here: the requester is emailed.{% endif %}</div>
+    <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Pick what you need below: they get an email, make the change and mark it done, and you are told.{% else %}Changes people in this account have asked for. Make the change on the matching screen, then mark the request done here: the requester is emailed.{% endif %}</div>
   </div>
 </div>
 
-{% if special %}
-<section class="panel">
-  <div class="panel-head"><div><h2>Special access you hold</h2><div class="hint">Granted by the Administrator on your request. It is what your role can do beyond the standard access.</div></div><span class="chip done">{{ special | length }}</span></div>
-  {% for r in special %}
-  <div class="match-row"><div class="match-head"><div>
-    <div style="white-space:pre-wrap">{{ r.details }}</div>
-    <div class="note" style="margin-top:4px">Granted by {{ people.get(r.handled_by, 'the Administrator') }} on {{ r.handled_at | at(tz, '%d %b %Y') }}{% if r.note %}: {{ r.note }}{% endif %} · request #{{ r.id }}</div>
-  </div><span class="chip done">In place</span></div></div>
-  {% endfor %}
-</section>
-{% endif %}
-
 {% if can_raise %}
 <section class="panel">
-  <div class="panel-head"><div><h2>New request</h2></div></div>
-  <form method="post" action="/requests" class="panel-body stack">
-    <label class="f" style="max-width:560px">What is it about
-      <select name="kind" id="req-kind" required>{% for k, label in kinds_offered.items() %}<option value="{{ k }}" data-example="{{ examples.get(k, '') }}">{{ label }}</option>{% endfor %}</select>
-    </label>
-    <label class="f">What do you need<textarea name="details" id="req-details" rows="4" required minlength="5" placeholder="e.g. {{ examples.values() | first }}"></textarea></label>
+  <div class="panel-head"><div><h2>Your current access</h2><div class="hint">What you have today. A request changes it from here.</div></div></div>
+  <div class="panel-body access-now">
+    <div><div class="k">Role</div><div class="v">{{ actor.role.label }}</div></div>
+    <div><div class="k">You see</div><div class="v">{{ actor.scope.label }}</div></div>
+    <div><div class="k">Business units</div><div class="v">{% for b in actor.bu_names %}<span class="chip gray">{{ b }}</span> {% else %}<span class="muted">None</span>{% endfor %}</div></div>
+    <div><div class="k">Practices</div><div class="v">{% for p in actor.practices %}<span class="chip gray">{{ p }}</span> {% else %}<span class="muted">Not limited to a practice</span>{% endfor %}</div></div>
+    {% if my_profile %}
+    <div><div class="k">Interview skills</div><div class="v">{% for s in my_profile.skills %}<span class="chip gray">{{ s }}</span> {% else %}<span class="muted">None set</span>{% endfor %}</div></div>
+    <div><div class="k">Interviews up to grade</div><div class="v">{{ my_profile.max_grade or 'Any' }} · {{ 'available' if my_profile.active else 'unavailable' }}</div></div>
+    {% endif %}
+    <div style="grid-column:1 / -1"><div class="k">Special access</div><div class="v">{% for r in special %}<div class="small">✓ {{ r.details }} <span class="muted">· granted {{ r.handled_at | at(tz, '%d %b %Y') }}</span></div>{% else %}<span class="muted">None beyond the standard access of your role.</span>{% endfor %}</div></div>
+  </div>
+</section>
+
+<section class="panel" id="new">
+  <div class="panel-head"><div><h2>New request</h2><div class="hint">Choose what it is about, then pick from the options. What you already have is shown ticked.</div></div></div>
+  <form method="post" action="/requests" class="panel-body stack" id="req-form">
+    <fieldset class="f req-kinds"><legend>What is it about</legend>
+      {% for k, label in kinds_offered.items() %}
+      <label class="req-kind"><input type="radio" name="kind" value="{{ k }}" required {{ 'checked' if (picked_kind or (kinds_offered | list | first)) == k }}><span><strong>{{ label.split(' (')[0] }}</strong><small>{{ label.split(' (')[1].rstrip(')') if ' (' in label else '' }}</small></span></label>
+      {% endfor %}
+    </fieldset>
+
+    {% if 'special' in kinds_offered %}
+    <fieldset class="f req-body" data-kind="special"><legend>Special access you need</legend>
+      {% for text, held in special_options %}
+      <label class="tick {{ 'held' if held }}"><input type="checkbox" name="special" value="{{ text }}" {{ 'checked disabled' if held }}> {{ text }}{% if held %} <span class="chip done">In place</span>{% endif %}</label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+
+    {% if 'access' in kinds_offered %}
+    <div class="req-body stack" data-kind="access">
+      <fieldset class="f"><legend>Business units <span class="hint">ticked = you have it today; tick to add, untick to remove</span></legend>
+        <div class="ticks">{% for b in all_bus %}<label class="tick"><input type="checkbox" name="bu" value="{{ b }}" {{ 'checked' if b in actor.bu_names }}> {{ b }}</label>{% endfor %}</div>
+      </fieldset>
+      <fieldset class="f"><legend>Practices</legend>
+        <div class="ticks">{% for p in cfg.practices %}<label class="tick"><input type="checkbox" name="practice" value="{{ p }}" {{ 'checked' if p in actor.practices }}> {{ p }}</label>{% endfor %}</div>
+      </fieldset>
+      <fieldset class="f"><legend>Role</legend>
+        <div class="ticks">{% for r in role_options %}<label class="tick"><input type="radio" name="role" value="{{ r.value }}" {{ 'checked' if r == actor.role }}> {{ r.label }}{% if r == actor.role %} <span class="small muted">(today)</span>{% endif %}</label>{% endfor %}</div>
+      </fieldset>
+    </div>
+    {% endif %}
+
+    {% if 'rate_card' in kinds_offered %}
+    <div class="req-body grid4" data-kind="rate_card">
+      <label class="f">Practice<select name="rc_practice" required><option value="">Choose…</option>{% for p in cfg.practices %}<option>{{ p }}</option>{% endfor %}</select></label>
+      <label class="f">Grade<select name="rc_grade" required><option value="">Choose…</option>{% for g in cfg.grades %}<option>{{ g }}</option>{% endfor %}</select></label>
+      <label class="f">New cost per hour ($)<input type="number" name="rc_cost" min="0.01" step="0.01" required></label>
+      <label class="f">From<input type="date" name="rc_from" value="{{ today.isoformat() }}" required></label>
+    </div>
+    {% endif %}
+
+    {% if 'settings' in kinds_offered %}
+    <div class="req-body grid3" data-kind="settings">
+      <label class="f">Which setting<select name="st_what" required><option value="">Choose…</option>{% for k, opt in settings_options.items() %}<option value="{{ k }}" data-numeric="{{ '1' if opt[1] else '' }}">{{ opt[0] }}</option>{% endfor %}</select></label>
+      <label class="f">Value<input type="text" name="st_value" maxlength="60" required placeholder="The name or number"></label>
+      <label class="f" data-for-status hidden>Maps to stage<select name="st_stage"><option value="">Choose…</option>{% for st in stages %}<option value="{{ st.value }}">{{ st.label }}</option>{% endfor %}</select></label>
+    </div>
+    {% endif %}
+
+    {% if 'escalation' in kinds_offered %}
+    <div class="req-body stack" data-kind="escalation">
+      <label class="f" style="max-width:520px">Which escalation<select name="es_trigger" required><option value="">Choose…</option>{% for t, rule in triggers %}<option value="{{ t.value }}" data-now="{{ 'On' if rule.enabled else 'Off' }} · {{ rule.severity.label }} severity · {{ rule.responsible.label }} acts">{{ t.label }}</option>{% endfor %}</select><span class="hint" data-es-now></span></label>
+      <div class="grid3">
+        <label class="f">Severity<select name="es_severity"><option value="">No change</option>{% for x in severities %}<option value="{{ x.value }}">{{ x.label }}</option>{% endfor %}</select></label>
+        <label class="f">Who acts<select name="es_responsible"><option value="">No change</option>{% for x in responsibles %}<option value="{{ x.value }}">{{ x.label }}</option>{% endfor %}</select></label>
+        <label class="f">On or off<select name="es_enabled"><option value="">No change</option><option value="on">Turn it on</option><option value="off">Turn it off</option></select></label>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'profile' in kinds_offered %}
+    <div class="req-body stack" data-kind="profile">
+      {% if not my_profile %}
+      <label class="f" style="max-width:420px">Which interviewer<select name="pf_user" required><option value="">Choose…</option>{% for u, p in interviewers %}<option value="{{ u.id }}" data-skills="{{ p.skills | join('|') }}" data-grade="{{ p.max_grade or '' }}" data-active="{{ 'yes' if p.active else 'no' }}">{{ u.name }}</option>{% endfor %}</select></label>
+      {% endif %}
+      <fieldset class="f"><legend>Skills <span class="hint">ticked = on the profile today</span></legend>
+        <div class="ticks">{% for s in skill_options %}<label class="tick"><input type="checkbox" name="pf_skill" value="{{ s }}" {{ 'checked' if my_profile and s in my_profile.skills }}> {{ s }}</label>{% endfor %}</div>
+      </fieldset>
+      <div class="grid3">
+        <label class="f">Interviews up to grade<select name="pf_grade"><option value="">No change</option>{% for g in cfg.grades %}<option>{{ g }}</option>{% endfor %}</select></label>
+        <label class="f">Availability<select name="pf_available"><option value="">No change</option><option value="yes">Available for interviews</option><option value="no">Unavailable for interviews</option></select></label>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'data_fix' in kinds_offered %}
+    <div class="req-body grid3" data-kind="data_fix">
+      <label class="f">Which demand<select name="df_demand" required><option value="">Choose…</option>{% for d in demands %}<option value="{{ d.app_ref }}">{{ d.gtd_req_id or d.app_ref }} · {{ d.name[:50] }}</option>{% endfor %}</select></label>
+      <label class="f">What is wrong<select name="df_field" required><option value="">Choose…</option>{% for k, label in data_fields.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+      <label class="f">What it should be<input type="text" name="df_value" maxlength="80" required placeholder="The right value"></label>
+    </div>
+    {% endif %}
+
     <div><button class="btn primary">Send to the Administrator</button></div>
   </form>
 </section>
 <script>
 (function () {
-  var kind = document.getElementById('req-kind'), box = document.getElementById('req-details');
-  function hint() { var ex = kind.selectedOptions[0].dataset.example; box.placeholder = ex ? 'e.g. ' + ex : 'Say what you need, and why'; }
-  kind.addEventListener('change', hint); hint();
+  var form = document.getElementById('req-form');
+  function sync() {
+    var kind = (form.querySelector('input[name=kind]:checked') || {}).value;
+    form.querySelectorAll('.req-body').forEach(function (b) {
+      var on = b.dataset.kind === kind;
+      b.hidden = !on;
+      b.querySelectorAll('input, select').forEach(function (el) { if (!el.closest('.held')) el.disabled = !on; });
+    });
+    var st = form.querySelector('[name=st_what]'), box = form.querySelector('[data-for-status]');
+    if (st && box) {
+      box.hidden = st.value !== 'map_status';
+      var v = form.querySelector('[name=st_value]'), num = st.selectedOptions[0] && st.selectedOptions[0].dataset.numeric;
+      v.type = num ? 'number' : 'text'; v.step = 'any'; v.placeholder = num ? 'The number' : 'The name';
+    }
+    var es = form.querySelector('[name=es_trigger]');
+    if (es) form.querySelector('[data-es-now]').textContent = es.value ? 'Today: ' + es.selectedOptions[0].dataset.now : '';
+  }
+  var who = form.querySelector('[name=pf_user]');
+  if (who) who.addEventListener('change', function () {  // show the chosen interviewer's profile as it is today
+    var o = who.selectedOptions[0], have = (o.dataset.skills || '').split('|');
+    form.querySelectorAll('[name=pf_skill]').forEach(function (c) { c.checked = have.indexOf(c.value) >= 0; });
+  });
+  form.addEventListener('change', sync);
+  sync();
 })();
 </script>
 {% endif %}
@@ -47,7 +146,7 @@
   <div class="match-row">
     <div class="match-head">
       <div>
-        <div class="title">#{{ r.id }} · {{ kinds[r.kind] }}</div>
+        <div class="title">#{{ r.id }} · {{ kinds[r.kind].split(' (')[0] }}</div>
         <div class="note">Asked by {{ people.get(r.requested_by, '—') }}{% if roles.get(r.requested_by) %} ({{ roles[r.requested_by] }}){% endif %} on {{ r.created_at | at(tz, '%d %b %Y, %H:%M') }}</div>
         <div style="margin-top:6px;white-space:pre-wrap">{{ r.details }}</div>
         {% if r.status != 'open' %}<div class="note" style="margin-top:6px">{{ r.status | capitalize }} by {{ people.get(r.handled_by, '—') }} on {{ r.handled_at | at(tz, '%d %b %Y') }}{% if r.note %}: {{ r.note }}{% endif %}</div>{% endif %}

@@ -1,27 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Pod contribution margin
-<script>
-(function () {
-  var box = document.getElementById('lines'), tpl = document.getElementById('line-tpl');
-  function renumber() {
-    var rows = box.querySelectorAll('.teamrow');
-    rows.forEach(function (r) { r.querySelector('.rm').disabled = rows.length === 1; });
-  }
-  document.getElementById('add-line').addEventListener('click', function () {
-    box.appendChild(tpl.content.cloneNode(true));
-    renumber();
-    box.lastElementChild.querySelector('select').focus();
-  });
-  box.addEventListener('click', function (e) {
-    var b = e.target.closest('.rm');
-    if (!b) return;
-    b.closest('.teamrow').remove();
-    renumber();
-  });
-  renumber();
-})();
-</script>
-{% endblock %}
+{% block title %}Pod contribution margin{% endblock %}
 {% block main %}
 <div class="head">
   <div>

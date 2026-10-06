@@ -588,7 +588,7 @@ admin and the Administrator see all.
 
 **D94. Lead admin.** The "GTD team admin" is the Lead admin: a member of the GTD admin team who leads
 it. What the role can do beyond the team is special access requested from the Administrator and on
-record as done requests, listed for the Lead admin as "Special access you hold".
+record as done requests, listed under "Your current access" on the Raise a request screen.
 
 **D95. Margin calculator, three pages.** *Individual contribution margin*: client rate, practice and
 grade in; that grade's margin out, with at most five recommendations (same practice: closest to the
@@ -602,3 +602,18 @@ The team and pod definitions are a first reading, to be confirmed.
 **D96. Practices and their tech stack** are set by the Administrator in Account settings. Two practices
 that share a tech stack can take the same person, which is what the calculator's cross-practice
 recommendations use.
+
+**D97. Interview feedback form, as in Acquisition Central.** Six areas, each rated 1 to 10 and given a
+band; the band puts its standard sentence on the record, so nothing is retyped. Panel details, support
+needed, recommended designation and fit for another role are kept with the feedback. Outcomes read
+Offer, Reject, Hold.
+
+**D98. Raise a request, by choices.** The screen is "Raise a request". It first shows what the person
+has today (role, what they see, business units, practices, interviewer profile, special access in
+place). A request is then built from choices: a kind, then boxes, lists, a number or a date. There is
+no free text; the only typed values are a short name or number (a new list entry, a corrected value).
+Access and profile requests are worded as the difference from today, and a request that changes
+nothing is not sent. Each special access ticked is its own request.
+
+**D99. Team and pod calculators** start with three lines; lines are added and removed with buttons.
+The account's margin cut-off is no longer shown at the top right of the calculator.
