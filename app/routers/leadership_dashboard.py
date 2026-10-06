@@ -1,4 +1,4 @@
-"""Leadership and the GTD team admin: account overview. Fill speed, pipeline, and revenue lost
+"""Leadership and the lead admin: account overview. Fill speed, pipeline, and revenue lost
 to missed start dates."""
 
 from typing import Any
@@ -43,7 +43,7 @@ def overview_page(
     today = account_today(db, actor.account_id)
     period = period_for(db, actor.account_id, start, end, days)
     o = loss_service.overview(db, actor.account_id, today, period)
-    # Offers this viewer decides: below the cut-off for leadership, at or above for the GTD team admin.
+    # Offers this viewer decides: below the cut-off for leadership, at or above for the lead admin.
     route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(
         select(func.count())
@@ -172,7 +172,7 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
 async def save_nb_caps(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
-    """The GTD team admin sets the agreed number of non-billable positions per business unit."""
+    """The lead admin sets the agreed number of non-billable positions per business unit."""
     if actor.role is not Role.ADMIN:
         return RedirectResponse("/overview?err=Only+the+GTD+team+admin+sets+the+caps#nb", status_code=303)
     form = await request.form()

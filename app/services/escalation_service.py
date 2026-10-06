@@ -15,7 +15,7 @@ Who acts (§9.2, redesigned 1 Oct): each trigger has a rule in Account settings:
 The responsible person acts; everyone else is only informed.
 
 - L1: the escalation opens with the rule's severity. The responsible person is mailed what to do and
-  by when (working days per severity). The demand owner and the GTD team admin are copied.
+  by when (working days per severity). The demand owner and the lead admin are copied.
 - L2: the due date passed with no response. Leadership and the BU's delivery head are informed; the
   same responsible person still has to act and is reminded once a day until they do.
 - The responsible person closes it with a reason and an action. Asking for more time keeps its level.
@@ -512,7 +512,7 @@ def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepRes
 class Audience:
     to: list[str]  # the responsible person or people: they act
     cc: list[str]  # informed only
-    names: list[str]  # for the screen: "Demand owner (Priya N.) acts · informed: GTD team admin"
+    names: list[str]  # for the screen: "Demand owner (Priya N.) acts · informed: Lead admin"
     acts: str = ""  # who acts, in words
 
 
@@ -538,7 +538,7 @@ def responsible_people(db: Session, account: Account, esc: Escalation, demand: D
             )
         )
         people = list(db.scalars(select(User).where(User.id.in_(set(ids)), User.active)))
-    # Nobody to act (owner left, interviewer not assigned): it falls to the GTD team admin.
+    # Nobody to act (owner left, interviewer not assigned): it falls to the lead admin.
     return people or _users(db, account.id, Role.ADMIN)
 
 
@@ -558,7 +558,7 @@ def audience(db: Session, account: Account, esc: Escalation, demand: Demand | No
         cc.append(owner.email)
     team_admin = [u.email for u in _users(db, account.id, Role.ADMIN) if u.email not in to]
     if team_admin:
-        informed.append("GTD team admin")
+        informed.append("Lead admin")
         cc += team_admin
     if esc.level == 2:
         if cfg.l2_inform_leadership:

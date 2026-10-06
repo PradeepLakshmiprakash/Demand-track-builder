@@ -5,6 +5,7 @@ import sys
 from app.core.config import get_settings
 from app.core.db import new_session
 from seed.load import load
+from seed.requests_demo import load_requests
 
 
 def main() -> None:
@@ -12,9 +13,10 @@ def main() -> None:
         sys.exit("Refusing to seed a production database.")
     with new_session() as db:
         load(db)
+        requests = load_requests(db)
     print(
         "Seeded Discover NA: 4 BUs, 12 users, 18 demands, 6 open escalations, 2 interviews,"
-        " 64 rate card rows."
+        f" 64 rate card rows, {requests} requests to the Administrator."
     )
     print(
         "Seeded Acme Insurance: 3 BUs, 7 people (Sanjay shared with Discover),"

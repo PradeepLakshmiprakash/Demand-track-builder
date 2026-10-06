@@ -1,4 +1,4 @@
-"""GTD team admin and GTD admin team: what the latest BCM sheet says, and rows that need a person."""
+"""Lead admin and GTD admin team: what the latest BCM sheet says, and rows that need a person."""
 
 from typing import Any
 from urllib.parse import quote

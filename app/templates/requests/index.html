@@ -5,31 +5,50 @@
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
     <h1>{{ 'Requests to the Administrator' if can_raise else 'Requests' }}</h1>
-    <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Ask for a change here: they get an email, make the change and mark it done.{% else %}Changes the GTD team admin has asked for. Make the change on the matching screen, then mark the request done; they are emailed.{% endif %}</div>
+    <div class="lede">{% if can_raise %}The Administrator runs User access, Account settings and the Rate card. Ask for what your role needs here: they get an email, make the change and mark it done, and you are told.{% else %}Changes people in this account have asked for. Make the change on the matching screen, then mark the request done here: the requester is emailed.{% endif %}</div>
   </div>
 </div>
+
+{% if special %}
+<section class="panel">
+  <div class="panel-head"><div><h2>Special access you hold</h2><div class="hint">Granted by the Administrator on your request. It is what your role can do beyond the standard access.</div></div><span class="chip done">{{ special | length }}</span></div>
+  {% for r in special %}
+  <div class="match-row"><div class="match-head"><div>
+    <div style="white-space:pre-wrap">{{ r.details }}</div>
+    <div class="note" style="margin-top:4px">Granted by {{ people.get(r.handled_by, 'the Administrator') }} on {{ r.handled_at | at(tz, '%d %b %Y') }}{% if r.note %}: {{ r.note }}{% endif %} · request #{{ r.id }}</div>
+  </div><span class="chip done">In place</span></div></div>
+  {% endfor %}
+</section>
+{% endif %}
 
 {% if can_raise %}
 <section class="panel">
   <div class="panel-head"><div><h2>New request</h2></div></div>
   <form method="post" action="/requests" class="panel-body stack">
-    <label class="f" style="max-width:520px">What is it about
-      <select name="kind" required>{% for k, label in kinds.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+    <label class="f" style="max-width:560px">What is it about
+      <select name="kind" id="req-kind" required>{% for k, label in kinds_offered.items() %}<option value="{{ k }}" data-example="{{ examples.get(k, '') }}">{{ label }}</option>{% endfor %}</select>
     </label>
-    <label class="f">What needs to change<textarea name="details" rows="4" required minlength="5" placeholder="e.g. Add Asha P. (asha.p@example.com) as a demand owner in CARDS"></textarea></label>
+    <label class="f">What do you need<textarea name="details" id="req-details" rows="4" required minlength="5" placeholder="e.g. {{ examples.values() | first }}"></textarea></label>
     <div><button class="btn primary">Send to the Administrator</button></div>
   </form>
 </section>
+<script>
+(function () {
+  var kind = document.getElementById('req-kind'), box = document.getElementById('req-details');
+  function hint() { var ex = kind.selectedOptions[0].dataset.example; box.placeholder = ex ? 'e.g. ' + ex : 'Say what you need, and why'; }
+  kind.addEventListener('change', hint); hint();
+})();
+</script>
 {% endif %}
 
 <section class="panel">
-  <div class="panel-head"><div><h2>Open and past requests</h2></div><span class="chip {{ 'risk' if open_count else 'gray' }}">{{ open_count }} open</span></div>
+  <div class="panel-head"><div><h2>{{ 'Open and past requests' if sees_all else 'Your requests' }}</h2>{% if sees_all and can_raise %}<div class="hint">As Lead admin you see every request raised in this account.</div>{% endif %}</div><span class="chip {{ 'risk' if open_count else 'gray' }}">{{ open_count }} open</span></div>
   {% for r in rows %}
   <div class="match-row">
     <div class="match-head">
       <div>
         <div class="title">#{{ r.id }} · {{ kinds[r.kind] }}</div>
-        <div class="note">Asked by {{ people.get(r.requested_by, '—') }} on {{ r.created_at | at(tz, '%d %b %Y, %H:%M') }}</div>
+        <div class="note">Asked by {{ people.get(r.requested_by, '—') }}{% if roles.get(r.requested_by) %} ({{ roles[r.requested_by] }}){% endif %} on {{ r.created_at | at(tz, '%d %b %Y, %H:%M') }}</div>
         <div style="margin-top:6px;white-space:pre-wrap">{{ r.details }}</div>
         {% if r.status != 'open' %}<div class="note" style="margin-top:6px">{{ r.status | capitalize }} by {{ people.get(r.handled_by, '—') }} on {{ r.handled_at | at(tz, '%d %b %Y') }}{% if r.note %}: {{ r.note }}{% endif %}</div>{% endif %}
       </div>
@@ -44,7 +63,7 @@
     {% endif %}
   </div>
   {% else %}
-  <div class="empty">No requests yet.</div>
+  <div class="empty">{{ 'No requests yet.' if sees_all else 'You have not asked the Administrator for anything yet.' }}</div>
   {% endfor %}
 </section>
 {% endblock %}

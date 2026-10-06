@@ -555,7 +555,7 @@ def confirm_match(db: Session, account_id: int, actor_id: int, row_id: int, dema
 
 
 def owner_for_originator(db: Session, account_id: int, originator: str | None) -> User | None:
-    """The sheet's originator, if their name matches an active demand owner or GTD team admin."""
+    """The sheet's originator, if their name matches an active demand owner or lead admin."""
     if not originator:
         return None
     people = list(db.scalars(select(User).where(member_of(account_id, Role.DEMAND_OWNER, Role.ADMIN))))
@@ -578,7 +578,7 @@ def create_from_row(
         .options(selectinload(User.business_units), selectinload(User.memberships))
     )
     if owner is None:
-        raise ReconcileError("Pick an active demand owner or GTD team admin as the owner.")
+        raise ReconcileError("Pick an active demand owner or lead admin as the owner.")
     if owner.membership(account_id).role == Role.DEMAND_OWNER.value:  # type: ignore[union-attr]
         bus = [b for b in owner.business_units if b.account_id == account_id]
         if len(bus) != 1:

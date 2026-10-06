@@ -214,7 +214,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
     assert "Globex Retail" in client.get("/platform/accounts").text
 
     # 2. The Administrator (whoever created the account) sets it up in Account settings.
-    assert client.as_user("pat").get("/settings").status_code == 403  # the GTD team admin asks, never edits
+    assert client.as_user("pat").get("/settings").status_code == 403  # the lead admin asks, never edits
     pat = client.as_user("anil", "Globex Retail")
     assert pat.get("/settings").status_code == 200
     _post(pat, "/settings/business-units", {"name": "Stores"})
@@ -365,7 +365,7 @@ def test_phase8_exit_new_account_through_settings_only(client: Client, db: Sessi
     assert demand(db, ref).status == "offer_in_process"
     offer = db.scalars(select(OfferApproval).where(OfferApproval.demand_id == d.id)).one()
     assert (offer.cost_rate, offer.margin_pct, offer.route) == (Decimal("50.00"), Decimal("37.50"), "admin")
-    # 37.5% is above the 20% cut-off: the demand owner approves; the GTD team admin is notified.
+    # 37.5% is above the 20% cut-off: the demand owner approves; the lead admin is notified.
     _post(client.as_user("uma"), f"/approvals/{offer.id}/decide", {"decision": "approved", "comment": ""})
     assert any(
         "Offer for Candidate Z approved" in m.subject for m in mail.sent if m.to == ["pat.q@example.com"]

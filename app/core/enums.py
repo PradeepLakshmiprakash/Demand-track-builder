@@ -9,7 +9,9 @@ from enum import StrEnum
 
 class Role(StrEnum):
     DEMAND_OWNER = "demand_owner"
-    ADMIN = "admin"  # "GTD team admin" in the UI: heads the GTD admin team
+    # "Lead admin" in the UI: a member of the GTD admin team who leads it. Everything the team can do,
+    # plus the special access the Administrator granted on request (rates, approvals, caps, profiles).
+    ADMIN = "admin"
     ADMIN_TEAM = "admin_team"  # "GTD admin team": the manual GTD and BCM sheet work
     LEADERSHIP = "leadership"
     INTERVIEWER = "interviewer"
@@ -23,7 +25,7 @@ class Role(StrEnum):
 
 ROLE_LABELS = {
     Role.DEMAND_OWNER: "Demand owner",
-    Role.ADMIN: "GTD team admin",
+    Role.ADMIN: "Lead admin",
     Role.ADMIN_TEAM: "GTD admin team",
     Role.LEADERSHIP: "Leadership",
     Role.INTERVIEWER: "Interviewer",
@@ -345,7 +347,7 @@ class RowOutcome(StrEnum):
 
 class ApprovalRoute(StrEnum):
     """Who decides an offer. At or above the margin cut-off: the demand's owner (the stored value is
-    still "admin" from when the GTD team admin decided these). Below it: leadership."""
+    still "admin" from when the lead admin decided these). Below it: leadership."""
 
     ADMIN = "admin"
     LEADERSHIP = "leadership"

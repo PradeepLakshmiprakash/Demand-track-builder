@@ -1,7 +1,7 @@
 """Escalations: opened automatically, closed only with a reason and an action.
 
 The responsible party responds: the GTD admin team for what is theirs to do, the demand owner for
-their own demands (they see only those). Leadership and the GTD team admin see everything; leadership
+their own demands (they see only those). Leadership and the lead admin see everything; leadership
 is informed, never the one to act.
 """
 

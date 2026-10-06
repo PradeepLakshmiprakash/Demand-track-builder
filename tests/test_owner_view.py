@@ -54,9 +54,9 @@ def test_owner_asks_for_the_offer_approval(client: Client, db: Session) -> None:
     r = neha.post("/demands/DM-000146/offers", data={"candidate_id": str(cid), "channel": "sogeti"})
     assert r.status_code == 303 and "err=" not in r.headers["location"]
     offer = db.scalars(select(OfferApproval).where(OfferApproval.candidate_id == cid)).one()
-    # D1 Sogeti: cost 80, bill 125 → 36%: the GTD team admin decides
+    # D1 Sogeti: cost 80, bill 125 → 36%: the lead admin decides
     assert offer.channel == "sogeti" and offer.route == "admin"
-    [m] = mail.sent  # at 36% it is hers to decide; the GTD team admin is notified
+    [m] = mail.sent  # at 36% it is hers to decide; the lead admin is notified
     assert m.to == ["neha.t@example.com"] and m.cc == ["kavya.r@example.com"]
     assert "Offer approval needed for Asked For" in m.subject and "Steps:" in m.text
 
@@ -77,7 +77,7 @@ def test_owner_asks_for_the_offer_approval(client: Client, db: Session) -> None:
 def test_only_the_owner_asks_and_only_for_a_selected_candidate(client: Client, db: Session) -> None:
     cid = _select(db, "DM-000146", "Asked For")
     form = {"candidate_id": str(cid), "channel": "sogeti"}
-    for who in ("kavya", "rahul"):  # the GTD team admin, and a BU colleague who can only read it
+    for who in ("kavya", "rahul"):  # the lead admin, and a BU colleague who can only read it
         r = client.as_user(who).post("/demands/DM-000146/offers", data=form)
         assert "err=" in r.headers["location"]
     assert client.as_user("priya").post("/demands/DM-000146/offers", data=form).status_code == 404

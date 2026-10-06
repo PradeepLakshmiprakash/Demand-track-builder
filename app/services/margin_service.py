@@ -3,7 +3,7 @@
 When a demand reaches Offer in process, its candidate's offer is priced:
     margin = (client bill rate − vendor cost rate) ÷ client bill rate
 with the cost from the rate card in force on the offer date. At or above the account's cut-off (30% for
-Discover) the GTD team admin approves or declines; below it, leadership decides at their
+Discover) the lead admin approves or declines; below it, leadership decides at their
 discretion (confirmed 24 Sep). Every decision records approver, margin and time.
 
 An offer whose bill rate or rate card entry is missing waits unpriced, with the reason
@@ -108,7 +108,7 @@ def _numbers(approval: OfferApproval) -> str:
 def _mail_raised(
     db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval
 ) -> None:
-    """An offer needs a decision: mail whoever decides it. The GTD team admin is always notified."""
+    """An offer needs a decision: mail whoever decides it. The lead admin is always notified."""
     owner = db.get_one(User, demand.owner_id)
     admins = _team_admins(db, account.id)
     if approval.route == ApprovalRoute.LEADERSHIP.value:
@@ -263,7 +263,7 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
 def _mail_decision(
     db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval, actor: Actor
 ) -> None:
-    """The decision goes to the GTD team admin (always notified) and to the demand owner when someone
+    """The decision goes to the lead admin (always notified) and to the demand owner when someone
     else decided."""
     owner = db.get_one(User, demand.owner_id)
     to = set(_team_admins(db, account.id)) | ({owner.email} if owner.active else set())

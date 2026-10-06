@@ -111,14 +111,14 @@
           <button class="btn primary">{{ 'Change the date' if d.billable_from else 'Mark as billable' }}</button>
           {% if d.billable_from %}<button class="btn" name="undo" value="1" formnovalidate>Undo: still non-billable</button>{% endif %}
         </form>
-        {% if not d.billable_from %}<div class="small muted" style="margin-top:8px">Costing stops from that date. The GTD team admin is told.</div>{% endif %}
+        {% if not d.billable_from %}<div class="small muted" style="margin-top:8px">Costing stops from that date. The lead admin is told.</div>{% endif %}
         {% endif %}
       </div>
       {% endif %}
       {% if can_revise_dates %}
       <form method="post" action="/demands/{{ d.app_ref }}/dates" id="dates" class="dates-form">
         <div class="title">Change the dates</div>
-        <div class="small muted">The rest of the demand is locked now that it is on GTD. The GTD team admin is told of any change.</div>
+        <div class="small muted">The rest of the demand is locked now that it is on GTD. The lead admin is told of any change.</div>
         <div class="fields">
           <label>Requested start date<input type="date" name="start_date" value="{{ d.start_date or '' }}" required></label>
           {% if d.type == 'Replacement' %}<label>Last working day (leaver)<input type="date" name="lwd" value="{{ d.lwd or '' }}" required></label>{% endif %}

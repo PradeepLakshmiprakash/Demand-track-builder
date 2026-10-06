@@ -137,7 +137,7 @@ def test_l1_mail_goes_to_the_responsible_person_with_the_steps(db: Session) -> N
     assert "Action needed" in m.subject and "High severity" in m.subject
     assert "DM-000117" in m.text and "Who acts: Demand owner (Priya N.)" in m.text
     assert "Steps: Give a revised start date" in m.text and "Respond by" in m.text
-    assert "kavya.r@example.com" in m.cc  # the GTD team admin is informed
+    assert "kavya.r@example.com" in m.cc  # the lead admin is informed
     # at L1 nobody above is told: not leadership, not the delivery head
     assert "sanjay.m@example.com" not in m.cc and "ritu.s@example.com" not in m.cc
 

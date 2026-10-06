@@ -1,4 +1,4 @@
-"""GTD team admin and GTD admin team: upload the BCM sheet, see past imports."""
+"""Lead admin and GTD admin team: upload the BCM sheet, see past imports."""
 
 from datetime import date
 from urllib.parse import quote

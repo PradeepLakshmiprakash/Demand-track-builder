@@ -1,4 +1,4 @@
-"""Demand owner (and GTD team admin): raise a demand, edit it while it's a draft or waiting for the
+"""Demand owner (and lead admin): raise a demand, edit it while it's a draft or waiting for the
 admin mail, submit it, attach the job description."""
 
 from typing import Any

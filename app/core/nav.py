@@ -44,11 +44,17 @@ NAV: tuple[NavItem, ...] = (
         ready=True,
     ),
     NavItem("approvals", "/approvals", _same("Offer approvals", DO, AD, LD), phase=5, ready=True),
-    NavItem("requests", "/requests", {AD: "Requests to administrator", ADM: "Requests"}, phase=8, ready=True),
     NavItem("calculator", "/margin-calculator", _same("Margin calculator", DO, AD, LD), phase=8, ready=True),
     NavItem("candidates", "/candidates", _same("Candidates", AD, AT), phase=6, ready=True),
     NavItem("interviews", "/interviews", _same("My interviews", IV), phase=6, ready=True),
     NavItem("interviewer_profiles", "/interviewers", _same("Interviewer profiles", AD), phase=6, ready=True),
+    NavItem(
+        "requests",
+        "/requests",
+        _same("Requests to administrator", DO, AD, AT, LD, IV) | {ADM: "Requests"},
+        phase=8,
+        ready=True,
+    ),
     NavItem("users", "/users", _same("User access", ADM), ready=True),
     NavItem("settings", "/settings", _same("Account settings", ADM), ready=True),
     NavItem("rate_card", "/rate-card", _same("Rate card", ADM), phase=5, ready=True),
@@ -63,7 +69,7 @@ def menu_for(role: Role) -> list[NavItem]:
     return [n for n in NAV if role in n.labels]
 
 
-# Where each role lands. The GTD team admin's day starts on the demands, not the overview.
+# Where each role lands. The lead admin's day starts on the demands, not the overview.
 HOME = {AD: "demands", ADM: "requests"}
 
 

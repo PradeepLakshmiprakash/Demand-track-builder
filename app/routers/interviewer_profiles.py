@@ -1,4 +1,4 @@
-"""GTD team admin: interviewer skill tags. Alerts go to interviewers sharing at least one
+"""Lead admin: interviewer skill tags. Alerts go to interviewers sharing at least one
 technology with a requisition, so the tags are what routes requisitions to people."""
 
 from urllib.parse import quote

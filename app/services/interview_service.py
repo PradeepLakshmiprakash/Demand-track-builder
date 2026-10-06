@@ -341,7 +341,7 @@ def request_next_round(
 def decide_next_round(
     db: Session, actor: Actor, interview_id: int, approve: bool, note: str | None
 ) -> Interview:
-    """The demand owner (or the GTD team admin) approves or declines an asked-for round."""
+    """The demand owner (or the lead admin) approves or declines an asked-for round."""
     iv = _interview(db, actor, interview_id)
     if iv.status_enum is not InterviewStatus.REQUESTED:
         raise InterviewError("That round isn't waiting for a decision.")

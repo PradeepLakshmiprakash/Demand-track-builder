@@ -1,7 +1,7 @@
 """User access: who exists, their role, BUs, practices and what they see.
 
 Rules (flow-artifact §1.1):
-- GTD team admins, their GTD admin team and leadership always see the full account, all BUs. Fixed.
+- lead admins, their GTD admin team and leadership always see the full account, all BUs. Fixed.
 - A demand owner belongs to exactly one BU and sees their own demands; the admin may widen that to
   own + BU read-only.
 - Interviewers see assigned interviews; their skills, practices and max grade live on their profile.

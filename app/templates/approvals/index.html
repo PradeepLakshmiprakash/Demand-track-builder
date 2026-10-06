@@ -28,7 +28,7 @@
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ 'my demands' if actor.role.value == 'demand_owner' else 'all BUs' }}</div>
     <h1>Offer approvals</h1>
-    <div class="lede">Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with the cost from the rate card on the offer date. {{ '%g' % cutoff }}% and above: the demand owner approves, and the GTD team admin is notified. Below {{ '%g' % cutoff }}%: leadership decides.</div>
+    <div class="lede">Margin = (client bill rate − vendor cost rate) ÷ client bill rate, with the cost from the rate card on the offer date. {{ '%g' % cutoff }}% and above: the demand owner approves, and the lead admin is notified. Below {{ '%g' % cutoff }}%: leadership decides.</div>
   </div>
   {% if is_admin %}<a class="btn" href="/requests">Ask the Administrator for a rate change</a>{% endif %}
 </div>

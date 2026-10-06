@@ -561,3 +561,31 @@ The sidebar's current page has a bright left edge.
 blues for brand, buttons, links and the sidebar; its neutrals for backgrounds, borders and text; its
 red and orange for warnings and its green for "joined". Stage colours are three of its blues, light to
 dark, then green and grey; the workflow diagram and the rings share them. The typeface is Ubuntu, as on their site.
+
+## Round of 6 Oct
+
+**D89. "Client Onboarding In Progress"** replaces "Allocation Pending" as the third main stage.
+
+**D90. Overview.** Beside the main ring only the sub-stage ring is shown (a second ring on another
+footing invited comparisons that don't hold); type and practice stay as bars. Info marks carry fuller,
+formal descriptions. Non-billable cost shows the cost so far only, and its list shows business unit,
+practice, grade and cost so far.
+
+**D91. Rate card by practice and grade** (Acquisition Central's concept). The cost per hour is set by
+practice and grade; supply channel and region no longer price anything (the channel stays on a
+candidate as information from the BCM sheet). The client's rate belongs to the position; margin =
+(client rate − cost) ÷ client rate. The screen is a grade-by-practice grid with dated history.
+Migration 0018 keeps, per practice and grade, the highest of the old per-channel rates.
+
+**D92. Margin calculator** (Acquisition Central's). "The client pays $X an hour: which practice and
+grade can we put forward?" It answers in a sentence, then shows the best grade of each practice, or
+the grades around the rate in one practice, at the account's margin or one being tried.
+
+**D93. Requests from every role.** Anyone in the account asks the Administrator for what their role
+needs (access, special access, settings, escalation rules, rate card, interviewer profile, data
+correction), with the kinds offered depending on the role. People see their own requests; the Lead
+admin and the Administrator see all.
+
+**D94. Lead admin.** The "GTD team admin" is the Lead admin: a member of the GTD admin team who leads
+it. What the role can do beyond the team is special access requested from the Administrator and on
+record as done requests, listed for the Lead admin as "Special access you hold".

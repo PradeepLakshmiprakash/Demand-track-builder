@@ -66,7 +66,7 @@ class BusinessUnit(Base):
     # L1 escalation owner for this BU. Not an app user: they're mailed, they don't sign in.
     delivery_head_name: Mapped[str | None] = mapped_column(String(120))
     delivery_head_email: Mapped[str | None] = mapped_column(String(254))
-    # Agreed number of non-billable (proactive) positions for this BU; set by the GTD team admin.
+    # Agreed number of non-billable (proactive) positions for this BU; set by the lead admin.
     nb_cap: Mapped[int | None] = mapped_column(Integer)
 
     account: Mapped[Account] = relationship(back_populates="business_units")

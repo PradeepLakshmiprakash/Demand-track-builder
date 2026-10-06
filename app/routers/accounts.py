@@ -62,7 +62,7 @@ async def create_account(
     except PlatformError as e:
         db.rollback()
         return RedirectResponse(f"/platform/accounts?err={quote(str(e))}", status_code=303)
-    msg = f"{account.name} created. Its GTD team admin sets it up in Account settings."
+    msg = f"{account.name} created. Its lead admin sets it up in Account settings."
     return RedirectResponse(f"/platform/accounts?msg={quote(msg)}", status_code=303)
 
 

@@ -213,7 +213,7 @@ class NbRow:
 
 
 def non_billable_by_bu(db: Session, account_id: int) -> list[NbRow]:
-    """Per business unit: open non-billable (proactive) positions against the cap the GTD team admin set."""
+    """Per business unit: open non-billable (proactive) positions against the cap the lead admin set."""
     counts: dict[int, dict[str, int]] = {}
     for d in db.scalars(
         select(Demand).where(

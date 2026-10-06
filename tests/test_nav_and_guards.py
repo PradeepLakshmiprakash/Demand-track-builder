@@ -24,6 +24,7 @@ def test_demand_owner_menu(client: Client) -> None:
         "My escalations",
         "Offer approvals",
         "Margin calculator",
+        "Requests to administrator",
     ]
 
 
@@ -58,7 +59,14 @@ def test_administrator_menu_has_only_app_controls(client: Client) -> None:
 
 def test_leadership_menu(client: Client) -> None:
     items = menu(client.as_user("sanjay"))
-    assert items == ["Account overview", "All demands", "Escalations", "Offer approvals", "Margin calculator"]
+    assert items == [
+        "Account overview",
+        "All demands",
+        "Escalations",
+        "Offer approvals",
+        "Margin calculator",
+        "Requests to administrator",
+    ]
 
 
 def test_admin_team_menu(client: Client) -> None:
@@ -69,12 +77,13 @@ def test_admin_team_menu(client: Client) -> None:
         "Reconciliation",
         "Escalations",
         "Candidates",
+        "Requests to administrator",
     ]
 
 
 def test_interviewer_menu_and_home(client: Client) -> None:
     client.as_user("vikram")
-    assert menu(client) == ["My interviews"]
+    assert menu(client) == ["My interviews", "Requests to administrator"]
     r = client.get("/", follow_redirects=False)
     assert r.headers["location"] == "/interviews"
 
