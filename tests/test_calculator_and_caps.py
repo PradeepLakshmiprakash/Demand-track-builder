@@ -19,19 +19,47 @@ def test_calculator_gives_the_margin_for_a_practice_and_grade(client: Client) ->
     c = client.as_user("kavya")
     page = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&grade=C2").text
     # C2 in CCA-FS costs $68: at $100 that leaves 32%, above the 30% margin.
-    assert (
-        "<strong>C2 in CCA-FS</strong>" in page and "$68.00" in page and "32.0%" in page and "$32.00" in page
-    )
-    assert (
-        "the demand owner approves" in page and "Margin by grade in CCA-FS" in page and "your choice" in page
-    )
+    assert "<strong>C2 in CCA-FS</strong>" in page and "$68.00" in page
+    assert "32.0%" in page and "$32.00" in page and "the demand owner approves" in page
     assert "Margin to hold" not in page and "Supply channel" not in page
+    assert page.index("Recommendations") < page.index(
+        "<strong>C2 in CCA-FS</strong>"
+    )  # the wording comes last
     low = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&grade=D1").text  # $80: 20%
     assert "20.0%" in low and "leadership decides" in low and "at most $70.00" in low
     assert "Calculate margin" in c.get("/margin-calculator").text  # opens with nothing worked out
     assert "number above 0" in c.get("/margin-calculator?bill_rate=abc&practice=CCA-FS&grade=C2").text
-    by_practice = c.get("/margin-calculator?bill_rate=100&grade=C2").text
-    assert "Margin for C2 by practice" in by_practice and "DCX-FS" in by_practice
+
+
+def test_calculator_recommends_a_few_alternatives(db: Session) -> None:
+    from datetime import date as day
+    from decimal import Decimal
+
+    from app.services import rate_card_service as rc
+
+    rows = rc.offerings(db, 1, Decimal("100"), Decimal("30"), day(2026, 9, 1))
+    out = rc.suggestions(rows, "Cloud-MF", "C1", Decimal("30"))
+    assert (
+        len(out) <= 5
+        and out[0].chosen
+        and (out[0].offering.practice, out[0].offering.grade) == ("Cloud-MF", "C1")
+    )
+    by_why = {w: s for s in out for w in s.why}
+    near, top = by_why["Closest to the 30% margin"], by_why["Highest margin"]
+    # In Cloud-MF at $100: C2 costs $63.92 (36.1%), the last grade that clears 30%; A5 earns the most.
+    same = [s for s in out if s.offering.practice == "Cloud-MF" and not s.chosen]
+    assert {(s.offering.grade, tuple(s.why)) for s in same} == {
+        ("C2", ("Closest to the 30% margin",)),
+        ("A5", ("Highest margin",)),
+    }
+    # Other practices are only those that take the same skills (cloud), at the same grade.
+    other = [s for s in out if s.offering.practice != "Cloud-MF"]
+    assert other and all(s.offering.grade == "C1" and "cloud and DevOps" in s.where for s in other)
+    assert {s.offering.practice for s in other} <= {"CCA-FS", "ADM-FS", "Cloud-Java", "Cloud-APM"}
+    assert near.offering.fits and top.offering.margin_pct >= near.offering.margin_pct
+    assert rc.shared_skills("TES-FS", "DCX-FS") == [] and rc.shared_skills("tes-fs", "CCA-FS") == [
+        "testing and QA"
+    ]
 
 
 def test_calculator_says_when_the_card_has_no_cost(client: Client, db: Session) -> None:
@@ -51,8 +79,8 @@ def test_calculator_is_not_for_everyone(client: Client, who: str) -> None:
 
 
 def test_demand_owners_have_the_calculator_too(client: Client) -> None:
-    page = client.as_user("priya").get("/margin-calculator?grade=C2&region=US&bill_rate=110").text
-    assert "38.2%" in page and "Demand owner" in page  # Sogeti 68 against 110: hers to approve
+    page = client.as_user("priya").get("/margin-calculator?practice=CCA-FS&grade=C2&bill_rate=110").text
+    assert "38.2%" in page and "Demand owner" in page  # $68 against $110: hers to approve
 
 
 def _raise_nb(client: Client) -> str:

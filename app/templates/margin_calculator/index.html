@@ -31,38 +31,32 @@
   </form>
 </section>
 
-{% if bill and not error and (v.practice or v.grade) %}
+{% if bill and not error and v.practice and v.grade %}
+{% if not has_card %}
+<section class="panel panel-body"><p class="calc-answer">The rate card has no costs yet, so the margin can't be worked out. The Administrator sets them under Rate card.</p></section>
+{% elif not pick %}
+<section class="panel panel-body"><p class="calc-answer">The rate card has no cost for <strong>{{ v.grade }} in {{ v.practice }}</strong>, so its margin can't be worked out. Ask the Administrator to add it.</p></section>
+{% else %}
 <section class="panel panel-body">
-  {% if not has_card %}
-    <p class="calc-answer">The rate card has no costs yet, so the margin can't be worked out. The Administrator sets them under Rate card.</p>
-  {% elif pick %}
-    <div class="calc-result">
-      <div><div class="k">Margin</div><div class="v {{ 'low' if not pick.fits }}">{{ '%.1f' % pick.margin_pct }}%</div></div>
-      <div><div class="k">Margin per hour</div><div class="v">{{ (bill - pick.cost) | money(true) }}</div></div>
-      <div><div class="k">Cost per hour</div><div class="v">{{ pick.cost | money(true) }}</div></div>
-      <div><div class="k">An offer would go to</div><div class="v"><span class="chip {{ 'done' if pick.fits else 'risk' }}">{{ 'Demand owner' if pick.fits else 'Leadership' }}</span></div></div>
-    </div>
-    <p class="calc-answer" style="margin-top:14px">A <strong>{{ pick.grade }} in {{ pick.practice }}</strong> at {{ bill | money(true) }} an hour costs {{ pick.cost | money(true) }} an hour, leaving a margin of <strong>{{ '%.1f' % pick.margin_pct }}%</strong> ({{ (bill - pick.cost) | money(true) }} an hour).
-      {% if pick.fits %}That is at or above the {{ '%g' % threshold }}% margin, so the demand owner approves the offer.{% else %}That is below the {{ '%g' % threshold }}% margin, so leadership decides, with a reason. To reach {{ '%g' % threshold }}% at this client rate the cost can be at most {{ ceiling | money(true) }} an hour.{% endif %}</p>
-  {% elif v.practice and v.grade %}
-    <p class="calc-answer">The rate card has no cost for <strong>{{ v.grade }} in {{ v.practice }}</strong>, so its margin can't be worked out. Ask the Administrator to add it.</p>
-  {% elif v.practice %}
-    <p class="calc-answer">Choose a grade to see its margin. Below is every grade in <strong>{{ v.practice }}</strong> at {{ bill | money(true) }} an hour.</p>
-  {% else %}
-    <p class="calc-answer">Choose a practice to see its margin. Below is <strong>{{ v.grade }}</strong> in every practice at {{ bill | money(true) }} an hour.</p>
-  {% endif %}
+  <div class="calc-result">
+    <div><div class="k">Margin</div><div class="v {{ 'low' if not pick.fits }}">{{ '%.1f' % pick.margin_pct }}%</div></div>
+    <div><div class="k">Margin per hour</div><div class="v">{{ (bill - pick.cost) | money(true) }}</div></div>
+    <div><div class="k">Cost per hour</div><div class="v">{{ pick.cost | money(true) }}</div></div>
+    <div><div class="k">An offer would go to</div><div class="v"><span class="chip {{ 'done' if pick.fits else 'risk' }}">{{ 'Demand owner' if pick.fits else 'Leadership' }}</span></div></div>
+  </div>
 </section>
+{% endif %}
 
 {% if options %}
 <section class="panel">
-  <div class="panel-head"><div><h2>{{ ('Margin by grade in ' ~ v.practice) if v.practice else ('Margin for ' ~ v.grade ~ ' by practice') }}</h2><div class="hint">At a client rate of {{ bill | money(true) }} an hour. Margin = (client rate − cost) ÷ client rate. At or above {{ '%g' % threshold }}% the demand owner approves; below it, leadership.</div></div></div>
+  <div class="panel-head"><div><h2>Recommendations</h2><div class="hint">At {{ bill | money(true) }} an hour: in {{ v.practice }}, the grade closest to the {{ '%g' % threshold }}% margin and the grade with the highest margin; and the same for {{ v.grade }} in the practices that take the same technical skills.</div></div></div>
   <div class="tbl plain">
-    <div class="tr th calc"><div>Practice</div><div>Grade</div><div>Cost / h</div><div>Margin</div><div>Margin / h</div><div>An offer would go to</div></div>
-    {% for r in options %}
-    {% set chosen = pick and r.practice == pick.practice and r.grade == pick.grade %}
-    <div class="tr calc {{ 'best' if chosen }}">
+    <div class="tr th calc rec"><div>Recommendation</div><div>Practice</div><div>Grade</div><div>Cost / h</div><div>Margin</div><div>Margin / h</div><div>An offer would go to</div></div>
+    {% for s in options %}{% set r = s.offering %}
+    <div class="tr calc rec {{ 'best' if s.chosen }}">
+      <div><strong>{{ s.why | join(' · ') if s.why else 'Your choice' }}</strong>{% if s.chosen and s.why %} <span class="chip blue">your choice</span>{% endif %}<div class="small muted">{{ s.where if not s.chosen else (v.grade ~ ' in ' ~ v.practice) }}</div></div>
       <div>{{ r.practice }}</div>
-      <div><strong>{{ r.grade }}</strong>{% if chosen %} <span class="chip blue">your choice</span>{% endif %}</div>
+      <div><strong>{{ r.grade }}</strong></div>
       <div>{{ r.cost | money(true) }}</div>
       <div><strong class="{{ 'sev-high' if not r.fits }}">{{ '%.1f' % r.margin_pct }}%</strong></div>
       <div>{{ (bill - r.cost) | money(true) }}</div>
@@ -70,6 +64,13 @@
     </div>
     {% endfor %}
   </div>
+</section>
+{% endif %}
+
+{% if has_card and pick %}
+<section class="panel panel-body">
+  <p class="calc-answer">A <strong>{{ pick.grade }} in {{ pick.practice }}</strong> at {{ bill | money(true) }} an hour costs {{ pick.cost | money(true) }} an hour, leaving a margin of <strong>{{ '%.1f' % pick.margin_pct }}%</strong> ({{ (bill - pick.cost) | money(true) }} an hour).
+    {% if pick.fits %}That is at or above the {{ '%g' % threshold }}% margin, so the demand owner approves the offer.{% else %}That is below the {{ '%g' % threshold }}% margin, so leadership decides, with a reason. To reach {{ '%g' % threshold }}% at this client rate the cost can be at most {{ ceiling | money(true) }} an hour.{% endif %}</p>
 </section>
 {% endif %}
 {% endif %}

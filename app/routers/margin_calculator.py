@@ -1,8 +1,9 @@
 """Margin calculator: "the client pays $100 an hour for a C2 in CCA-FS: what margin do we make?"
 
-Client rate, practice and grade in; the margin for that grade out, with the other grades of the practice
-beside it for comparison. It reads the rate card and the margin threshold the approvals use, so what it
-says is how an offer would really be routed. Nothing is saved.
+Client rate, practice and grade in; the margin for that grade out, with a short list of alternatives: in
+the same practice, and in the practices that take the same technical skills. It reads the rate card
+and the margin threshold the approvals use, so what it says is how an offer would really be routed.
+Nothing is saved.
 """
 
 from decimal import Decimal, InvalidOperation
@@ -42,17 +43,9 @@ def calculator(
         bill, error = None, "Enter what the client pays per hour as a number above 0."
 
     today = account_today(db, account.id)
-    rank = cfg.grade_rank
     rows = rate_card_service.offerings(db, account.id, bill, threshold, today) if bill else []
-    # The grade asked about, then what to compare it with: the practice's other grades, or, with no
-    # practice chosen, the same grade in every practice.
     pick = next((r for r in rows if r.practice == practice and r.grade == grade), None)
-    if practice:
-        options = sorted((r for r in rows if r.practice == practice), key=lambda r: rank(r.grade))
-    elif grade:
-        options = sorted((r for r in rows if r.grade == grade), key=lambda r: (-r.margin_pct, r.practice))
-    else:
-        options = []
+    options = rate_card_service.suggestions(rows, practice, grade, threshold) if practice and grade else []
     return render(
         request,
         "margin_calculator/index.html",
