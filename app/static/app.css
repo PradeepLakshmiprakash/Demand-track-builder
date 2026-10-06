@@ -540,3 +540,21 @@ button.quick { font: inherit; font-size: 13px; cursor: pointer; min-height: 0; }
 .tr.teamout { display: grid; grid-template-columns: 1.6fr .5fr .9fr .8fr .7fr .9fr 1fr 1fr; gap: 12px; align-items: center; }
 .tr.podout { display: grid; grid-template-columns: 1.6fr .5fr .7fr 1fr .9fr 1fr 1fr; gap: 12px; align-items: center; }
 .tr.total { background: var(--brand-tint); }
+
+/* Interview feedback form, after Acquisition Central's. */
+.fb { display: flex; flex-direction: column; gap: 16px; }
+.fb-card { border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--card); }
+.fb-card h3 { margin: 0; font-size: 16px; }
+.fb-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.fb-param { border: 0; border-top: 1px solid var(--line-soft); margin: 0; padding: 12px 0 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fb-param-head { padding: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; width: 100%; }
+.fb-scale { display: flex; gap: 6px; flex-wrap: wrap; }
+.fb-scale .rating span { width: 38px; height: 38px; }
+.fb-sentence { background: var(--brand-tint); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--muted); }
+.fb-warn { color: var(--warn-ink); }
+.choice.reject input:checked + span { background: var(--esc-ink); border-color: var(--esc-ink); color: #fff; font-weight: 600; }
+.choice.hold input:checked + span { background: var(--warn-ink); border-color: var(--warn-ink); color: #fff; font-weight: 600; }
+.fb-confirm { border: 1px solid var(--line); border-radius: 14px; padding: 22px; max-width: 480px; width: calc(100% - 32px); }
+.fb-confirm::backdrop { background: rgba(18, 26, 56, .45); }
+.fb-confirm h3 { margin: 0 0 8px; font-size: 18px; }
+.fb-confirm p { margin: 0 0 10px; }

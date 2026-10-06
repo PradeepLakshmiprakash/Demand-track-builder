@@ -16,7 +16,7 @@ from app.services import escalation_service, notify_service
 from app.services import interview_service as svc
 from app.services.interview_service import Feedback
 from seed import sample_sheet
-from tests.conftest import Client, user_id
+from tests.conftest import RATINGS, Client, user_id
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +43,7 @@ def import_sample(client: Client, day: date, title: bool = True) -> None:
 
 
 def fb(round_: str = "L1", outcome: str = "select", **kw: object) -> Feedback:
-    ratings = {"Technical depth": 4, "Problem solving": 4, "Communication": 4}
+    ratings = dict(RATINGS)
     kw.setdefault("comments", "notes")
     return Feedback(round=round_, ratings=ratings, outcome=outcome, **kw)  # type: ignore[arg-type]
 

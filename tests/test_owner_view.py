@@ -9,7 +9,7 @@ from app.core import mail
 from app.models import Account, Demand, OfferApproval
 from app.services import interview_service as svc
 from app.services.interview_service import Feedback
-from tests.conftest import Client, user_id
+from tests.conftest import RATINGS, Client, user_id
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +26,7 @@ def _select(db: Session, ref: str, name: str) -> int:
     """The panel selects a candidate on the demand; returns the candidate's id."""
     d = demand(db, ref)
     c = svc.ensure_candidate(db, 1, d, name)
-    ratings = {"Technical depth": 4, "Problem solving": 4, "Communication": 4}
+    ratings = dict(RATINGS)
     fb = Feedback(round="L1", ratings=ratings, outcome="select", comments="good")
     svc.record_feedback(db, db.get_one(Account, 1), user_id("vikram"), c, fb)
     return c.id

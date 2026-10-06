@@ -14,7 +14,7 @@ from app.services import escalation_service as svc
 from app.services import notify_service, reconcile_service
 from app.services.escalation_service import EscalationError
 from seed import sample_sheet
-from tests.conftest import Client, user_id
+from tests.conftest import RATINGS, Client, user_id
 
 NOW = datetime.now(UTC)
 
@@ -469,7 +469,7 @@ def test_late_feedback_goes_to_the_interviewer_and_closes_when_given(db: Session
 
     from app.models import Candidate
 
-    fb = Feedback(round=iv.round, ratings={"Technical depth": 4, "Problem solving": 4, "Communication": 4},
+    fb = Feedback(round=iv.round, ratings=dict(RATINGS),
                   outcome="select", comments="ok")  # fmt: skip
     interview_service.record_feedback(
         db, account, user_id("vikram"), db.get_one(Candidate, iv.candidate_id), fb, iv

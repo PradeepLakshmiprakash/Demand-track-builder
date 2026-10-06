@@ -1,5 +1,9 @@
-{# Shared by My interviews and the no-sign-in feedback link. Needs: dims, fixed_round (or none), v (previous values). #}
+{# The interview feedback form, shared by My interviews and the no-sign-in link. After Acquisition
+   Central's: about the panelist, six rated areas each with a band and its standard sentence, then the
+   recommendation. Needs: dims, fbref (interview_service.form_reference), fixed_round (or none), v. #}
 {% set v = v or {} %}
+{% macro pick(name, options, chosen, blank) %}<select name="{{ name }}"><option value="">{{ blank }}</option>{% for o in options %}<option {{ 'selected' if chosen == o }}>{{ o }}</option>{% endfor %}</select>{% endmacro %}
+<div class="fb" data-reference='{{ fbref.areas | tojson | forceescape }}'>
 {% if not fixed_round %}
 <div class="grid2">
   <label class="f">Round
@@ -10,28 +14,126 @@
   <label class="f">Interviewed on <span class="hint">(optional)</span><input type="date" name="interviewed_on" value="{{ v.get('interviewed_on', '') }}"></label>
 </div>
 {% endif %}
-<fieldset class="f ratings">
-  <legend>Ratings (1 to 5)</legend>
-  {% for d in dims %}
+
+<section class="fb-card">
+  <h3>About you</h3>
+  <div class="grid3">
+    <label class="f">Your business unit{{ pick('panel_bu', fbref.business_units, v.get('panel_bu'), 'Choose…') }}</label>
+    <label class="f">Your designation{{ pick('panel_designation', fbref.grades, v.get('panel_designation'), 'Choose…') }}</label>
+    <label class="f">Your practice{{ pick('panel_practice', fbref.practices, v.get('panel_practice'), 'Choose…') }}</label>
+  </div>
+</section>
+
+<section class="fb-card">
+  <div class="fb-head">
+    <div><h3>Ratings</h3><div class="small muted">Rate each area from 1 to 10 and choose the band. The standard sentence for the band goes into the record.</div></div>
+    <span class="small muted" data-fb-progress>0 of {{ dims | length }} done · overall —</span>
+  </div>
+  {% for a in fbref.areas %}
   {% set i = loop.index0 %}
-  <div class="rating-row" role="radiogroup" aria-label="{{ d }}">
-    <div class="rating-label">{{ d }}</div>
-    {% for n in range(1, 6) %}
-      <label class="rating"><input type="radio" name="r{{ i }}" value="{{ n }}" required {{ 'checked' if (v.get('ratings') or {}).get(d) == n }}><span>{{ n }}</span></label>
-    {% endfor %}
-  </div>
+  {% set rated = (v.get('ratings') or {}).get(a.label) %}
+  {% set banded = (v.get('bands') or {}).get(a.label) %}
+  <fieldset class="fb-param" data-area="{{ i }}">
+    <legend class="fb-param-head"><strong>{{ a.label }}</strong> <span class="small muted" data-fb-usual></span></legend>
+    <div class="fb-scale" role="radiogroup" aria-label="{{ a.label }} rating">
+      {% for n in range(1, 11) %}
+        <label class="rating"><input type="radio" name="r{{ i }}" value="{{ n }}" required {{ 'checked' if rated == n }}><span>{{ n }}</span></label>
+      {% endfor %}
+    </div>
+    <div class="row" style="gap:8px">
+      <label class="small" for="b{{ i }}">Band</label>
+      <select name="b{{ i }}" id="b{{ i }}" required style="max-width:200px;min-height:38px">
+        <option value="">Choose…</option>
+        {% for b in a.bands %}<option {{ 'selected' if banded == b.band }}>{{ b.band }}</option>{% endfor %}
+      </select>
+      <span class="small fb-warn" data-fb-warn></span>
+    </div>
+    <div class="fb-sentence" data-fb-sentence hidden></div>
+  </fieldset>
   {% endfor %}
-</fieldset>
-<fieldset class="f outcome">
-  <legend>Decision</legend>
-  <div class="row">
-    {% for key, label in [('select', 'Select'), ('reject', 'Reject'), ('hold', 'On hold')] %}
-      <label class="choice {{ key }}"><input type="radio" name="outcome" value="{{ key }}" required {{ 'checked' if v.get('outcome') == key }}><span>{{ label }}</span></label>
-    {% endfor %}
+</section>
+
+<section class="fb-card">
+  <h3>Recommendation</h3>
+  <fieldset class="f outcome">
+    <legend>Outcome</legend>
+    <div class="row">
+      {% for key, label in [('select', 'Offer'), ('reject', 'Reject'), ('hold', 'Hold')] %}
+        <label class="choice {{ key }}"><input type="radio" name="outcome" value="{{ key }}" required {{ 'checked' if v.get('outcome') == key }}><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% if fixed_round != 'L2' %}
+  <div data-fb-show="select hold" hidden class="stack" style="gap:8px">
+    <label class="row" style="font-weight:500"><input type="checkbox" name="needs_next_round" value="1" style="width:18px;height:18px;accent-color:var(--brand)" {{ 'checked' if v.get('needs_next_round') }}> Needs another interview round before the demand owner approves</label>
+    <label class="f" data-fb-next hidden>What should the next round check? <span class="hint">Interviewers see this when they take the round up</span><input type="text" name="next_round_note" value="{{ v.get('next_round_note') or '' }}" maxlength="400" placeholder="e.g. system design, client-facing skills"></label>
   </div>
-</fieldset>
-<label class="f">Comments<textarea name="comments" rows="4" placeholder="Strengths, gaps, and anything the client panel should probe. Required to reject or hold.">{{ v.get('comments', '') }}</textarea></label>
-{% if fixed_round != 'L2' %}
-<label class="row" style="font-weight:500"><input type="checkbox" name="needs_next_round" value="1" style="width:18px;height:18px;accent-color:var(--brand)" {{ 'checked' if v.get('needs_next_round') }}> Needs another round (the demand owner approves it)</label>
-<label class="f">Why another round <span class="hint">(optional)</span><input type="text" name="next_round_note" value="{{ v.get('next_round_note', '') }}" maxlength="400"></label>
-{% endif %}
+  {% endif %}
+  <div class="grid2" data-fb-show="reject hold" hidden>
+    <label class="f">Support needed{{ pick('support_needed', fbref.support_options, v.get('support_needed'), 'Choose…') }}</label>
+    <label class="f">In which area{{ pick('support_area', dims, v.get('support_area'), 'Not specific') }}</label>
+  </div>
+  <div class="grid2">
+    <label class="f">Recommended designation{{ pick('designation', fbref.grades, v.get('designation'), 'Same as the role') }}</label>
+    <label class="f">Fit for another role in the firm?{{ pick('other_role_fit', ['Yes', 'No'], v.get('other_role_fit'), 'Not assessed') }}</label>
+  </div>
+  <label class="f" data-fb-capacity hidden>In what capacity<input type="text" name="other_role_capacity" value="{{ v.get('other_role_capacity') or '' }}" maxlength="200"></label>
+  <label class="f">Remarks<textarea name="comments" rows="3" placeholder="Strengths, gaps, and anything the next panel or the client should probe.">{{ v.get('comments') or '' }}</textarea></label>
+</section>
+
+<dialog class="fb-confirm">
+  <h3>Submit feedback?</h3>
+  <p data-fb-summary></p>
+  <p class="fb-warn small" data-fb-odd hidden></p>
+  <p class="small muted">Submitted feedback cannot be changed.</p>
+  <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-fb-back>Back</button><button type="submit" class="btn primary" data-fb-go>Submit feedback</button></div>
+</dialog>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('.fb').forEach(function (fb) {
+    if (fb.dataset.ready) return;
+    fb.dataset.ready = '1';
+    var ref = JSON.parse(fb.dataset.reference), form = fb.closest('form'), dialog = fb.querySelector('.fb-confirm');
+    var name = form.dataset.candidate || 'this candidate';
+    function val(n) { var el = form.querySelector('[name="' + n + '"]:checked') || form.querySelector('select[name="' + n + '"], input[type=text][name="' + n + '"]'); return el ? el.value : ''; }
+    function state() {
+      var done = 0, sum = 0, n = 0, odd = 0;
+      ref.forEach(function (a, i) {
+        var box = fb.querySelector('[data-area="' + i + '"]'), r = Number(val('r' + i)) || 0, band = val('b' + i);
+        var b = a.bands.filter(function (x) { return x.band === band; })[0];
+        box.querySelector('[data-fb-usual]').textContent = b ? '"' + b.band + '" is usually ' + b.range[0] + '–' + b.range[1] : '';
+        var s = box.querySelector('[data-fb-sentence]'); s.hidden = !b; s.textContent = b ? b.sentence : '';
+        var off = b && r && (r < b.range[0] || r > b.range[1]);
+        box.querySelector('[data-fb-warn]').textContent = off ? r + ' is unusual for "' + b.band + '" (usually ' + b.range[0] + '–' + b.range[1] + ').' : '';
+        if (off) odd++;
+        if (r) { sum += r; n++; }
+        if (r && b) done++;
+      });
+      var overall = n === ref.length ? (Math.round(sum / n * 10) / 10).toFixed(1) : '—';
+      fb.querySelector('[data-fb-progress]').textContent = done + ' of ' + ref.length + ' done · overall ' + overall;
+      var outcome = val('outcome');
+      fb.querySelectorAll('[data-fb-show]').forEach(function (el) { el.hidden = el.dataset.fbShow.split(' ').indexOf(outcome) < 0; });
+      var next = form.querySelector('[name=needs_next_round]'), note = fb.querySelector('[data-fb-next]');
+      if (note) note.hidden = !(next && next.checked);
+      fb.querySelector('[data-fb-capacity]').hidden = val('other_role_fit') !== 'Yes';
+      return { overall: overall, odd: odd, outcome: outcome, next: !!(next && next.checked && outcome !== 'reject') };
+    }
+    form.addEventListener('change', state);
+    state();
+    if (!dialog.showModal) return;  // an old browser: the form submits as it is
+    var confirmed = false;
+    form.addEventListener('submit', function (e) {
+      if (confirmed) return;
+      e.preventDefault();
+      var s = state(), label = { select: 'Offer', reject: 'Reject', hold: 'Hold' }[s.outcome] || s.outcome;
+      fb.querySelector('[data-fb-summary]').innerHTML = '<strong>' + label + '</strong> for ' + name.replace(/[&<>]/g, '') + ', overall <strong>' + s.overall + '</strong>.' + (s.next ? ' You are also asking for another interview round: the demand owner approves it.' : '');
+      var o = fb.querySelector('[data-fb-odd]'); o.hidden = !s.odd;
+      o.textContent = s.odd + ' rating' + (s.odd === 1 ? ' sits' : 's sit') + ' outside the usual range for the band chosen. That is allowed; check it is what you meant.';
+      dialog.showModal();
+    });
+    fb.querySelector('[data-fb-back]').addEventListener('click', function () { dialog.close(); });
+    fb.querySelector('[data-fb-go]').addEventListener('click', function (e) { e.preventDefault(); confirmed = true; dialog.close(); form.requestSubmit ? form.requestSubmit() : form.submit(); });
+  });
+})();
+</script>

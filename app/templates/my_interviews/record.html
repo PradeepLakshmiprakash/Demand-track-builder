@@ -9,10 +9,10 @@
   </div>
 </div>
 
-<div class="iv-split">
+<div class="split">
   <section class="panel panel-body stack">
     {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
-    <form method="post" class="stack">
+    <form method="post" class="stack" data-candidate="{{ c.name }}">
       <div class="f">Requisition
         {% if d %}
           <div style="font-weight:400"><span class="mono">{{ d.gtd_req_id or 'no GTD ID' }}</span> <span class="mono">{{ d.app_ref }}</span> · {{ d.name }} · {{ d.grade }}</div>

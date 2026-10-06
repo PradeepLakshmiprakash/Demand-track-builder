@@ -79,7 +79,10 @@ class Interview(Base):
     scheduled_at: Mapped[datetime | None]
     # Single-use link for the interviewer's feedback; issued when an interviewer is assigned.
     feedback_token: Mapped[str | None] = mapped_column(String(64), unique=True)
-    ratings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    ratings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # area → 1 to 10
+    # The rest of the feedback form: bands and their sentences, the panelist's details, support needed,
+    # recommended designation, fit for another role, and the overall rating.
+    feedback_details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     outcome: Mapped[str | None] = mapped_column(String(10))
     comments: Mapped[str | None] = mapped_column(Text)
     submitted_at: Mapped[datetime | None]

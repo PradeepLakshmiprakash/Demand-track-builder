@@ -114,3 +114,14 @@ def client() -> Iterator[Client]:
 
     with Client(create_app(), follow_redirects=False) as c:
         yield c
+
+
+# Interview feedback as the seeded account rates it: the six standard areas.
+from app.core.feedback_reference import DEFAULT_AREAS  # noqa: E402
+
+RATINGS = dict.fromkeys(DEFAULT_AREAS, 7)
+# The feedback form as posted: a rating and a band for every area.
+GOOD_FORM = {f"r{i}": "7" for i in range(len(DEFAULT_AREAS))} | {
+    f"b{i}": "Good" for i in range(len(DEFAULT_AREAS))
+}
+GOOD_FORM |= {"outcome": "select", "comments": "Strong Spring Boot"}

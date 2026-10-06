@@ -113,7 +113,7 @@
       {% if c.cv_path and iv.feedback_token %}<a href="/cv/{{ iv.feedback_token }}">Candidate CV</a>{% else %}<span class="muted">CV not attached yet</span>{% endif %}
       {% if d and d.primary_skills %}<span class="muted">Required: {{ d.primary_skills | join(', ') }}{% if d.exp_min %} · {{ d.exp_min }}+ years{% endif %}</span>{% endif %}
     </div>
-    <form method="post" action="/interviews/{{ iv.id }}/feedback" class="stack">
+    <form method="post" action="/interviews/{{ iv.id }}/feedback" class="stack" data-candidate="{{ c.name }}">
       {% with dims=dims, fixed_round=iv.round, v={} %}{% include "_feedback_fields.html" %}{% endwith %}
       <div><button class="btn primary">Submit feedback</button></div>
     </form>

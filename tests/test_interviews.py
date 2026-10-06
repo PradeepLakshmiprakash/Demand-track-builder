@@ -15,9 +15,9 @@ from app.services import escalation_service
 from app.services import interview_service as svc
 from app.services.interview_service import Feedback, InterviewError
 from seed import sample_sheet
-from tests.conftest import Client, user_id
+from tests.conftest import GOOD_FORM, RATINGS, Client, user_id
 
-GOOD = {"r0": "4", "r1": "4", "r2": "3", "outcome": "select", "comments": "Strong Spring Boot"}
+GOOD = GOOD_FORM
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +53,7 @@ def import_sample(client: Client, day: date | None = None, title: bool = True) -
 def fb(**kw: object) -> Feedback:
     base: dict[str, object] = {
         "round": "L1",
-        "ratings": {"Technical depth": 4, "Problem solving": 3, "Communication": 4},
+        "ratings": dict(RATINGS),
         "outcome": "select",
         "comments": "ok",
     }
@@ -108,7 +108,7 @@ def test_feedback_on_an_assigned_interview(client: Client, db: Session) -> None:
     db.expire_all()
     done = db.get_one(Interview, iv.id)
     assert (done.status, done.outcome, done.feedback_token) == ("completed", "select", None)
-    assert done.ratings == {"Technical depth": 4, "Problem solving": 4, "Communication": 3}
+    assert done.ratings == dict(RATINGS)
 
 
 def test_record_for_a_candidate_found_by_name_and_map_it(client: Client, db: Session) -> None:
@@ -151,9 +151,13 @@ def test_mapping_onto_a_requisition_with_the_same_person_merges(client: Client, 
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        ({"ratings": {"Technical depth": 4}}, "Rate 1 to 5"),
-        ({"outcome": "maybe"}, "select, reject"),
-        ({"outcome": "reject", "comments": ""}, "Add a comment"),
+        ({"ratings": {"Technical Skills": 4}}, "Rate 1 to 10"),
+        ({"ratings": RATINGS | {"Communication": 11}}, "Rate 1 to 10: Communication"),
+        ({"bands": {"Technical Skills": "Good"}}, "Choose a band for"),
+        ({"outcome": "maybe"}, "offer, reject or hold"),
+        ({"outcome": "reject", "comments": ""}, "needs support, or add a remark"),
+        ({"support_area": "Juggling"}, "area the support is needed in"),
+        ({"designation": "Z9"}, "recommended designation"),
         ({"round": "L3"}, "round"),
         ({"outcome": "reject", "needs_next_round": True}, "rejected candidate"),
         ({"round": "L2", "needs_next_round": True}, "last round"),

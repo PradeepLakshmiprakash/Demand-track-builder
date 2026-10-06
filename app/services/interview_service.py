@@ -28,7 +28,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core import mail, storage
+from app.core import feedback_reference, mail, storage
 from app.core.config import get_settings
 from app.core.enums import (
     FINISHED,
@@ -40,7 +40,16 @@ from app.core.enums import (
     Role,
 )
 from app.core.security import Actor
-from app.models import Account, Candidate, Demand, Interview, InterviewerProfile, User, member_of
+from app.models import (
+    Account,
+    BusinessUnit,
+    Candidate,
+    Demand,
+    Interview,
+    InterviewerProfile,
+    User,
+    member_of,
+)
 
 CV_EXTENSIONS = {".pdf", ".doc", ".docx", ".rtf", ".txt"}
 ROUNDS = ("L1", "L2")
@@ -252,6 +261,54 @@ class Feedback:
     needs_next_round: bool = False
     next_round_note: str | None = None
     interviewed_on: datetime | None = None
+    # The fuller form (as in Acquisition Central). None for `bands` means the caller didn't use the form
+    # (a test, or an integration), so bands aren't asked for.
+    bands: dict[str, str] | None = None
+    panel_bu: str | None = None
+    panel_designation: str | None = None
+    panel_practice: str | None = None
+    support_needed: str | None = None
+    support_area: str | None = None
+    designation: str | None = None  # the grade the panelist would put the candidate at
+    other_role_fit: str | None = None  # "Yes" / "No": fit for another role in the firm
+    other_role_capacity: str | None = None
+
+    def details(self, areas: list[str]) -> dict[str, object]:
+        bands = self.bands or {}
+        rated = [self.ratings[a] for a in areas if a in self.ratings]
+        return {
+            "overall": feedback_reference.overall(rated),
+            "bands": {a: bands[a] for a in areas if bands.get(a)},
+            "sentences": {
+                a: s for a in areas if bands.get(a) and (s := feedback_reference.sentence(a, bands[a]))
+            },
+            "panel_bu": self.panel_bu or None,
+            "panel_designation": self.panel_designation or None,
+            "panel_practice": self.panel_practice or None,
+            "support_needed": self.support_needed or None,
+            "support_area": self.support_area or None,
+            "designation": self.designation or None,
+            "other_role_fit": self.other_role_fit or None,
+            "other_role_capacity": (self.other_role_capacity or "").strip() or None,
+        }
+
+
+def form_reference(db: Session, account: Account) -> dict[str, object]:
+    """What the feedback form offers: the rated areas with their bands, and the lists it picks from."""
+    cfg = account.settings
+    return {
+        "areas": feedback_reference.form_reference(cfg.interview_ratings),
+        "grades": list(cfg.grades),
+        "practices": list(cfg.practices),
+        "business_units": list(
+            db.scalars(
+                select(BusinessUnit.name)
+                .where(BusinessUnit.account_id == account.id)
+                .order_by(BusinessUnit.name)
+            )
+        ),
+        "support_options": feedback_reference.SUPPORT_OPTIONS,
+    }
 
 
 def _check_feedback(account: Account, fb: Feedback) -> None:
@@ -260,13 +317,28 @@ def _check_feedback(account: Account, fb: Feedback) -> None:
     try:
         InterviewOutcome(fb.outcome)
     except ValueError as e:
-        raise InterviewError("Choose select, reject or on hold.") from e
-    dims = account.settings.interview_ratings
-    missing = [d for d in dims if fb.ratings.get(d) not in (1, 2, 3, 4, 5)]
+        raise InterviewError("Choose offer, reject or hold.") from e
+    cfg = account.settings
+    dims = cfg.interview_ratings
+    missing = [d for d in dims if fb.ratings.get(d) not in feedback_reference.SCALE]
     if missing:
-        raise InterviewError("Rate 1 to 5: " + ", ".join(missing) + ".")
-    if fb.outcome in (InterviewOutcome.REJECT, InterviewOutcome.HOLD) and not (fb.comments or "").strip():
-        raise InterviewError("Add a comment: what was missing, or what the hold is waiting on.")
+        raise InterviewError("Rate 1 to 10: " + ", ".join(missing) + ".")
+    if fb.bands is not None:
+        unbanded = [d for d in dims if feedback_reference.sentence(d, fb.bands.get(d, "")) is None]
+        if unbanded:
+            raise InterviewError("Choose a band for: " + ", ".join(unbanded) + ".")
+    declined = fb.outcome in (InterviewOutcome.REJECT, InterviewOutcome.HOLD)
+    if declined and not (fb.support_needed or "").strip() and not (fb.comments or "").strip():
+        raise InterviewError(
+            "Say where the candidate needs support, or add a remark: what was missing, or what the hold "
+            "is waiting on."
+        )
+    if fb.support_area and fb.support_area not in dims:
+        raise InterviewError("Choose the area the support is needed in from the rated areas.")
+    if fb.designation and fb.designation not in cfg.grades:
+        raise InterviewError("Choose the recommended designation from the account's grades.")
+    if fb.other_role_fit and fb.other_role_fit not in ("Yes", "No"):
+        raise InterviewError("Fit for another role is Yes or No.")
     if fb.needs_next_round and fb.outcome == InterviewOutcome.REJECT:
         raise InterviewError("A rejected candidate can't go to another round.")
     if fb.needs_next_round and fb.round == ROUNDS[-1]:
@@ -297,6 +369,7 @@ def record_feedback(
     elif interview.status_enum is InterviewStatus.COMPLETED:
         raise InterviewError("Feedback for this interview is already in.")
     interview.ratings = dict(fb.ratings)
+    interview.feedback_details = fb.details(account.settings.interview_ratings)
     interview.outcome, interview.comments = fb.outcome, (fb.comments or "").strip() or None
     interview.submitted_at, interview.status = now, InterviewStatus.COMPLETED.value
     interview.interviewer_id = interview.interviewer_id or interviewer_id

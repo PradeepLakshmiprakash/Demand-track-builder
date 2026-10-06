@@ -13,7 +13,7 @@ from app.core.db import get_db
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import Account, Candidate, Demand, Interview
-from app.schemas.interviews import feedback_from_form
+from app.schemas.interviews import feedback_from_form, feedback_values
 from app.services import escalation_service
 from app.services import interview_service as svc
 from app.services.interview_service import InterviewError
@@ -54,6 +54,7 @@ def my_interviews(
         done=[x for x in mine if x[0].status == "completed"],
         selected=selected,
         dims=account.settings.interview_ratings,
+        fbref=svc.form_reference(db, account),
         new_reqs=svc.new_in_my_skills(db, actor),
         q=request.query_params.get("q", ""),
         results=svc.search(db, actor.account_id, request.query_params.get("q", "")),
@@ -133,6 +134,7 @@ def _record_page(
         requisitions=svc.open_requisitions(db, actor.account_id),
         history=svc.for_candidate(db, c.id),
         dims=account.settings.interview_ratings,
+        fbref=svc.form_reference(db, account),
         v=v,
         error=error,
     )
@@ -165,14 +167,7 @@ async def record(
         svc.record_feedback(db, account, actor.id, c, fb)
     except InterviewError as e:
         db.rollback()
-        v = {
-            "round": fb.round,
-            "ratings": fb.ratings,
-            "outcome": fb.outcome,
-            "comments": fb.comments,
-            "needs_next_round": fb.needs_next_round,
-            "next_round_note": fb.next_round_note,
-        }
+        v = feedback_values(fb)
         return _record_page(request, actor, db, db.get_one(Candidate, candidate_id), v=v, error=str(e))
     msg = f"Recommendation for {c.name} recorded" + (
         " · another round requested" if fb.needs_next_round else ""

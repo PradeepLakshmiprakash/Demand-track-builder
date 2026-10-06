@@ -38,6 +38,7 @@ def _page(request: Request, db: Session, iv: Interview, error: str | None = None
             "d": d,
             "who": db.get(User, iv.interviewer_id),
             "dims": account.settings.interview_ratings,
+            "fbref": svc.form_reference(db, account),
             "error": error,
             "token": iv.feedback_token,
         },

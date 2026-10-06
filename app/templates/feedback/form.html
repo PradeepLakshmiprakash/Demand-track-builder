@@ -24,7 +24,7 @@
       {% if c.cv_path %}<a href="/cv/{{ token }}">Candidate CV</a>{% endif %}
     </div>
     {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
-    <form method="post" class="stack">
+    <form method="post" class="stack" data-candidate="{{ c.name }}">
       {% with dims=dims, fixed_round=iv.round, v={} %}{% include "_feedback_fields.html" %}{% endwith %}
       <div><button class="btn primary">Submit feedback</button></div>
       <div class="small muted">This link works once. After you submit, it closes.</div>

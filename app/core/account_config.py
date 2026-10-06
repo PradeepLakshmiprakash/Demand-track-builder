@@ -8,6 +8,7 @@ because the escalation sweep filters on them in SQL.
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.enums import SHEET_STAGES, DemandStatus, Responsible, Severity
+from app.core.feedback_reference import DEFAULT_AREAS
 
 
 class SupplyChannel(BaseModel):
@@ -241,7 +242,8 @@ class AccountConfig(BaseModel):
     l2_inform_leadership: bool = True
     l2_inform_delivery_head: bool = True
     # What a panelist rates, each 1 to 5 (flow-artifact §7).
-    interview_ratings: list[str] = ["Technical depth", "Problem solving", "Communication"]
+    # The areas the interview feedback form rates, 1 to 10 with a band (feedback_reference).
+    interview_ratings: list[str] = Field(default_factory=lambda: list(DEFAULT_AREAS))
     # Revenue lost = hourly bill rate × these hours × working days late (flow-artifact §10).
     billable_hours_per_day: float = Field(8.0, gt=0, le=24)
     # A joined or abandoned demand leaves the lists and the overview this many days after it finished.
