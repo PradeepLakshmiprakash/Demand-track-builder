@@ -634,3 +634,18 @@ sheet built from the account's demands as they are, most requisitions one step f
 and one row that belongs to no demand; its second tab says what each row should do. Uploading it is an
 ordinary import. `python -m seed.flavors` adds sample demands so every workflow step has one, and gives
 seeded demands a dated history; it adds to the data and can be run again safely.
+
+**D102. Change history (audit trail).** Every change to a demand, a person or their access, the
+account's settings, a rate, a business unit or an interviewer profile is recorded: who, when, and each
+field's value before and after (`audit_log`). It is written by a listener on the database session, in
+the same transaction as the change, so no screen or job can change a record without it; changes made
+by jobs and scripts are recorded as "System". Rows are never edited. The Administrator and the Lead
+admin read it on *Change history*; rate fields are hidden from roles that don't see rates.
+
+**D103. Form posts from another site are refused.** A post, put, patch or delete whose browser says it
+comes from another site (Origin, or Sec-Fetch-Site: cross-site) gets 403. Calls under /api/ carry their
+own key and are left to that check.
+
+**D104. A much shorter sheet is questioned.** A BCM sheet with under 60% of the last sheet's rows (when
+the last had at least 8) is not imported until the uploader confirms it, since a filtered sheet would
+flag the missing requisitions as removed.

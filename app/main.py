@@ -4,7 +4,7 @@ import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -20,6 +20,7 @@ from app.routers import (
     account_settings,
     accounts,
     approvals,
+    audit,
     candidates,
     cron,
     escalations,
@@ -61,6 +62,7 @@ ROUTERS = [
     accounts.router,
     margin_calculator.router,
     requests.router,
+    audit.router,
     cron.router,
 ]
 
@@ -105,10 +107,33 @@ def _demo_gate(app: FastAPI, password: str) -> None:
         return await call_next(request)
 
 
+UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _same_site_only(app: FastAPI) -> None:
+    """Refuse a form post that another website sent a signed-in browser to make (cross-site request
+    forgery). Browsers say where a post comes from; one that comes from elsewhere is turned away. Calls
+    under /api/ carry their own key instead of a browser session, so they are left to that check."""
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        if request.method in UNSAFE and not request.url.path.startswith("/api/"):
+            origin = request.headers.get("origin", "")
+            foreign = (
+                bool(origin)
+                and origin != "null"
+                and urlsplit(origin).netloc != request.headers.get("host", "")
+            )
+            if foreign or origin == "null" or request.headers.get("sec-fetch-site", "") == "cross-site":
+                return Response("This request came from another site and was refused.", status_code=403)
+        return await call_next(request)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Demand Tracker", version="0.2.0", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    _same_site_only(app)
     if settings.demo_password:
         _demo_gate(app, settings.demo_password)
 

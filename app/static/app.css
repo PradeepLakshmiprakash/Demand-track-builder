@@ -741,3 +741,8 @@ fieldset[data-kind=special] .tick { display: flex; }
 /* sub-stage bars keep their own colour when picked, and the track shows against a hover */
 .ov .bar[data-key=sub] .track { height: 10px; }
 .ov .bar[data-key=sub].on .fill { outline: 2px solid var(--ink); outline-offset: 1px; }
+/* Change history */
+.audit-table { margin-top: 0; }
+.audit-changes { font-size: 13px; max-width: 560px; overflow-wrap: anywhere; }
+.audit-changes div + div { margin-top: 3px; }
+.audit-changes .was { color: var(--muted); text-decoration: line-through; }

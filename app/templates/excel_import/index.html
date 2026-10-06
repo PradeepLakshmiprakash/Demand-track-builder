@@ -19,7 +19,7 @@
       <label class="f">Sheet date<input type="date" name="sheet_date" value="{{ sheet_date }}"><span class="hint">Read from the file name when it has one, e.g. …9-Sep-2026.xlsx</span></label>
     </div>
     {% if needs_confirm %}
-      <label class="row" style="font-weight:500"><input type="checkbox" name="confirm_older" value="1" style="width:18px;height:18px;accent-color:var(--brand)"> Import this older sheet anyway</label>
+      <label class="row" style="font-weight:500"><input type="checkbox" name="confirm_older" value="1" style="width:18px;height:18px;accent-color:var(--brand)"> Import this sheet anyway</label>
     {% endif %}
     <div><button class="btn primary">Import and reconcile</button></div>
   </form>

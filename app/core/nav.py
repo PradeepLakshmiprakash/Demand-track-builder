@@ -55,6 +55,7 @@ NAV: tuple[NavItem, ...] = (
         phase=8,
         ready=True,
     ),
+    NavItem("audit", "/audit", _same("Change history", ADM, AD), phase=8, ready=True),
     NavItem("users", "/users", _same("User access", ADM), ready=True),
     NavItem("settings", "/settings", _same("Account settings", ADM), ready=True),
     NavItem("rate_card", "/rate-card", _same("Rate card", ADM), phase=5, ready=True),

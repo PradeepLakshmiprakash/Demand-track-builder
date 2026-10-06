@@ -48,6 +48,7 @@ def test_administrator_menu_has_only_app_controls(client: Client) -> None:
     c = client.as_user("anil")
     assert [m.split("  ")[0] for m in menu(c)] == [
         "Requests",
+        "Change history",
         "User access",
         "Account settings",
         "Rate card",

@@ -362,7 +362,7 @@ def test_older_sheet_needs_confirmation(team: Client, db: Session) -> None:
     older = sample_sheet.build(sample_sheet.without("W3NX5A"))
     r = upload(team, older, TODAY - timedelta(days=3))
     assert r.status_code == 400 and "older than the latest import" in r.text  # type: ignore[attr-defined]
-    assert "Import this older sheet anyway" in r.text  # type: ignore[attr-defined]
+    assert "Import this sheet anyway" in r.text  # type: ignore[attr-defined]
     r = upload(team, older, TODAY - timedelta(days=3), confirm_older="1")
     assert r.status_code == 303  # type: ignore[attr-defined]
 

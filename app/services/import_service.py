@@ -24,8 +24,14 @@ MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", 
                                       "nov", "dec"], start=1)}  # fmt: skip
 
 
+# A sheet with fewer than this share of the last sheet's rows is questioned before it is imported.
+SHRINK_SHARE = 0.6
+SHRINK_MIN_ROWS = 8
+
+
 class SheetImportError(ValueError):
-    """Upload refused. `needs_confirm` means an older sheet the uploader may still confirm."""
+    """Upload refused. `needs_confirm` means the uploader may still confirm it (an older sheet, or one
+    much shorter than the last)."""
 
     def __init__(self, message: str, needs_confirm: bool = False) -> None:
         super().__init__(message)
@@ -83,6 +89,14 @@ def import_sheet(
             f"This sheet is dated {sheet_date:%d %b %Y}, older than the latest import "
             f"({latest.sheet_date:%d %b %Y}). Importing it would compare against newer data and could flag "
             "demands as dropped. Tick the box to import it anyway.",
+            needs_confirm=True,
+        )
+    shrunk = latest is not None and latest.row_count >= SHRINK_MIN_ROWS
+    if shrunk and latest and not confirm_older and len(parsed.rows) < latest.row_count * SHRINK_SHARE:
+        raise SheetImportError(
+            f"This sheet has {len(parsed.rows)} rows; the last one had {latest.row_count}. A filtered or "
+            "partial sheet would flag the missing requisitions as removed. If this really is the full "
+            "sheet, tick the box to import it anyway.",
             needs_confirm=True,
         )
 

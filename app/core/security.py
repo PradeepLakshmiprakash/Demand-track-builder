@@ -15,6 +15,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core import audit
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.enums import Role, Scope
@@ -129,7 +130,9 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> Actor:
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No users yet. Run the seed script.")
     raw_account = request.cookies.get(ACCOUNT_COOKIE, "")
-    return actor_from_user(db, user, int(raw_account) if raw_account.isdigit() else None)
+    actor = actor_from_user(db, user, int(raw_account) if raw_account.isdigit() else None)
+    audit.set_actor(db, actor.id, actor.name, actor.account_id)  # what this request changes is theirs
+    return actor
 
 
 def require_role(*roles: Role) -> Callable[..., Actor]:
