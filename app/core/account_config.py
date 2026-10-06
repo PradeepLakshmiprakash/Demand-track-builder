@@ -163,14 +163,14 @@ DEFAULT_REASONS: dict[str, list[str]] = {
 # off the practice names), for an account that hasn't set its own. Keys are lower case.
 DEFAULT_PRACTICE_STACKS: dict[str, tuple[str, ...]] = {
     "cca-fs": ("Front end and mobile", "Cloud and DevOps", "Data and integration", "Testing and QA",
-               "BA, delivery and architecture"),
+               "BA / delivery / architecture"),
     "dcx-fs": ("Salesforce", "Data and integration", "Front end and mobile"),
-    "dmn-fs": ("Guidewire", "Data and integration", "BA, delivery and architecture"),
+    "dmn-fs": ("Guidewire", "Data and integration", "BA / delivery / architecture"),
     "tes-fs": ("Testing and QA",),
-    "adm-fs": ("Data and integration", "Cloud and DevOps", "ServiceNow, Workday and SAP"),
+    "adm-fs": ("Data and integration", "Cloud and DevOps", "ServiceNow / Workday / SAP"),
     "cloud-java": ("Cloud and DevOps",),
     "cloud-mf": ("Cloud and DevOps",),
-    "cloud-apm": ("Cloud and DevOps", "ServiceNow, Workday and SAP"),
+    "cloud-apm": ("Cloud and DevOps", "ServiceNow / Workday / SAP"),
 }  # fmt: skip
 
 
