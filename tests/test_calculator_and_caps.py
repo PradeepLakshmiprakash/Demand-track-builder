@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.core import mail
-from app.models import BusinessUnit
+from app.models import Account, BusinessUnit
 from tests.conftest import Client, bu_id
 
 
@@ -38,7 +38,8 @@ def test_calculator_recommends_a_few_alternatives(db: Session) -> None:
     from app.services import rate_card_service as rc
 
     rows = rc.offerings(db, 1, Decimal("100"), Decimal("30"), day(2026, 9, 1))
-    out = rc.suggestions(rows, "Cloud-MF", "C1", Decimal("30"))
+    cfg = db.get_one(Account, 1).settings
+    out = rc.suggestions(rows, "Cloud-MF", "C1", Decimal("30"), cfg.shared_stacks)
     assert (
         len(out) <= 5
         and out[0].chosen
@@ -54,12 +55,33 @@ def test_calculator_recommends_a_few_alternatives(db: Session) -> None:
     }
     # Other practices are only those that take the same skills (cloud), at the same grade.
     other = [s for s in out if s.offering.practice != "Cloud-MF"]
-    assert other and all(s.offering.grade == "C1" and "cloud and DevOps" in s.where for s in other)
+    assert other and all(s.offering.grade == "C1" and "Cloud and DevOps" in s.where for s in other)
     assert {s.offering.practice for s in other} <= {"CCA-FS", "ADM-FS", "Cloud-Java", "Cloud-APM"}
     assert near.offering.fits and top.offering.margin_pct >= near.offering.margin_pct
-    assert rc.shared_skills("TES-FS", "DCX-FS") == [] and rc.shared_skills("tes-fs", "CCA-FS") == [
-        "testing and QA"
-    ]
+    assert cfg.shared_stacks("TES-FS", "DCX-FS") == []
+    assert cfg.shared_stacks("tes-fs", "CCA-FS") == ["Testing and QA"]
+
+
+def test_administrator_sets_each_practice_tech_stack(client: Client, db: Session) -> None:
+    anil = client.as_user("anil")
+    page = anil.get("/settings").text
+    assert "Practices and their tech stack" in page
+    assert 'value="Cloud and DevOps"' in page  # the starting guess
+    cfg = db.get_one(Account, 1).settings
+    form = {"practice": list(cfg.practices), "stacks": ["" for _ in cfg.practices]}
+    form["stacks"][cfg.practices.index("Cloud-MF")] = "Mainframe,  COBOL , mainframe"
+    form["stacks"][cfg.practices.index("TES-FS")] = "Selenium, cobol"
+    r = anil.post("/settings/practice-stacks", data=form)
+    assert r.status_code == 303 and "msg=Saved" in r.headers["location"]
+    db.expire_all()
+    cfg = db.get_one(Account, 1).settings
+    assert cfg.stacks_of("Cloud-MF") == ["Mainframe", "COBOL"]  # tidied, no repeats
+    assert cfg.shared_stacks("Cloud-MF", "TES-FS") == ["COBOL"]  # matched whatever the case
+    assert cfg.stacks_of("CCA-FS") == [] and cfg.shared_stacks("Cloud-MF", "Cloud-Java") == []
+    # The calculator now compares Cloud-MF with TES-FS, and no longer with the cloud practices.
+    page = client.as_user("kavya").get("/margin-calculator?bill_rate=100&practice=Cloud-MF&grade=C1").text
+    assert "Also takes COBOL" in page and "Cloud and DevOps" not in page
+    assert client.as_user("kavya").post("/settings/practice-stacks", data=form).status_code == 403
 
 
 def test_calculator_says_when_the_card_has_no_cost(client: Client, db: Session) -> None:

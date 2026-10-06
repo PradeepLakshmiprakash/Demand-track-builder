@@ -163,6 +163,26 @@ def update_status_mapping(db: Session, account_id: int, rows: list[dict[str, str
     db.commit()
 
 
+def update_practice_stacks(db: Session, account_id: int, stacks: dict[str, str]) -> None:
+    """The tech stack each practice takes: one comma-separated line per practice. An empty line means
+    the practice shares nothing with the others."""
+    acc = get_account(db, account_id)
+    cfg = acc.settings
+    out: dict[str, list[str]] = {}
+    for practice in cfg.practices:
+        seen: dict[str, str] = {}
+        for item in (stacks.get(practice) or "").split(","):
+            name = " ".join(item.split())[:60]
+            if name:
+                seen.setdefault(name.casefold(), name)
+        if len(seen) > 12:
+            raise SettingsError(f"{practice}: 12 tech stacks at most.")
+        out[practice] = list(seen.values())
+    cfg.practice_stacks = out
+    acc.settings = cfg
+    db.commit()
+
+
 def update_supply_channels(db: Session, account_id: int, rows: list[dict[str, str]]) -> None:
     try:
         channels = [

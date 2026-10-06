@@ -45,7 +45,11 @@ def calculator(
     today = account_today(db, account.id)
     rows = rate_card_service.offerings(db, account.id, bill, threshold, today) if bill else []
     pick = next((r for r in rows if r.practice == practice and r.grade == grade), None)
-    options = rate_card_service.suggestions(rows, practice, grade, threshold) if practice and grade else []
+    options = (
+        rate_card_service.suggestions(rows, practice, grade, threshold, cfg.shared_stacks)
+        if practice and grade
+        else []
+    )
     return render(
         request,
         "margin_calculator/index.html",

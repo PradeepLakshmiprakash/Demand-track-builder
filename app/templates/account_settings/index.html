@@ -107,6 +107,25 @@
   </form>
 </section>
 
+<section id="practice-stacks" class="panel">
+  <div class="panel-head"><div><h2>Practices and their tech stack</h2><div class="hint">The tech stack each practice takes, separated by commas. Two practices that share a tech stack can take the same person, so the margin calculator compares them. Use the same wording in each practice that shares one. Practices are added and removed under Lists above.</div></div></div>
+  <form method="post" action="/settings/practice-stacks">
+    <div class="tbl stacks">
+      <div class="tr th"><div>Practice</div><div>Tech stack</div><div>Shares a tech stack with</div></div>
+      {% for p in cfg.practices %}
+      <div class="tr">
+        <div><strong>{{ p }}</strong><input type="hidden" name="practice" value="{{ p }}"></div>
+        <input type="text" name="stacks" value="{{ cfg.stacks_of(p) | join(', ') }}" placeholder="e.g. Cloud and DevOps, Data and integration" aria-label="Tech stack of {{ p }}">
+        <div class="small muted">{% set ns = namespace(any=false) %}{% for q in cfg.practices if q != p and cfg.shared_stacks(p, q) %}{{ ', ' if ns.any }}{{ q }}{% set ns.any = true %}{% endfor %}{{ '—' if not ns.any }}</div>
+      </div>
+      {% else %}
+      <div class="empty">Add practices under Lists first.</div>
+      {% endfor %}
+    </div>
+    <div class="panel-body"><button class="btn primary">Save tech stacks</button></div>
+  </form>
+</section>
+
 <section id="supply-channels" class="panel">
   <div class="panel-head"><div><h2>Supply channels</h2><div class="hint">How the BCM sheet names each channel. Clear a label to remove a row.</div></div></div>
   <form method="post" action="/settings/supply-channels">

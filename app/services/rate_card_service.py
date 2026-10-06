@@ -11,6 +11,7 @@ that one the day before the new one starts.
 
 import csv
 import io
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -183,48 +184,11 @@ def offerings(db: Session, account_id: int, bill: Decimal, hold: Decimal, on: da
     return out
 
 
-# Which technical skills a practice takes, beyond the Java and mainframe work every practice does. Two
-# practices that share a skill can take the same person, at a different cost. A starting mapping, the one
-# Acquisition Central uses, read off the practice names; matching ignores case.
-SKILL_LABELS = {
-    "frontend": "front end and mobile",
-    "cloud": "cloud and DevOps",
-    "data": "data and integration",
-    "testing": "testing and QA",
-    "delivery": "BA, delivery and architecture",
-    "salesforce": "Salesforce",
-    "guidewire": "Guidewire",
-    "enterprise": "ServiceNow, Workday and SAP",
-}
-PRACTICE_SKILLS: dict[str, tuple[str, ...]] = {
-    "cca-fs": ("frontend", "cloud", "data", "testing", "delivery"),
-    "dcx-fs": ("salesforce", "data", "frontend"),
-    "dmn-fs": ("guidewire", "data", "delivery"),
-    "tes-fs": ("testing",),
-    "adm-fs": ("data", "cloud", "enterprise"),
-    "cloud-java": ("cloud",),
-    "cloud-mf": ("cloud",),
-    "cloud-apm": ("cloud", "enterprise"),
-    "digital-ot": ("frontend", "delivery"),
-    "digital-ui": ("frontend",),
-    "digital-bpm exstream": ("enterprise", "delivery"),
-    "dmn-mf": ("data",),
-    "dmn-apm": ("data", "cloud"),
-}
-
-
-def shared_skills(a: str, b: str) -> list[str]:
-    """The technical skills both practices take, as words; empty when they share none."""
-    mine = PRACTICE_SKILLS.get(a.casefold(), ())
-    theirs = PRACTICE_SKILLS.get(b.casefold(), ())
-    return [SKILL_LABELS[s] for s in mine if s in theirs]
-
-
 @dataclass
 class Suggestion:
     offering: Offering
     why: list[str]  # "Closest to the 30% margin", "Highest margin"…
-    where: str  # "your choice", "same practice", or the skills a related practice shares
+    where: str  # "your choice", "same practice", or the tech stack a related practice shares
     chosen: bool = False
 
 
@@ -236,10 +200,17 @@ def _closest(rows: list[Offering]) -> Offering | None:
     return max(rows, key=lambda r: r.margin_pct) if rows else None
 
 
-def suggestions(rows: list[Offering], practice: str, grade: str, threshold: Decimal) -> list[Suggestion]:
+def suggestions(
+    rows: list[Offering],
+    practice: str,
+    grade: str,
+    threshold: Decimal,
+    shared: Callable[[str, str], list[str]],
+) -> list[Suggestion]:
     """A short list beside the grade asked about: in the same practice, the grade closest to the margin
     and the one with the highest margin; and the same two among the practices that take the same
-    technical skills, at the same grade. Never more than five rows."""
+    tech stack, at the same grade. `shared(a, b)` gives the tech stacks two practices have in common (the
+    account's own mapping: AccountConfig.shared_stacks). Never more than five rows."""
     out: list[Suggestion] = []
 
     def add(o: Offering | None, why: str, where: str, chosen: bool = False) -> None:
@@ -258,14 +229,14 @@ def suggestions(rows: list[Offering], practice: str, grade: str, threshold: Deci
     add(_closest(mine), near, "Same practice")
     add(max(mine, key=lambda r: r.margin_pct) if mine else None, "Highest margin", "Same practice")
     related = [
-        r for r in rows if r.grade == grade and r.practice != practice and shared_skills(practice, r.practice)
+        r for r in rows if r.grade == grade and r.practice != practice and shared(practice, r.practice)
     ]
     for o, why in (
         (_closest(related), near),
         (max(related, key=lambda r: r.margin_pct, default=None), "Highest margin"),
     ):
         if o is not None:
-            add(o, why, "Also takes " + ", ".join(shared_skills(practice, o.practice)))
+            add(o, why, "Also takes " + ", ".join(shared(practice, o.practice)))
     return out
 
 

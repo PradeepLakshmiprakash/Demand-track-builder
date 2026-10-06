@@ -49,7 +49,7 @@
 
 {% if options %}
 <section class="panel">
-  <div class="panel-head"><div><h2>Recommendations</h2><div class="hint">At {{ bill | money(true) }} an hour: in {{ v.practice }}, the grade closest to the {{ '%g' % threshold }}% margin and the grade with the highest margin; and the same for {{ v.grade }} in the practices that take the same technical skills.</div></div></div>
+  <div class="panel-head"><div><h2>Recommendations</h2><div class="hint">At {{ bill | money(true) }} an hour: in {{ v.practice }}, the grade closest to the {{ '%g' % threshold }}% margin and the grade with the highest margin; and the same for {{ v.grade }} in the practices that share its tech stack{% if cfg.stacks_of(v.practice) %} ({{ cfg.stacks_of(v.practice) | join(', ') }}){% else %}. No tech stack is set for {{ v.practice }}, so no other practice is compared: the Administrator sets it under Account settings{% endif %}.</div></div></div>
   <div class="tbl plain">
     <div class="tr th calc rec"><div>Recommendation</div><div>Practice</div><div>Grade</div><div>Cost / h</div><div>Margin</div><div>Margin / h</div><div>An offer would go to</div></div>
     {% for s in options %}{% set r = s.offering %}

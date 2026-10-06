@@ -105,6 +105,17 @@ async def save_mapping(
     return _done("status-mapping", lambda: svc.update_status_mapping(db, actor.account_id, rows), db)
 
 
+@router.post("/settings/practice-stacks")
+async def save_practice_stacks(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    form = await request.form()
+    names = [str(v) for v in form.getlist("practice")]
+    lines = [str(v) for v in form.getlist("stacks")]
+    stacks = dict(zip(names, lines, strict=False))
+    return _done("practice-stacks", lambda: svc.update_practice_stacks(db, actor.account_id, stacks), db)
+
+
 @router.post("/settings/supply-channels")
 async def save_channels(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)

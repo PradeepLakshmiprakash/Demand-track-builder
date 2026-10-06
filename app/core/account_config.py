@@ -159,6 +159,21 @@ DEFAULT_REASONS: dict[str, list[str]] = {
 }
 
 
+# A starting guess at which tech stack each practice takes (the mapping Acquisition Central uses, read
+# off the practice names), for an account that hasn't set its own. Keys are lower case.
+DEFAULT_PRACTICE_STACKS: dict[str, tuple[str, ...]] = {
+    "cca-fs": ("Front end and mobile", "Cloud and DevOps", "Data and integration", "Testing and QA",
+               "BA, delivery and architecture"),
+    "dcx-fs": ("Salesforce", "Data and integration", "Front end and mobile"),
+    "dmn-fs": ("Guidewire", "Data and integration", "BA, delivery and architecture"),
+    "tes-fs": ("Testing and QA",),
+    "adm-fs": ("Data and integration", "Cloud and DevOps", "ServiceNow, Workday and SAP"),
+    "cloud-java": ("Cloud and DevOps",),
+    "cloud-mf": ("Cloud and DevOps",),
+    "cloud-apm": ("Cloud and DevOps", "ServiceNow, Workday and SAP"),
+}  # fmt: skip
+
+
 def _default_rules() -> dict[str, EscalationRule]:
     return {k: EscalationRule(responsible=r, severity=s, steps=t) for k, (r, s, t) in DEFAULT_RULES.items()}
 
@@ -212,6 +227,10 @@ class AccountConfig(BaseModel):
     work_modes: list[str] = ["Onsite", "Hybrid", "Remote"]
     categories: list[str] = ["Open", "Proactive"]
     supply_channels: list[SupplyChannel] = []
+    # The tech stack each practice takes, set by the Administrator (Account settings). Two practices
+    # that share a tech stack can take the same person; the margin calculator compares them. A practice
+    # the account hasn't listed here falls back to DEFAULT_PRACTICE_STACKS, if it is named there.
+    practice_stacks: dict[str, list[str]] = {}
     status_mapping: list[StatusMapping] = []
     escalation_owners: dict[str, str] = {"L1": "LOB delivery head", "L2": "Account leadership"}
     # Escalations (flow-artifact §9): the responsible person acts; everyone else is informed.
@@ -257,6 +276,19 @@ class AccountConfig(BaseModel):
         """The reasons offered when responding to this kind of escalation; "Other" always comes last."""
         own = self.rule_for(trigger).reasons or DEFAULT_REASONS[trigger]
         return [*(r for r in own if r != OTHER_REASON), OTHER_REASON]
+
+    def stacks_of(self, practice: str) -> list[str]:
+        """The tech stack this practice takes."""
+        want = practice.casefold()
+        for name, stacks in self.practice_stacks.items():
+            if name.casefold() == want:
+                return list(stacks)
+        return list(DEFAULT_PRACTICE_STACKS.get(want, ()))
+
+    def shared_stacks(self, a: str, b: str) -> list[str]:
+        """The tech stacks both practices take, in the first one's wording; empty when they share none."""
+        theirs = {s.casefold() for s in self.stacks_of(b)}
+        return [s for s in self.stacks_of(a) if s.casefold() in theirs]
 
     def grade_rank(self, grade: str) -> int:
         try:
