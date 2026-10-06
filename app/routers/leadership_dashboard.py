@@ -70,6 +70,61 @@ def overview_page(
     )
 
 
+def _flow_counts(db: Session, account_id: int) -> tuple[dict[str, Any], dict[str, int], dict[str, int]]:
+    """The overview's positions, counted per workflow step: how many are there, and their open escalations."""
+    o = loss_service.overview(
+        db, account_id, account_today(db, account_id), period_for(db, account_id, "", "", "")
+    )
+    data = _page_data(db, o)
+    counts: dict[str, int] = {}
+    escs: dict[str, int] = {}
+    for r in data["rows"]:
+        counts[r["sub"]] = counts.get(r["sub"], 0) + 1
+        if r["esc"]:
+            escs[r["sub"]] = escs.get(r["sub"], 0) + len(r["esc"])
+    return data, counts, escs
+
+
+@router.get("/overview/workflow", response_class=HTMLResponse)
+def workflow_page(
+    request: Request, motion: str = "", actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """The detailed workflow, on a page of its own: every step with who acts, what moves it on, where it
+    goes back to and which escalation fires there."""
+    data, counts, escs = _flow_counts(db, actor.account_id)
+    account = get_account(db, actor.account_id)
+    return render(
+        request,
+        "leadership_dashboard/workflow.html",
+        actor,
+        db,
+        wf={
+            "layout": data["layout"],
+            "counts": counts,
+            "esc": escs,
+            "detail": workflow_service.detail(account),
+            "still": motion == "off",
+        },
+        account=account,
+        hours=data["hours"],
+    )
+
+
+@router.get("/overview/workflow/classic", response_class=HTMLResponse)
+def workflow_classic_page(
+    request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """The workflow diagram as it was before the numbered one, kept to show."""
+    data, counts, escs = _flow_counts(db, actor.account_id)
+    return render(
+        request,
+        "leadership_dashboard/workflow_classic.html",
+        actor,
+        db,
+        wf={"layout": data["layout"], "counts": counts, "esc": escs},
+    )
+
+
 # What each main stage means, in plain words, under its name on the overview.
 MEANS = {
     MainStage.COVERAGE: (

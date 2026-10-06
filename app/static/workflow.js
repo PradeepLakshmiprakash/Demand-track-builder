@@ -1,18 +1,15 @@
-/* The workflow diagram: each main stage a container, each sub-stage a box, arrows in the order a demand
-   moves. wfDiagram(layout, {counts}) puts the number of demands on each box (account overview);
-   wfDiagram(layout, {current}) ticks the steps one demand has passed and fills in where it is now.
-   Open escalations ride on the box they belong to: {esc: {sub: n}} on the overview, {escalations: [...]}
-   for one demand.
-   The layout comes from workflow_service.layout(). */
+/* The workflow diagram: each main stage a column, each sub-stage a numbered step, arrows in the order a
+   demand moves, exceptions on a dashed branch beside the step they belong to.
+   wfDiagram(layout, {counts, esc}) puts the number of demands and open escalations on each step (account
+   overview); wfDiagram(layout, {current}) marks the steps one demand has passed and where it is now.
+   {detail} adds who acts, what happens, what moves it on, where it goes back to and which escalation
+   fires there (the detailed page). The layout comes from workflow_service.layout().
+   The diagram before this one is kept as workflow_classic.js. */
 (function () {
   // One blue, light to dark, while a demand is in progress; green once joined; grey if abandoned.
   var COL = ['#8EA6D5', '#3573C0', '#1C4076', '#43A063', '#A6ACB5'];
   var TINT = ['#EFF0F4', '#E9EDF3', '#DFE1EB', '#E7F6EB', '#F1F4F7'];
   var ON = ['#121A38', '#fff', '#fff', '#fff', '#171A22'];  // text that sits on each colour
-  var INK = '#171A22', MUTED = '#595E6A', WARN = '#C00036';
-  var BW = 150, BH = 40, TOP = 68, GAP = 64, EDGE = '#8A919C', DIM = '#646A75';
-  // container x, container width, main column x, problem column x (first stage only)
-  var GEO = [{ x: 10, w: 340, mx: 185, ex: 25 }, { x: 380, w: 210, mx: 410 }, { x: 620, w: 210, mx: 650 }, { x: 860, w: 210, mx: 890 }];
 
   function tint(hex, t) {  // mix towards white by t (0 = the colour itself)
     var n = parseInt(hex.slice(1), 16), ch = [n >> 16, (n >> 8) & 255, n & 255];
@@ -37,87 +34,102 @@
     return { stage: COL.slice(), sub: sub, order: order };
   };
 
-  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function lines(t) {
-    if (t.length <= 17) return [t];
-    var mid = t.length / 2, best = -1;
-    for (var i = 0; i < t.length; i++) if (t[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
-    return best < 0 ? [t] : [t.slice(0, best), t.slice(best + 1)];
-  }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   /* How to read the diagram, for an info mark beside its heading. */
   window.wfKey = function (single) {
-    return 'Solid boxes represent the standard path, read top to bottom within a stage and then left to right across stages. Dashed boxes represent exception states that a demand may enter at the corresponding step.'
-      + (single ? ' A tick marks a step already completed; the filled box marks the current step.' : ' The figure on each box is the number of demands currently at that step; select a box or a stage header to list them.')
+    return 'Numbered steps are the standard path, read top to bottom within a stage and then left to right across stages. A dashed red branch is an exception a demand may fall into at that step.'
+      + (single ? ' Green steps are completed, with the date reached where it is recorded; the outlined step is the current one; faded steps are still ahead.' : ' The figure on each step is the number of demands currently there; select a step or a stage header to list them.')
       + ' A warning badge shows the number of open escalations at that step.';
   };
 
   window.wfDiagram = function (layout, o) {
-    var cur = o.current, counts = o.counts, h = '', order = [], hangs = {}, SUBC = window.wfColours(layout).sub;
+    var cur = o.current, counts = o.counts, D = o.detail, SUBC = window.wfColours(layout).sub;
+    var order = [], hangs = {};
     layout.stages.forEach(function (c) {
       c.subs.forEach(function (b) { order.push(b); });
       c.problems.forEach(function (e) { hangs[e[0]] = c.subs[e[1]]; });
     });
     var left = cur && cur.stage === layout.abandoned.label;
     var reached = cur && !left ? order.indexOf(hangs[cur.sub] || cur.sub) : -1;
-    var rows = Math.max.apply(null, layout.stages.map(function (c) { return c.subs.length; }));
-    var H = TOP + rows * GAP + 2, AY = H + 26;  // container bottom, abandoned band top
+    var when = o.when || {}, skipped = o.skipped || [], pick = counts ? ' style="cursor:pointer"' : '';
 
-    function box(stage, sub, x, y, ci, problem) {
-      var n = counts ? (counts[sub] || 0) : 0, idx = order.indexOf(sub);
+    function who(k) { var w = D.who[k]; return w ? '<span class="wx-who' + (w[2] ? ' out' : '') + '"><i style="background:' + w[1] + '"></i>' + esc(w[0]) + '</span>' : ''; }
+    function more(sub) {
+      var d = D && D.steps[sub]; if (!d) return '';
+      return '<div class="wx-d">' + (d.who || []).map(who).join(' ')
+        + (d.does ? '<p>' + esc(d.does) + '</p>' : '')
+        + (d.next ? '<p class="wx-next">' + esc(d.next) + '</p>' : '')
+        + (d.back || []).map(function (l) { return '<div><span class="wx-back"><b>↩</b>' + esc(l) + '</span></div>'; }).join('')
+        + (d.trig || []).map(function (t) { return '<span class="wx-trig">⚠ ' + esc(t) + '</span>'; }).join('') + '</div>';
+    }
+    function step(stage, sub, ci, no, problem) {
+      var n = counts ? (counts[sub] || 0) : 0, idx = order.indexOf(sub), mine = SUBC[sub] || COL[ci];
       var now = cur && cur.sub === sub && cur.stage === stage;
-      var done = cur && !left && !problem && idx >= 0 && (idx < reached || (idx === reached && hangs[cur.sub]));
-      var dim = counts ? !n : (cur && !now && !done), sel = o.sel === sub;
-      var mine = SUBC[sub] || COL[ci];
-      var fill = now ? mine : (done ? TINT[ci] : '#fff'), ink = now ? inkOn(mine) : (dim ? DIM : INK);
-      var s = '<g class="wfbox" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '"' + (counts ? ' style="cursor:pointer"' : '') + '>';
-      s += '<rect x="' + x + '" y="' + y + '" width="' + BW + '" height="' + BH + '" rx="4" fill="' + fill + '" stroke="' + (sel || now ? INK : (problem ? WARN : EDGE)) + '" stroke-width="' + (sel || now ? 2 : 1) + '"' + (problem && !now ? ' stroke-dasharray="4 3"' : '') + '/>';
-      if (!now) s += '<rect x="' + x + '" y="' + y + '" width="5" height="' + BH + '" rx="2" fill="' + mine + '" opacity="' + (dim ? .45 : 1) + '"/>';
-      var ls = lines(sub), ty = y + (ls.length === 1 ? 24 : 17);
-      ls.forEach(function (l, k) { s += '<text x="' + (x + 13) + '" y="' + (ty + k * 13) + '" font-size="11" fill="' + ink + '"' + (now ? ' font-weight="700"' : '') + '>' + esc(l) + '</text>'; });
-      if (counts && n) s += '<circle cx="' + (x + BW - 16) + '" cy="' + (y + 20) + '" r="11" fill="' + mine + '" stroke="rgba(0,0,0,.18)" stroke-width="1"/><text x="' + (x + BW - 16) + '" y="' + (y + 24) + '" text-anchor="middle" font-size="11" font-weight="700" fill="' + inkOn(mine) + '">' + n + '</text>';
-      if (done) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="13" font-weight="700" fill="' + COL[ci] + '">✓</text>';
-      if (now) s += '<text x="' + (x + BW - 14) + '" y="' + (y + 25) + '" text-anchor="middle" font-size="12" fill="' + inkOn(mine) + '">●</text>';
+      var skip = cur && !problem && skipped.indexOf(sub) >= 0 && idx < reached;
+      var done = cur && !left && !problem && !skip && idx >= 0 && (idx < reached || (idx === reached && hangs[cur.sub]));
+      var cls = 'wx-step wfbox' + (problem ? ' ex' : ' main') + (o.sel === sub ? ' sel' : '');
+      if (counts) cls += n ? '' : ' zero';
+      if (cur) cls += now ? ' here' : done ? ' done' : (problem && when[sub] ? ' was' : ' later');
       var en = o.esc ? (o.esc[sub] || 0) : (now && o.escalations ? o.escalations.length : 0);
-      if (en) s += '<rect x="' + (x + BW - 40) + '" y="' + (y - 20) + '" width="40" height="16" rx="8" fill="' + WARN + '"/><text x="' + (x + BW - 20) + '" y="' + (y - 8.5) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">⚠ ' + en + '</text><title>' + en + ' open escalation' + (en === 1 ? '' : 's') + '</title>';
-      return s + '</g>';
+      var h = (problem ? '<div class="wx-exlink"><i></i>' + (D ? '<span>If it goes wrong</span>' : '') + '</div>' : '');
+      h += '<div class="' + cls + '" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '" style="--c:' + mine + ';--on:' + inkOn(mine) + '"' + pick + '>';
+      h += '<div class="wx-h"><span class="wx-num">' + no + '</span><b>' + esc(sub) + '</b>';
+      if (en) h += '<span class="wx-e" title="' + en + ' open escalation' + (en === 1 ? '' : 's') + '">⚠ ' + en + '</span>';
+      if (cur && now) h += '<span class="wx-here">Now here' + (when[sub] ? ' · since ' + esc(when[sub]) : '') + '</span>';
+      else if (cur && when[sub] && (done || problem)) h += '<span class="wx-when">' + (problem ? 'was here ' : '') + esc(when[sub]) + '</span>';
+      if (n) h += '<span class="wx-n">' + n + '</span>';
+      return h + '</div>' + more(sub) + '</div>';
     }
 
-    h += '<defs><marker id="wfa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="' + MUTED + '"/></marker></defs>';
+    var no = 0, h = '';
     layout.stages.forEach(function (c, ci) {
-      var g = GEO[ci], total = 0;
+      var total = 0, body = '';
       if (counts) c.subs.concat(c.problems.map(function (e) { return e[0]; })).forEach(function (b) { total += counts[b] || 0; });
-      var on = o.sel === c.label || (cur && cur.stage === c.label);
-      h += '<g class="wfstage" data-stage="' + esc(c.label) + '"' + (counts ? ' style="cursor:pointer"' : '') + '><rect x="' + g.x + '" y="10" width="' + g.w + '" height="' + (H - 10) + '" rx="6" fill="' + TINT[ci] + '" stroke="' + COL[ci] + '" stroke-width="' + (on ? 2.5 : 1) + '"/>';
-      h += '<rect x="' + g.x + '" y="10" width="' + g.w + '" height="32" rx="6" fill="' + COL[ci] + '"/><rect x="' + g.x + '" y="30" width="' + g.w + '" height="12" fill="' + COL[ci] + '"/>';
-      h += '<text x="' + (g.x + 12) + '" y="31" font-size="' + (c.label.length > 24 ? 11.5 : 12.5) + '" font-weight="700" fill="' + ON[ci] + '">' + esc(c.label) + '</text>';
-      if (counts) h += '<text x="' + (g.x + g.w - 12) + '" y="31" text-anchor="end" font-size="13" font-weight="700" fill="' + ON[ci] + '">' + total + '</text>';
-      h += '</g>';
       c.subs.forEach(function (b, k) {
-        var y = TOP + k * GAP;
-        if (k) h += '<line x1="' + (g.mx + BW / 2) + '" y1="' + (y - GAP + BH) + '" x2="' + (g.mx + BW / 2) + '" y2="' + (y - 2) + '" stroke="' + MUTED + '" stroke-width="1.3" marker-end="url(#wfa)"/>';
-        h += box(c.label, b, g.mx, y, ci, false);
+        if (k) body += '<div class="wx-arrow"><i></i></div>';
+        body += step(c.label, b, ci, ++no, false);
+        c.problems.forEach(function (e) { if (e[1] === k) body += step(c.label, e[0], ci, no + 'a', true); });
+        if (D && D.decision && D.decision.after === b) {
+          body += '<div class="wx-arrow"><i></i></div><div class="wx-dec"><div class="q">' + esc(D.decision.q) + '</div><div class="o"><b>Yes</b><span>' + esc(D.decision.yes) + '</span></div><div class="o"><b>No</b><span>' + esc(D.decision.no) + '</span></div></div>';
+        }
       });
-      c.problems.forEach(function (e) {
-        var y = TOP + e[1] * GAP;
-        h += '<line x1="' + g.mx + '" y1="' + (y + 20) + '" x2="' + (g.ex + BW + 2) + '" y2="' + (y + 20) + '" stroke="' + WARN + '" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#wfa)" marker-start="url(#wfa)"/>';
-        h += box(c.label, e[0], g.ex, y, ci, true);
-      });
-      if (ci < layout.stages.length - 1) {  // last step of this stage → first step of the next, as an elbow
-        var y1 = TOP + (c.subs.length - 1) * GAP + 20, xm = g.x + g.w + 15;
-        h += '<path d="M' + (g.mx + BW) + ' ' + y1 + 'H' + xm + 'V' + (TOP + 20) + 'H' + (GEO[ci + 1].mx - 2) + '" fill="none" stroke="' + MUTED + '" stroke-width="1.3" marker-end="url(#wfa)"/>';
-      }
+      var on = o.sel === c.label || (cur && cur.stage === c.label);
+      h += '<section class="wx-stage wfstage' + (on ? ' on' : '') + '" data-stage="' + esc(c.label) + '" style="--c:' + COL[ci] + ';--on:' + ON[ci] + ';--t:' + TINT[ci] + '"' + pick + '><header><span>' + esc(c.label) + '</span>' + (counts ? '<span>' + total + '</span>' : '') + '</header><div class="wx-body">' + body + '</div></section>';
     });
     var ab = layout.abandoned, abN = 0;
     if (counts) ab.subs.forEach(function (b) { abN += counts[b] || 0; });
-    h += '<line x1="540" y1="' + (H + 2) + '" x2="540" y2="' + (AY - 2) + '" stroke="' + MUTED + '" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#wfa)"/>';
-    h += '<g class="wfstage" data-stage="' + esc(ab.label) + '"' + (counts ? ' style="cursor:pointer"' : '') + '><rect x="10" y="' + AY + '" width="1060" height="64" rx="6" fill="' + TINT[4] + '" stroke="' + COL[4] + '" stroke-width="' + (o.sel === ab.label || left ? 2.5 : 1) + '"/><rect x="10" y="' + AY + '" width="150" height="64" rx="6" fill="' + COL[4] + '"/>';
-    h += '<text x="22" y="' + (AY + 28) + '" font-size="12.5" font-weight="700" fill="' + ON[4] + '">' + esc(ab.label) + (counts ? ' · ' + abN : '') + '</text><text x="22" y="' + (AY + 46) + '" font-size="10.5" fill="' + ON[4] + '">leaves the flow</text></g>';
-    ab.subs.forEach(function (b, k) { h += box(ab.label, b, 185 + k * 170, AY + 12, 4, false); });
-    h += '<text x="' + (185 + ab.subs.length * 170 + 5) + '" y="' + (AY + 36) + '" font-size="11.5" fill="' + MUTED + '">A demand can be cancelled or closed from any step above.</text>';
-    return '<svg viewBox="0 0 1080 ' + (AY + 74) + '" width="100%" role="img" aria-label="Workflow diagram" style="min-width:860px">' + h + '</svg>'
+    var band = '<div class="wx-band wfstage' + (o.sel === ab.label || left ? ' on' : '') + '" data-stage="' + esc(ab.label) + '"' + pick + '><div class="t">' + esc(ab.label) + (counts ? ' · ' + abN : '') + '<small>leaves the flow from any step</small></div><div class="c">'
+      + ab.subs.map(function (b) { return step(ab.label, b, 4, '–', false); }).join('') + '</div></div>';
+    var cls = 'wx' + (D ? ' detailed' : ' simple') + (cur ? ' demand' : '') + (o.still ? ' still' : '');
+    setTimeout(window.wfLinks, 0);
+    return '<div class="' + cls + '"><div class="wx-scroll"><div class="wx-flow">' + h + '<svg class="wx-links" aria-hidden="true"></svg></div></div>' + band + '</div>'
       + (cur ? '<div class="wf-esc">' + (o.escalations && o.escalations.length
         ? '<strong>Open escalations:</strong> ' + o.escalations.map(function (e) { return '<span>⚠ ' + esc(e.t) + ' · L' + e.l + (e.l === 2 ? ' overdue' : '') + '</span>'; }).join(' ')
         : 'No open escalations on this demand.') + '</div>' : '');
   };
+
+  /* The arrow from the last step of each stage into the first step of the next. Positions are measured,
+     so this runs after a diagram is put on the page and again when the page changes size. */
+  window.wfLinks = function () {
+    document.querySelectorAll('.wx-flow').forEach(function (flow, f) {
+      var svg = flow.querySelector('.wx-links'), o = flow.getBoundingClientRect(), cols = flow.querySelectorAll('.wx-stage'), h = '';
+      if (!o.width) return;
+      var moving = flow.closest('.wx').classList.contains('detailed') && !flow.closest('.wx').classList.contains('still');
+      for (var i = 0; i < cols.length - 1; i++) {
+        var m = cols[i].querySelectorAll('.wx-step.main'), a = m[m.length - 1].getBoundingClientRect(), b = cols[i + 1].querySelector('.wx-step.main').getBoundingClientRect();
+        var x1 = a.right - o.left, y1 = a.top - o.top + 21, x2 = b.left - o.left, y2 = b.top - o.top + 21, xm = cols[i].getBoundingClientRect().right - o.left + 28;
+        var up = y2 < y1 ? -1 : 1, r = Math.min(10, Math.abs(y2 - y1) / 2), id = 'wxl' + f + '-' + i;
+        var d = 'M' + x1 + ' ' + y1 + 'H' + (xm - r) + 'Q' + xm + ' ' + y1 + ' ' + xm + ' ' + (y1 + up * r) + 'V' + (y2 - up * r) + 'Q' + xm + ' ' + y2 + ' ' + (xm + r) + ' ' + y2 + 'H' + (x2 - 12);
+        h += '<path class="line" id="' + id + '" d="' + d + '" fill="none" stroke="#33373F" stroke-width="3"/>';
+        if (moving) h += '<circle r="5.5" fill="#F17817"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#' + id + '"/></animateMotion></circle>';
+        h += '<path d="M' + (x2 - 13) + ' ' + (y2 - 8) + 'L' + (x2 - 1) + ' ' + y2 + 'L' + (x2 - 13) + ' ' + (y2 + 8) + 'z" fill="#33373F"/>';
+      }
+      svg.innerHTML = h;
+    });
+  };
+  var again;
+  window.addEventListener('resize', function () { clearTimeout(again); again = setTimeout(window.wfLinks, 120); });
+  window.addEventListener('load', window.wfLinks);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(window.wfLinks);
 })();

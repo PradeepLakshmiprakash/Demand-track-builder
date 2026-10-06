@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Workflow · earlier diagram{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }} · kept as a backup</div>
+    <h1>Workflow · earlier diagram</h1>
+    <div class="lede">The diagram the Account overview showed before the numbered workflow. Kept for reference; the figures are today's.</div>
+  </div>
+  <div class="head-side"><a class="btn" href="/overview#workflow">Back to the overview</a></div>
+</div>
+<section class="panel panel-body"><div class="wf-wrap" id="wf-classic"></div></section>
+<script src="/static/workflow_classic.js?v={{ static_v }}"></script>
+<script>
+(function () {
+  var W = {{ wf | tojson }};
+  document.getElementById('wf-classic').innerHTML = wfDiagram(W.layout, { counts: W.counts, esc: W.esc });
+})();
+</script>
+{% endblock %}

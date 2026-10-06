@@ -221,7 +221,8 @@
     $('ov-flowlink').textContent = showFlow ? 'Hide workflow' : 'Show workflow';
     $('ov-flowlink').setAttribute('aria-expanded', showFlow ? 'true' : 'false');
     $('ov-flow').hidden = !showFlow;
-    if (showFlow) $('ov-flow').innerHTML = '<h2 style="margin-bottom:10px">Workflow' + tip('The end-to-end demand fulfilment process, showing every main stage and sub-stage. ' + wfKey(false)) + '</h2><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
+    if (showFlow) $('ov-flow').innerHTML = '<div class="wx-top"><h2>Workflow' + tip('The end-to-end demand fulfilment process, showing every main stage and sub-stage. ' + wfKey(false)) + '</h2><div class="wx-seg" role="group" aria-label="Level of detail"><span class="on">Simple</span><a href="/overview/workflow" target="_blank" rel="noopener" title="Opens the detailed workflow as a new page">Detailed ↗</a></div></div>'
+      + '<div class="wx-backup">Backup versions: <a href="/overview/workflow/classic" target="_blank" rel="noopener">Earlier workflow diagram ↗</a><a href="/overview/workflow?motion=off" target="_blank" rel="noopener">Detailed, without animation ↗</a></div><div class="wf-wrap">' + wfDiagram(L, { counts: counts, esc: em, sel: F.sub || F.stage }) + '</div>';
   }
 
   function draw() {

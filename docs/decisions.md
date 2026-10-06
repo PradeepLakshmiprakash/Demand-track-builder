@@ -617,3 +617,14 @@ nothing is not sent. Each special access ticked is its own request.
 
 **D99. Team and pod calculators** start with three lines; lines are added and removed with buttons.
 The account's margin cut-off is no longer shown at the top right of the calculator.
+
+**D100. Workflow, simple and detailed.** The workflow is numbered steps in stage columns: the normal
+path 1 to 11 with arrows, each exception on a dashed branch beside its step (2a, 3a…). *Simple* (steps,
+counts, open escalations) is what Show workflow opens on the Account overview and on a demand's page;
+for one demand, passed steps are green with the date reached, the current step is marked, later steps
+are faded. *Detailed* is a page of its own (`/overview/workflow`), opened from the overview's toggle: it
+maps the whole flow document onto the steps (who acts, what happens, what moves it on, where it goes
+back to, the escalation that fires there, the escalation ladder, what runs throughout), with thresholds
+and responsible parties read from the account's settings. It is animated, and Play walks one demand
+along the path. A demand's page has Simple only. Kept as backups: the earlier diagram
+(`/overview/workflow/classic`) and Detailed without animation (`?motion=off`).

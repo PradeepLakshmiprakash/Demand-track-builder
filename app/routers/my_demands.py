@@ -15,7 +15,7 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.enums import DemandStatus, ResolutionAction, Role, Scope
 from app.core.security import Actor, current_user, require_screen
-from app.core.templating import render
+from app.core.templating import _account_tz, render
 from app.models import BusinessUnit, Demand, Escalation, User
 from app.services import (
     costing_service,
@@ -162,6 +162,7 @@ def demand_page(
         wf_layout=workflow_service.layout(),
         wf_at=workflow_service.position(demand),
         wf_next=workflow_service.next_step(demand),
+        wf_reached=workflow_service.reached(demand, stage_history(db, demand), _account_tz(db, actor)),
         wf_esc=[
             {"t": e.type_enum.label, "l": e.level}
             for e in db.scalars(

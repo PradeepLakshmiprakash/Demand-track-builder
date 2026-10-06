@@ -16,3 +16,4 @@ __pycache__
 .agents
 skills-lock.json
 .vercel
+app/static/mockup

@@ -61,3 +61,34 @@ def test_demand_page_has_its_workflow(client: Client) -> None:
     assert '"sub": "Offer approval pending"' in html and '"stage": "Client Onboarding In Progress"' in html
     assert "<strong>Next:</strong> The offer is approved" in html
     assert '"t": "Past start date"' in html  # its open escalation rides on the diagram
+
+
+def test_detailed_workflow_page(client: Client, db: Session) -> None:
+    c = client.as_user("sanjay")
+    html = c.get("/overview/workflow").text
+    assert "Play the journey" in html and "/static/workflow_page.js" in html and "window.WF" in html
+    m = re.search(r"window\.WF = (\{.*?\});</script>", html, re.S)
+    assert m
+    wf = json.loads(m.group(1))
+    assert set(wf["detail"]["steps"]) == {s.label for s in DemandStatus}
+    assert sum(wf["counts"].values()) == loss_service.overview(db, 1, date.today()).live
+    assert wf["detail"]["decision"]["yes"].startswith("Continue to 7") and not wf["still"]
+    # thresholds read from the account, not fixed text
+    assert any("after 3 working days" in t for t in wf["detail"]["steps"]["GTD approval pending"]["trig"])
+    assert "30%" in wf["detail"]["steps"]["Offer approval pending"]["does"]
+    # the backups: the same page without motion, and the diagram that came before
+    still = c.get("/overview/workflow?motion=off").text
+    assert '"still": true' in still and 'id="wx-play"' not in still
+    classic = c.get("/overview/workflow/classic")
+    assert classic.status_code == 200 and "/static/workflow_classic.js" in classic.text
+    assert client.as_user("priya").get("/overview/workflow").status_code == 403
+
+
+def test_steps_are_numbered_along_the_path(db: Session) -> None:
+    assert workflow_service.number(DemandStatus.DRAFT) == 1
+    assert workflow_service.number(DemandStatus.STAFFED) == 11
+
+
+def test_demand_workflow_carries_the_dates_reached(client: Client) -> None:
+    html = client.as_user("priya").get("/demands/DM-000121").text
+    assert "when: {" in html and "skipped: [" in html

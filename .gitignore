@@ -18,3 +18,4 @@ var/
 .agents/
 .claude/
 skills-lock.json
+app/static/mockup/

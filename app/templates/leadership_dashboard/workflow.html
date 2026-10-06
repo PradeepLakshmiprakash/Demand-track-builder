@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Workflow · detailed{% endblock %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }} · all BUs</div>
+    <h1>Workflow</h1>
+    <div class="lede">Every step a demand takes, from the day it is raised to the day the candidate joins: who acts, what moves it on, where it can go back to, and the escalation that fires when a step is missed. Figures are the positions in the Account overview today.</div>
+  </div>
+</div>
+<section class="panel panel-body">
+  <div class="wx-top">
+    <div class="wx-seg" role="group" aria-label="Level of detail"><a href="/overview#workflow">Simple</a><span class="on">Detailed</span></div>
+    {% if not wf.still %}<button type="button" class="wx-play" id="wx-play">▶ Play the journey</button><button type="button" class="wx-play ghost" id="wx-stop" hidden>Stop</button>{% endif %}
+    <div class="wx-keyrow">Who acts:
+      {% for k, w in wf.detail.who.items() if k != 'client' %}<span class="wx-who {{ 'out' if w[2] }}"><i style="background:{{ w[1] }}"></i>{{ 'Outside the app' if w[2] else w[0] }}</span>{% endfor %}
+      <span class="wx-trig" style="margin:0">⚠ Escalation trigger</span>
+    </div>
+  </div>
+  <div class="wx-backup">Backup versions: <a href="/overview/workflow/classic" target="_blank" rel="noopener">Earlier workflow diagram ↗</a>{% if wf.still %}<a href="/overview/workflow">Detailed, with animation</a>{% else %}<a href="/overview/workflow?motion=off" target="_blank" rel="noopener">Detailed, without animation ↗</a>{% endif %}</div>
+  <div class="wx-read">How to read it:
+    <span><svg width="34" height="12" aria-hidden="true"><path d="M0 6H24" stroke="#33373F" stroke-width="3"/><path d="M24 0L34 6L24 12z" fill="#33373F"/></svg>the normal path, steps in number order</span>
+    <span><svg width="34" height="12" aria-hidden="true"><path d="M0 6H24" stroke="#C00036" stroke-width="2.5" stroke-dasharray="5 3"/><path d="M24 0L34 6L24 12z" fill="#C00036"/></svg>an exception a demand can fall into at that step</span>
+    <span><span class="wx-back"><b>↩</b>back to 5</span>where it returns to</span>
+  </div>
+  <div id="wx-root"></div>
+
+  <div class="wx-info"><div class="t">When a step is missed<small>the escalation ladder</small></div><div class="c">
+    <div><b>1 · A trigger fires</b>Each red tag above is a trigger that is switched on for this account. The escalation takes that rule's responsible person and severity. One open escalation per demand and trigger.</div>
+    <div><b>2 · Level 1</b>The responsible person is mailed what happened, the steps to take and the date to respond by, set by the severity. The demand owner and the Lead admin are copied.</div>
+    <div><b>3 · They respond</b>With a reason and an action: correct and resubmit · resubmit as is · ask for more time · revise the start date · close the demand · no further action once it has cleared.</div>
+    <div><b>4 · Level 2, if the date passes</b>Leadership and the business unit's delivery head are informed. The same person still has to act and is reminded once a day.</div>
+  </div></div>
+
+  <div class="wx-info all"><div class="t">Running throughout<small>at every step</small></div><div class="c">
+    <div><b>BCM sheet import</b>The GTD admin team uploads the full sheet. Rows are matched by requisition ID, a [DM-…] prefix, or one clear match. A row that is not in the app is escalated to the GTD admin team.</div>
+    <div><b>Sheet and panel</b>The sheet lags the panel. Panel records move a demand forward the day they are entered; a sheet stage further on always wins.</div>
+    <div><b>Revenue lost</b>From the requested start date, or the day after the leaver's last working day: bill rate × {{ hours }} billable hours × working days late, until the candidate joins.</div>
+    <div><b>Non-billable cost</b>Proactive, non-billable positions cost the account from their start date at the rate card cost, until the demand owner marks the position billable.</div>
+  </div></div>
+</section>
+<div class="wx-caption" id="wx-caption" hidden aria-live="polite"><div class="k" id="wx-cap-k"></div><div class="t" id="wx-cap-t"></div><div class="x" id="wx-cap-x"></div><div class="bar"><i id="wx-cap-bar"></i></div></div>
+<script>window.WF = {{ wf | tojson }};</script>
+<script src="/static/workflow.js?v={{ static_v }}"></script>
+<script src="/static/workflow_page.js?v={{ static_v }}"></script>
+{% endblock %}
