@@ -560,4 +560,4 @@ The sidebar's current page has a bright left edge.
 **D88. Colours.** The app uses the colour set of capgemini.com (its published design tokens): its
 blues for brand, buttons, links and the sidebar; its neutrals for backgrounds, borders and text; its
 red and orange for warnings and its green for "joined". Stage colours are three of its blues, light to
-dark, then green and grey; the workflow diagram and the rings share them. The typeface is unchanged.
+dark, then green and grey; the workflow diagram and the rings share them. The typeface is Ubuntu, as on their site.
