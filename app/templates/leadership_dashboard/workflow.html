@@ -11,7 +11,7 @@
 <section class="panel panel-body">
   <div class="wx-top">
     <div class="wx-seg" role="group" aria-label="Level of detail"><a href="/overview#workflow">Simple</a><span class="on">Detailed</span></div>
-    {% if not wf.still %}<button type="button" class="wx-play" id="wx-play">▶ Play the journey</button><button type="button" class="wx-play ghost" id="wx-stop" hidden>Stop</button>{% endif %}
+    {% if not wf.still %}<button type="button" class="wx-play" id="wx-play">▶ Play the journey</button><button type="button" class="wx-play ghost" id="wx-stop" hidden>Stop</button><div class="wx-seg wx-speed" id="wx-speed" role="group" aria-label="Playback speed"><button type="button" data-x="1" class="on" aria-pressed="true">1x</button><button type="button" data-x="2" aria-pressed="false">2x</button></div>{% endif %}
     <div class="wx-keyrow">Who acts:
       {% for k, w in wf.detail.who.items() if k != 'client' %}<span class="wx-who {{ 'out' if w[2] }}"><i style="background:{{ w[1] }}"></i>{{ 'Outside the app' if w[2] else w[0] }}</span>{% endfor %}
       <span class="wx-trig" style="margin:0">⚠ Escalation trigger</span>
@@ -39,7 +39,7 @@
     <div><b>Non-billable cost</b>Proactive, non-billable positions cost the account from their start date at the rate card cost, until the demand owner marks the position billable.</div>
   </div></div>
 </section>
-<div class="wx-caption" id="wx-caption" hidden aria-live="polite"><div class="k" id="wx-cap-k"></div><div class="t" id="wx-cap-t"></div><div class="x" id="wx-cap-x"></div><div class="bar"><i id="wx-cap-bar"></i></div></div>
+<div class="wx-caption" id="wx-caption" hidden aria-live="polite"><div class="k"><span id="wx-cap-state"></span><span id="wx-cap-k"></span></div><div class="t" id="wx-cap-t"></div><div class="x" id="wx-cap-x"></div><div class="bar"><i id="wx-cap-bar"></i></div></div>
 <script>window.WF = {{ wf | tojson }};</script>
 <script src="/static/workflow.js?v={{ static_v }}"></script>
 <script src="/static/workflow_page.js?v={{ static_v }}"></script>

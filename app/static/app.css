@@ -727,3 +727,5 @@ fieldset[data-kind=special] .tick { display: flex; }
 .wx-caption .bar i { display: block; height: 100%; background: #F17817; width: 0; transition: width .5s; }
 @media (max-width: 1250px) { .wx-info > .c { grid-template-columns: 1fr 1fr; } }
 @media (prefers-reduced-motion: reduce) { .wx *, .wx *::before, .wx *::after { animation: none !important; transition: none !important; } }
+.wx-seg button { border: 0; background: none; font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; color: var(--muted); cursor: pointer; min-height: 0; }
+.wx-seg button.on { background: #121A38; color: #fff; font-weight: 700; }
