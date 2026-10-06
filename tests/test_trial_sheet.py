@@ -44,7 +44,7 @@ def test_trial_sheet_leaves_one_out_and_adds_one(db: Session) -> None:
     wb = openpyxl.load_workbook(io.BytesIO(sheet.data))
     notes = [row[2] for row in wb.worksheets[1].iter_rows(min_row=2, values_only=True)]
     assert sum("Left out of the sheet" in n for n in notes) == 1
-    assert sum("Not in the app" in n for n in notes) == 1
+    assert sum("Not in the app" in n for n in notes) == 3
     assert sheet.rows > 5
 
 

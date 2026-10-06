@@ -27,6 +27,7 @@ from app.models import (
     StageEvent,
     User,
 )
+from app.services import margin_service, rate_card_service
 from app.services.workflow_service import PATH, PROBLEMS
 from seed import data
 
@@ -43,6 +44,17 @@ FLAVORS: list[tuple[DemandStatus, str, str, str, str, str, int, str | None, dict
     (S.PANEL_SELECTED, "Priya N.", "PAYMENTS", "Senior React Developer Payments Portal", "DCX-FS", "C2", 20,
      "PN5L3C", {}),
     (S.CLOSED, "Rahul K.", "CARDS", "Cards Rewards Test Analyst", "TES-FS", "B1", 15, "CL0S3D", {}),
+    # two more with the offer made, so a sheet upload has a few positions to complete
+    (S.OFFER_IN_MARKET, "Neha T.", "BANKING", "Deposits API Test Engineer", "TES-FS", "C1", 12, "J01N3A", {}),
+    (S.OFFER_IN_MARKET, "Meera S.", "BANKING", "Lending Java Developer", "CCA-FS", "C1", 9, "J01N3B", {}),
+]  # fmt: skip
+
+# Offers whose margin is under the cut-off, so they wait for leadership: the bill rate is set this far
+# above the rate card cost. owner, BU, name, practice, grade, start in days, requisition, candidate, mark-up
+LEADERSHIP_OFFERS: list[tuple[str, str, str, str, str, int, str, str, float]] = [
+    ("Priya N.", "PAYMENTS", "Payments Fraud Engineer", "CCA-FS", "C1", -10, "LD0FR1", "Candidate L", 1.20),
+    ("Rahul K.", "CARDS", "Cards Loyalty Java Developer", "CCA-FS", "C2", 14, "LD0FR2", "Candidate M", 1.30),
+    ("Arjun D.", "DATA", "Data Quality Analyst", "DMN-FS", "B1", 21, "LD0FR3", "Candidate N", 1.25),
 ]  # fmt: skip
 
 
@@ -71,6 +83,14 @@ def _history(db: Session, demand: Demand, last: datetime, actor_id: int) -> None
         )
 
 
+def _exists(db: Session, account_id: int, name: str, req: str | None) -> bool:
+    named = (
+        select(func.count()).select_from(Demand).where(Demand.account_id == account_id, Demand.name == name)
+    )
+    used = select(func.count()).select_from(GtdSubmission).where(GtdSubmission.gtd_req_id == req)
+    return bool(db.scalar(named)) or bool(req and db.scalar(used))
+
+
 def add_flavors(
     db: Session, account_name: str = "Discover NA", now: datetime | None = None
 ) -> tuple[int, int]:
@@ -93,15 +113,7 @@ def add_flavors(
 
     added = 0
     for status, owner, bu, name, practice, grade, start_in, req, extra in FLAVORS:
-        if db.scalar(
-            select(func.count())
-            .select_from(Demand)
-            .where(Demand.account_id == account.id, Demand.name == name)
-        ):
-            continue
-        if req and db.scalar(
-            select(func.count()).select_from(GtdSubmission).where(GtdSubmission.gtd_req_id == req)
-        ):
+        if _exists(db, account.id, name, req):
             continue
         fields: dict[str, Any] = {**data.DEFAULTS, **extra}
         fields["client_rate"] = Decimal(str(fields["client_rate"]))
@@ -147,6 +159,26 @@ def add_flavors(
                     submitted_at=now - timedelta(days=2),
                 )
             )  # fmt: skip
+        added += 1
+    for owner, bu, name, practice, grade, start_in, req, cand, markup in LEADERSHIP_OFFERS:
+        if _exists(db, account.id, name, req):
+            continue
+        start = date.today() + timedelta(days=start_in)
+        rate = rate_card_service.lookup(db, account.id, grade=grade, practice=practice, on=date.today())
+        bill = (rate.cost_rate * Decimal(str(markup))).quantize(Decimal("1")) if rate else Decimal("80")
+        fields = {**data.DEFAULTS, "client_rate": bill, "client_interview_required": False}
+        d = Demand(
+            account_id=account.id, bu_id=bus[bu].id, owner_id=users[owner].id, name=name, practice=practice,
+            grade=grade, start_date=start, status=S.OFFER_IN_PROCESS.value,
+            submitted_at=now - timedelta(days=30), primary_skills=["Java"], **fields,
+        )  # fmt: skip
+        db.add(d)
+        db.flush()
+        _history(db, d, now - timedelta(days=1), users[owner].id)
+        db.add(GtdSubmission(demand_id=d.id, gtd_req_id=req, submitted_by=admin.id,
+                             submitted_at=now - timedelta(days=25)))  # fmt: skip
+        db.flush()
+        margin_service.ensure_offer(db, account, d, cand, "fte")  # priced now: below the cut-off
         added += 1
     db.commit()
     return added, backfilled

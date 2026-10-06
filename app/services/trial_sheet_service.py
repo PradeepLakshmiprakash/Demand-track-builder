@@ -2,7 +2,7 @@
 
 Every requisition the app knows gets a row, most of them one step further on than the app has them, so
 uploading the sheet moves demands along the workflow. One requisition is left out on purpose (it becomes
-"Removed from sheet" when the previous sheet had it) and one row belongs to no demand (it is escalated
+"Removed from sheet" when the previous sheet had it) and three rows belong to no demand (they are escalated
 as "in the sheet, not in the
 app"). The second worksheet says, row by row, what the upload should do. Candidate names are
 placeholders; nothing here comes from a real sheet.
@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.account_config import DP_FIELDS, AccountConfig
 from app.core.enums import DemandStatus
-from app.models import Account, Demand
+from app.models import Account, Demand, OfferApproval
 
 S = DemandStatus
 
@@ -39,6 +39,14 @@ ADVANCE: dict[DemandStatus, tuple[DemandStatus, str]] = {
     S.INCORRECT: (S.INCORRECT, "Still marked incorrect: nothing changes"),
     S.CANCELLED: (S.CANCELLED, "Still cancelled: nothing changes"),
 }
+
+
+# Requisitions somebody raised on GTD without a demand in the app.
+OUTSIDE = [
+    ("TR1AL7", "Trial: Treasury Reporting Analyst (raised outside the app)"),
+    ("TR1AL8", "Trial: Collections Platform Support Engineer (raised outside the app)"),
+    ("TR1AL9", "Trial: Merchant Onboarding Business Analyst (raised outside the app)"),
+]
 
 
 @dataclass
@@ -67,6 +75,7 @@ def build(db: Session, account_id: int, today: date) -> TrialSheet:
         if d.gtd_req_id and d.status_enum not in (S.CLOSED, S.DROPPED)
     ]
     sourcing = [d for d in demands if d.status_enum is S.COVERAGE_REQUIRED]
+    waiting = set(db.scalars(select(OfferApproval.demand_id).where(OfferApproval.decision.is_(None))))
     leave_out = sourcing[-1] if len(sourcing) > 1 else None
 
     rows: list[dict[str, object]] = []
@@ -90,6 +99,8 @@ def build(db: Session, account_id: int, today: date) -> TrialSheet:
                 if first
                 else (S.COVERAGE_REQUIRED, "Still sourcing: nothing changes")
             )
+        elif now is S.OFFER_IN_PROCESS and d.id in waiting:
+            to, why = S.OFFER_IN_PROCESS, "Its offer still waits for approval: nothing changes"
         else:
             to, why = ADVANCE.get(now, (S.COVERAGE_REQUIRED, "In the sheet as sourcing"))
         text = _text(cfg, to) or _text(cfg, S.COVERAGE_REQUIRED)
@@ -121,22 +132,21 @@ def build(db: Session, account_id: int, today: date) -> TrialSheet:
         notes.append((d.gtd_req_id or "", d.name, f"{now.label} → {why}"))
     outside = _text(cfg, S.COVERAGE_REQUIRED)
     if outside:
-        rows.append(
-            {
-                "originator": "Someone outside the app",
-                "req_id": "TR1AL9",
-                "demand_request_name": "Trial row raised outside the app",
-                "practice": cfg.practices[0] if cfg.practices else blank,
-                "grade": cfg.grades[0] if cfg.grades else blank,
-                "region": blank,
-                "start_date": datetime.combine(today + timedelta(days=30), datetime.min.time()),
-                "status": outside[0],
-                "status_group": outside[1] or blank,
-            }
-        )
-        notes.append(
-            ("TR1AL9", "Trial row raised outside the app", "Not in the app: escalated to the GTD admin team")
-        )
+        for k, (req, name) in enumerate(OUTSIDE):
+            rows.append(
+                {
+                    "originator": "Raised outside the app",
+                    "req_id": req,
+                    "demand_request_name": name,
+                    "practice": cfg.practices[k % len(cfg.practices)] if cfg.practices else blank,
+                    "grade": cfg.grades[k % len(cfg.grades)] if cfg.grades else blank,
+                    "region": blank,
+                    "start_date": datetime.combine(today + timedelta(days=30 + 7 * k), datetime.min.time()),
+                    "status": outside[0],
+                    "status_group": outside[1] or blank,
+                }
+            )
+            notes.append((req, name, "Not in the app: escalated to the GTD admin team"))
 
     wb = openpyxl.Workbook()
     ws = wb.active
