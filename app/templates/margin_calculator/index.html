@@ -5,60 +5,68 @@
   <div>
     <div class="eyebrow">{{ actor.role.label }} · {{ account.name }}</div>
     <h1>Margin calculator</h1>
-    <div class="lede">Which practice and grade a client rate affords. It reads the rate card in use on {{ today | d }} and the margin the approvals use, so what it says is how an offer would really be routed. Nothing is saved.</div>
+    <div class="lede">The margin a client rate leaves for a practice and grade. It reads the rate card in use on {{ today | d }} and the {{ '%g' % threshold }}% margin the approvals use, so what it says is how an offer would really be routed. Nothing is saved.</div>
   </div>
-  <span class="chip {{ 'done' if hold == threshold else 'risk' }}">{% if hold == threshold %}Margin {{ '%g' % threshold }}%{% else %}Trying {{ '%g' % hold }}%, not the {{ '%g' % threshold }}% margin{% endif %}</span>
+  <span class="chip done">Account margin {{ '%g' % threshold }}%</span>
 </div>
 
 <section class="panel">
   <form method="get" class="panel-body stack">
     {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
     <div class="grid4">
-      <label class="f">The client pays, per hour ($)
+      <label class="f">Client rate, per hour ($)
         <input type="number" name="bill_rate" min="1" step="1" value="{{ v.bill_rate }}" required>
-        <span class="hint">What this position is worth to the client.</span>
+        <span class="hint">What the client pays for this position.</span>
       </label>
       <label class="f">Practice
-        <select name="practice"><option value="">Any practice: show me the best of each</option>{% for p in cfg.practices %}<option {{ 'selected' if v.practice == p }}>{{ p }}</option>{% endfor %}</select>
-        <span class="hint">{{ 'Grades around what this rate affords in this practice.' if v.practice else 'Pick one to see the grades around this rate.' }}</span>
+        <select name="practice" required><option value="">Choose…</option>{% for p in cfg.practices %}<option {{ 'selected' if v.practice == p }}>{{ p }}</option>{% endfor %}</select>
+        <span class="hint">The practice sets the cost of each grade.</span>
       </label>
-      <label class="f">Margin to hold (%)
-        <input type="number" name="hold" min="0" max="99" step="1" value="{{ v.hold }}">
-        <span class="hint">The account's margin is {{ '%g' % threshold }}%.{% if hold != threshold %} <a href="?bill_rate={{ v.bill_rate }}&practice={{ v.practice }}">Back to {{ '%g' % threshold }}%</a>{% endif %}</span>
+      <label class="f">Grade / designation
+        <select name="grade" required><option value="">Choose…</option>{% for g in cfg.grades %}<option {{ 'selected' if v.grade == g }}>{{ g }}</option>{% endfor %}</select>
+        <span class="hint">The grade you plan to put forward.</span>
       </label>
     </div>
-    <div><button class="btn primary">Work it out</button></div>
+    <div><button class="btn primary">Calculate margin</button></div>
   </form>
 </section>
 
-{% if bill and not error %}
+{% if bill and not error and (v.practice or v.grade) %}
 <section class="panel panel-body">
   {% if not has_card %}
-    <p class="calc-answer">The rate card has no costs yet, so nothing can be worked out. The Administrator sets them under Rate card.</p>
-  {% elif v.practice and pick %}
-    <p class="calc-answer">At {{ bill | money }} an hour, put forward <strong>{{ pick.grade }} in {{ pick.practice }}</strong>: it costs {{ pick.cost | money(true) }}/h and earns {{ '%.1f' % pick.margin_pct }}%. The most this position can cost at {{ '%g' % hold }}% is {{ ceiling | money(true) }}/h.</p>
-  {% elif v.practice %}
-    <p class="calc-answer">Nothing in <strong>{{ v.practice }}</strong> clears {{ '%g' % hold }}% at {{ bill | money }} an hour: its cheapest grade already costs more than the {{ ceiling | money(true) }}/h this rate affords. Try another practice, or leadership approves below the margin.</p>
+    <p class="calc-answer">The rate card has no costs yet, so the margin can't be worked out. The Administrator sets them under Rate card.</p>
   {% elif pick %}
-    <p class="calc-answer">At {{ bill | money }} an hour the most senior fit is <strong>{{ pick.grade }} in {{ pick.practice }}</strong>: {{ pick.cost | money(true) }}/h at {{ '%.1f' % pick.margin_pct }}%. The most this position can cost at {{ '%g' % hold }}% is {{ ceiling | money(true) }}/h. Below is the best each practice can do; choose a practice to see the grades around it.</p>
+    <div class="calc-result">
+      <div><div class="k">Margin</div><div class="v {{ 'low' if not pick.fits }}">{{ '%.1f' % pick.margin_pct }}%</div></div>
+      <div><div class="k">Margin per hour</div><div class="v">{{ (bill - pick.cost) | money(true) }}</div></div>
+      <div><div class="k">Cost per hour</div><div class="v">{{ pick.cost | money(true) }}</div></div>
+      <div><div class="k">An offer would go to</div><div class="v"><span class="chip {{ 'done' if pick.fits else 'risk' }}">{{ 'Demand owner' if pick.fits else 'Leadership' }}</span></div></div>
+    </div>
+    <p class="calc-answer" style="margin-top:14px">A <strong>{{ pick.grade }} in {{ pick.practice }}</strong> at {{ bill | money(true) }} an hour costs {{ pick.cost | money(true) }} an hour, leaving a margin of <strong>{{ '%.1f' % pick.margin_pct }}%</strong> ({{ (bill - pick.cost) | money(true) }} an hour).
+      {% if pick.fits %}That is at or above the {{ '%g' % threshold }}% margin, so the demand owner approves the offer.{% else %}That is below the {{ '%g' % threshold }}% margin, so leadership decides, with a reason. To reach {{ '%g' % threshold }}% at this client rate the cost can be at most {{ ceiling | money(true) }} an hour.{% endif %}</p>
+  {% elif v.practice and v.grade %}
+    <p class="calc-answer">The rate card has no cost for <strong>{{ v.grade }} in {{ v.practice }}</strong>, so its margin can't be worked out. Ask the Administrator to add it.</p>
+  {% elif v.practice %}
+    <p class="calc-answer">Choose a grade to see its margin. Below is every grade in <strong>{{ v.practice }}</strong> at {{ bill | money(true) }} an hour.</p>
   {% else %}
-    <p class="calc-answer">No practice clears {{ '%g' % hold }}% at {{ bill | money }} an hour: every grade costs more than the {{ ceiling | money(true) }}/h this rate affords. Leadership would have to approve below the margin.</p>
+    <p class="calc-answer">Choose a practice to see its margin. Below is <strong>{{ v.grade }}</strong> in every practice at {{ bill | money(true) }} an hour.</p>
   {% endif %}
 </section>
 
 {% if options %}
 <section class="panel">
-  <div class="panel-head"><div><h2>{{ ('Grades around this rate in ' ~ v.practice) if v.practice else 'The best each practice can do' }}</h2><div class="hint">Margin = (client rate − cost) ÷ client rate. An offer at or above {{ '%g' % threshold }}% goes to the demand owner; below it, to leadership.</div></div></div>
+  <div class="panel-head"><div><h2>{{ ('Margin by grade in ' ~ v.practice) if v.practice else ('Margin for ' ~ v.grade ~ ' by practice') }}</h2><div class="hint">At a client rate of {{ bill | money(true) }} an hour. Margin = (client rate − cost) ÷ client rate. At or above {{ '%g' % threshold }}% the demand owner approves; below it, leadership.</div></div></div>
   <div class="tbl plain">
     <div class="tr th calc"><div>Practice</div><div>Grade</div><div>Cost / h</div><div>Margin</div><div>Margin / h</div><div>An offer would go to</div></div>
     {% for r in options %}
-    <div class="tr calc {{ 'best' if pick and r.practice == pick.practice and r.grade == pick.grade }}">
-      <div>{% if v.practice %}{{ r.practice }}{% else %}<a href="?bill_rate={{ v.bill_rate }}&hold={{ v.hold }}&practice={{ r.practice | urlencode }}">{{ r.practice }}</a>{% endif %}</div>
-      <div><strong>{{ r.grade }}</strong>{% if pick and r.practice == pick.practice and r.grade == pick.grade %} <span class="chip done">put forward</span>{% endif %}</div>
+    {% set chosen = pick and r.practice == pick.practice and r.grade == pick.grade %}
+    <div class="tr calc {{ 'best' if chosen }}">
+      <div>{{ r.practice }}</div>
+      <div><strong>{{ r.grade }}</strong>{% if chosen %} <span class="chip blue">your choice</span>{% endif %}</div>
       <div>{{ r.cost | money(true) }}</div>
-      <div><strong class="{{ 'sev-high' if r.margin_pct < threshold }}">{{ '%.1f' % r.margin_pct }}%</strong>{% if not r.fits %} <span class="small muted">under {{ '%g' % hold }}%</span>{% endif %}</div>
+      <div><strong class="{{ 'sev-high' if not r.fits }}">{{ '%.1f' % r.margin_pct }}%</strong></div>
       <div>{{ (bill - r.cost) | money(true) }}</div>
-      <div><span class="chip {{ 'risk' if r.margin_pct < threshold else 'done' }}">{{ 'Leadership' if r.margin_pct < threshold else 'Demand owner' }}</span></div>
+      <div><span class="chip {{ 'done' if r.fits else 'risk' }}">{{ 'Demand owner' if r.fits else 'Leadership' }}</span></div>
     </div>
     {% endfor %}
   </div>

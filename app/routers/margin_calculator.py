@@ -1,7 +1,8 @@
-"""Rate calculator: "the client pays $100 an hour: which practice and grade can we put forward?"
+"""Margin calculator: "the client pays $100 an hour for a C2 in CCA-FS: what margin do we make?"
 
-The same idea as Acquisition Central's calculator. It reads the rate card and the margin threshold the
-approvals use, so what it says is how an offer would really be routed. Nothing is saved.
+Client rate, practice and grade in; the margin for that grade out, with the other grades of the practice
+beside it for comparison. It reads the rate card and the margin threshold the approvals use, so what it
+says is how an offer would really be routed. Nothing is saved.
 """
 
 from decimal import Decimal, InvalidOperation
@@ -30,40 +31,28 @@ def calculator(
     q = request.query_params
     threshold = Decimal(account.margin_threshold)
     practice = q.get("practice", "") if q.get("practice", "") in cfg.practices else ""
+    grade = q.get("grade", "") if q.get("grade", "") in cfg.grades else ""
     error = None
     bill: Decimal | None = None
-    hold = threshold
     try:
         bill = Decimal(q.get("bill_rate") or "100")
         if bill <= 0 or bill > 10000:
             raise InvalidOperation
     except InvalidOperation:
         bill, error = None, "Enter what the client pays per hour as a number above 0."
-    try:
-        if q.get("hold"):
-            hold = Decimal(q["hold"])
-            if hold < 0 or hold >= 100:
-                raise InvalidOperation
-    except InvalidOperation:
-        hold, error = threshold, "The margin to hold must be between 0 and 99."
 
     today = account_today(db, account.id)
     rank = cfg.grade_rank
-    rows = rate_card_service.offerings(db, account.id, bill, hold, today) if bill else []
-
-    def best_in(p: str) -> rate_card_service.Offering | None:
-        """The most senior grade this practice can afford at the margin held."""
-        fits = sorted((r for r in rows if r.practice == p and r.fits), key=lambda r: rank(r.grade))
-        return fits[-1] if fits else None
-
-    best = {p: best_in(p) for p in cfg.practices}
-    if practice:  # the grades around what the rate affords: the best one, with two either side
-        mine = sorted((r for r in rows if r.practice == practice), key=lambda r: rank(r.grade))
-        top = best[practice]
-        at = mine.index(top) if top is not None and top in mine else 0
-        options = mine[max(0, at - 2) : at + 3]
-    else:  # the best each practice can do, dearest first
-        options = sorted((b for b in best.values() if b), key=lambda r: (-r.cost, r.practice))
+    rows = rate_card_service.offerings(db, account.id, bill, threshold, today) if bill else []
+    # The grade asked about, then what to compare it with: the practice's other grades, or, with no
+    # practice chosen, the same grade in every practice.
+    pick = next((r for r in rows if r.practice == practice and r.grade == grade), None)
+    if practice:
+        options = sorted((r for r in rows if r.practice == practice), key=lambda r: rank(r.grade))
+    elif grade:
+        options = sorted((r for r in rows if r.grade == grade), key=lambda r: (-r.margin_pct, r.practice))
+    else:
+        options = []
     return render(
         request,
         "margin_calculator/index.html",
@@ -71,13 +60,12 @@ def calculator(
         db,
         cfg=cfg,
         account=account,
-        v={"practice": practice, "bill_rate": q.get("bill_rate", "100"), "hold": f"{hold:g}"},
+        v={"practice": practice, "grade": grade, "bill_rate": q.get("bill_rate", "100")},
         bill=bill,
-        hold=hold,
         threshold=threshold,
-        ceiling=rate_card_service.ceiling(bill, hold) if bill else None,
+        ceiling=rate_card_service.ceiling(bill, threshold) if bill else None,
         options=options,
-        pick=best.get(practice) if practice else (options[0] if options else None),
+        pick=pick,
         has_card=bool(rows),
         today=today,
         error=error,

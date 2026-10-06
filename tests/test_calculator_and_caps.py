@@ -15,24 +15,34 @@ def clear_outbox() -> None:
     mail.sent.clear()
 
 
-def test_calculator_says_what_a_client_rate_affords(client: Client) -> None:
+def test_calculator_gives_the_margin_for_a_practice_and_grade(client: Client) -> None:
     c = client.as_user("kavya")
-    page = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS").text
-    # At $100 and 30%, the most a position can cost is $70: in CCA-FS that is C2 ($68, 32%).
-    assert "put forward <strong>C2 in CCA-FS</strong>" in page and "$68.00" in page and "32.0%" in page
-    assert "$70.00" in page and "Grades around this rate in CCA-FS" in page
-    assert "D1" in page and "Leadership" in page  # the next grade up costs $80: under the margin
-    best = c.get("/margin-calculator?bill_rate=100").text  # no practice: the best of each
-    assert "The best each practice can do" in best and "DCX-FS" in best and "Supply channel" not in best
-    assert "Work it out" in c.get("/margin-calculator").text  # opens on $100 with the account's margin
-    assert "number above 0" in c.get("/margin-calculator?bill_rate=abc").text
-    tried = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&hold=40").text
-    assert "Trying 40%, not the 30% margin" in tried and "put forward <strong>C1 in CCA-FS</strong>" in tried
+    page = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&grade=C2").text
+    # C2 in CCA-FS costs $68: at $100 that leaves 32%, above the 30% margin.
+    assert (
+        "<strong>C2 in CCA-FS</strong>" in page and "$68.00" in page and "32.0%" in page and "$32.00" in page
+    )
+    assert (
+        "the demand owner approves" in page and "Margin by grade in CCA-FS" in page and "your choice" in page
+    )
+    assert "Margin to hold" not in page and "Supply channel" not in page
+    low = c.get("/margin-calculator?bill_rate=100&practice=CCA-FS&grade=D1").text  # $80: 20%
+    assert "20.0%" in low and "leadership decides" in low and "at most $70.00" in low
+    assert "Calculate margin" in c.get("/margin-calculator").text  # opens with nothing worked out
+    assert "number above 0" in c.get("/margin-calculator?bill_rate=abc&practice=CCA-FS&grade=C2").text
+    by_practice = c.get("/margin-calculator?bill_rate=100&grade=C2").text
+    assert "Margin for C2 by practice" in by_practice and "DCX-FS" in by_practice
 
 
-def test_calculator_says_when_nothing_fits(client: Client) -> None:
-    page = client.as_user("sanjay").get("/margin-calculator?bill_rate=30&practice=CCA-FS").text
-    assert "Nothing in <strong>CCA-FS</strong> clears 30%" in page
+def test_calculator_says_when_the_card_has_no_cost(client: Client, db: Session) -> None:
+    from sqlalchemy import delete
+
+    from app.models import RateCard
+
+    db.execute(delete(RateCard).where(RateCard.practice == "TES-FS", RateCard.grade == "E1"))
+    db.commit()
+    page = client.as_user("sanjay").get("/margin-calculator?bill_rate=90&practice=TES-FS&grade=E1").text
+    assert "The rate card has no cost for <strong>E1 in TES-FS</strong>" in page
 
 
 @pytest.mark.parametrize("who", ["farah", "vikram", "anil"])
