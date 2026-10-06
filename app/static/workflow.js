@@ -39,7 +39,7 @@
   /* How to read the diagram, for an info mark beside its heading. */
   window.wfKey = function (single) {
     return 'Numbered steps are the standard path, read top to bottom within a stage and then left to right across stages. A dashed red branch is an exception a demand may fall into at that step.'
-      + (single ? ' Green steps are completed, with the date reached where it is recorded; the outlined step is the current one; faded steps are still ahead.' : ' The figure on each step is the number of demands currently there; select a step or a stage header to list them.')
+      + (single ? ' Steps marked ✓ Done in green are completed, with the date reached where it is recorded; the outlined step is the current one; faded steps are still ahead. An exception this demand went through is shown in red; the others are greyed out.' : ' The figure on each step is the number of demands currently there; select a step or a stage header to list them.')
       + ' A warning badge shows the number of open escalations at that step.';
   };
 
@@ -72,12 +72,14 @@
       if (counts) cls += n ? '' : ' zero';
       if (cur) cls += now ? ' here' : done ? ' done' : (problem && when[sub] ? ' was' : ' later');
       var en = o.esc ? (o.esc[sub] || 0) : (now && o.escalations ? o.escalations.length : 0);
-      var h = (problem ? '<div class="wx-exlink"><i></i>' + (D ? '<span>If it goes wrong</span>' : '') + '</div>' : '');
+      var off = cur && problem && !now && !when[sub];  // an exception this demand never fell into
+      var h = (problem ? '<div class="wx-exlink' + (off ? ' off' : '') + '"><i></i>' + (D ? '<span>If it goes wrong</span>' : '') + '</div>' : '');
       h += '<div class="' + cls + '" data-stage="' + esc(stage) + '" data-sub="' + esc(sub) + '" style="--c:' + mine + ';--on:' + inkOn(mine) + '"' + pick + '>';
       h += '<div class="wx-h"><span class="wx-num">' + no + '</span><b>' + esc(sub) + '</b>';
       if (en) h += '<span class="wx-e" title="' + en + ' open escalation' + (en === 1 ? '' : 's') + '">⚠ ' + en + '</span>';
       if (cur && now) h += '<span class="wx-here">Now here' + (when[sub] ? ' · since ' + esc(when[sub]) : '') + '</span>';
-      else if (cur && when[sub] && (done || problem)) h += '<span class="wx-when">' + (problem ? 'was here ' : '') + esc(when[sub]) + '</span>';
+      else if (done) h += '<span class="wx-tick">✓ Done' + (when[sub] ? ' · ' + esc(when[sub]) : '') + '</span>';
+      else if (cur && problem && when[sub]) h += '<span class="wx-when">was here ' + esc(when[sub]) + '</span>';
       if (n) h += '<span class="wx-n">' + n + '</span>';
       return h + '</div>' + more(sub) + '</div>';
     }
@@ -95,7 +97,8 @@
         }
       });
       var on = o.sel === c.label || (cur && cur.stage === c.label);
-      h += '<section class="wx-stage wfstage' + (on ? ' on' : '') + '" data-stage="' + esc(c.label) + '" style="--c:' + COL[ci] + ';--on:' + ON[ci] + ';--t:' + TINT[ci] + '"' + pick + '><header><span>' + esc(c.label) + '</span>' + (counts ? '<span>' + total + '</span>' : '') + '</header><div class="wx-body">' + body + '</div></section>';
+      var past = cur && !left && order.indexOf(c.subs[c.subs.length - 1]) < reached;  // the whole stage is behind this demand
+      h += '<section class="wx-stage wfstage' + (on ? ' on' : '') + '" data-stage="' + esc(c.label) + '" style="--c:' + COL[ci] + ';--on:' + ON[ci] + ';--t:' + TINT[ci] + '"' + pick + '><header><span>' + esc(c.label) + '</span>' + (counts ? '<span>' + total + '</span>' : '') + (past ? '<span class="wx-stagedone">✓ Done</span>' : '') + '</header><div class="wx-body">' + body + '</div></section>';
     });
     var ab = layout.abandoned, abN = 0;
     if (counts) ab.subs.forEach(function (b) { abN += counts[b] || 0; });

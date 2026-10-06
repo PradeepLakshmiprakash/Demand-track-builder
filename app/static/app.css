@@ -729,3 +729,12 @@ fieldset[data-kind=special] .tick { display: flex; }
 @media (prefers-reduced-motion: reduce) { .wx *, .wx *::before, .wx *::after { animation: none !important; transition: none !important; } }
 .wx-seg button { border: 0; background: none; font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; color: var(--muted); cursor: pointer; min-height: 0; }
 .wx-seg button.on { background: #121A38; color: #fff; font-weight: 700; }
+/* one demand: a tick on what is done; exceptions it never fell into are grey, only its own are red */
+.wx-tick { margin-left: auto; background: #43A063; color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.wx-stagedone { background: #fff; color: #1F7A3D; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.wx.demand .wx-step.done { border-color: #43A063; }
+.wx.demand .wx-step.done::before { background: #43A063; }
+.wx.demand .wx-step.ex.later { border-color: #A6ACB5; color: var(--muted); opacity: .6; }
+.wx.demand .wx-step.ex.later .wx-num { background: #A6ACB5; }
+.wx.demand .wx-exlink.off { border-color: #C7CCD3; }
+.wx.demand .wx-exlink.off::after { border-left-color: #C7CCD3; }
