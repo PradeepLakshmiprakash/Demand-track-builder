@@ -582,3 +582,31 @@ button.quick { font: inherit; font-size: 13px; cursor: pointer; min-height: 0; }
 fieldset[data-kind=special] { display: flex; flex-direction: column; gap: 8px; }
 fieldset[data-kind=special] .tick { display: flex; }
 @media (max-width: 900px) { .access-now { grid-template-columns: 1fr; } }
+
+/* Visual pass on the overview: room around the numbers, one badge style, a clearer table. */
+.ov { gap: 20px; }
+.ov-kpis { gap: 12px; }
+.kpi { padding: 16px 16px 14px; display: flex; flex-direction: column; min-height: 112px; }
+.kpi .v { font-size: 26px; line-height: 1.15; margin: 6px 0 10px; }
+.kpi .tag, .ov-toolbar .pill { font-size: 12px; font-weight: 600; line-height: 1.4; border-radius: 999px; padding: 3px 10px; border: 1px solid transparent; }
+.kpi .tag { align-self: flex-start; margin-top: auto; }
+.kpi.amber .tag, .ov-toolbar .pill.amber { background: #FECFAD; border-color: #FCB988; color: #743C0B; }
+.kpi.red .tag, .ov-toolbar .pill.red { background: #FFCACA; border-color: #FFA7A9; color: #9E0029; }
+.ov-main { align-items: stretch; }
+.minis.one .mini-body { gap: 36px; }
+.minis.one .mini-body svg { width: 200px; height: 200px; }
+.minis.one .mini-legend { max-width: 360px; }
+.mini-legend li { padding: 5px 8px; align-items: start; }
+.mini-legend .sw { margin-top: 5px; }
+.mini-legend .nm { white-space: normal; overflow: visible; line-height: 1.35; }
+.ov-table th { background: var(--ov-soft); padding: 8px 10px; color: var(--ink); white-space: nowrap; }
+.ov-table th:first-child { border-radius: 6px 0 0 0; }
+.ov-table th:last-child { border-radius: 0 6px 0 0; }
+.ov-table td { padding: 11px 10px; line-height: 1.4; }
+.ov-table td:first-child, .ov-table td:last-child { white-space: nowrap; }
+.ov-table td.small > div + div { margin-top: 3px; }
+.ov-table .wf-link { display: inline-block; border: 1px solid var(--brand); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; text-decoration: none; background: #fff; }
+.ov-table .wf-link:hover, .ov-table .wf-link:focus-visible { background: var(--brand); color: #fff; }
+.ov-table .nw { white-space: nowrap; }
+.ov-table .nw .small { font-weight: 500; }
+.ov-table td.small > div { white-space: nowrap; }
