@@ -46,6 +46,8 @@ class Loss:
     @property
     def filled(self) -> bool:
         """Joined, or has a DOJ on or before the start: not at risk any more."""
+        if self.demand.awaits_billing:
+            return False  # joined, but not billing yet: the seat is still losing revenue
         return self.demand.status_enum is DemandStatus.STAFFED or (
             self.doj is not None and self.demand.loss_from is not None and self.doj <= self.demand.loss_from
         )
@@ -66,6 +68,10 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
             continue
         j = doj.get(d.id)
         end = min(j, today) if j else today
+        if d.status_enum is DemandStatus.STAFFED and d.position_type == "Billable":
+            # Joining doesn't stop the loss; billing does. Until the owner confirms the first billable
+            # day, the seat keeps counting.
+            end = min(d.billable_from, today) if d.billable_from else today
         if end <= start:
             continue
         wd = working_days(start, end)
@@ -85,6 +91,15 @@ def losses(db: Session, account_id: int, today: date) -> list[Loss]:
 GROUPS: list[tuple[str, str, tuple[DemandStatus, ...]]] = [(m.value, m.label, m.subs) for m in MainStage]
 GROUP_OF = {s: s.main.value for s in DemandStatus}
 OPEN_GROUPS = (MainStage.COVERAGE.value, MainStage.SELECTION.value, MainStage.ALLOC_PENDING.value)
+BILLING_PENDING = "Joined, billing to be confirmed"  # a sub-stage of client onboarding, not a status
+
+
+def group_of(d: Demand) -> str:
+    """The main stage a demand counts under. A joined position whose billing isn't confirmed is still
+    in client onboarding."""
+    return MainStage.ALLOC_PENDING.value if d.awaits_billing else GROUP_OF[d.status_enum]
+
+
 # Still looking for someone: linked to GTD and sourcing, nobody in the panel yet.
 NEED_COVERAGE = (DemandStatus.LINKED, DemandStatus.COVERAGE_REQUIRED)
 # The four kinds of open position, in a fixed order (the order is the chart's colour order).
@@ -144,9 +159,13 @@ def overview(db: Session, account_id: int, today: date, period: Period | None = 
     shown = {d.id for d in demands}
     counts = {key: 0 for key, _, _ in GROUPS}
     by_sub: dict[DemandStatus, int] = {}
+    waiting = 0  # joined, billing not confirmed: still in client onboarding
     for d in demands:
-        counts[GROUP_OF[d.status_enum]] += 1
-        by_sub[d.status_enum] = by_sub.get(d.status_enum, 0) + 1
+        counts[group_of(d)] += 1
+        if d.awaits_billing:
+            waiting += 1
+        else:
+            by_sub[d.status_enum] = by_sub.get(d.status_enum, 0) + 1
     subs: dict[str, list[tuple[str, int]]] = {}
     for m in MainStage:
         merged: dict[str, int] = {}  # two statuses can share a sub-stage name (GTD creation pending)
@@ -154,10 +173,12 @@ def overview(db: Session, account_id: int, today: date, period: Period | None = 
             if by_sub.get(st):
                 merged[st.label] = merged.get(st.label, 0) + by_sub[st]
         subs[m.value] = list(merged.items())
+    if waiting:
+        subs[MainStage.ALLOC_PENDING.value].append((BILLING_PENDING, waiting))
 
     mix = dict.fromkeys(MIX, 0)
     for d in demands:
-        if GROUP_OF[d.status_enum] in OPEN_GROUPS:
+        if group_of(d) in OPEN_GROUPS:
             kind = "Replacement" if d.type == "Replacement" else "New"
             mix[f"{kind} · {'non-billable' if d.position_type == 'Non-billable' else 'billable'}"] += 1
 
@@ -169,7 +190,7 @@ def overview(db: Session, account_id: int, today: date, period: Period | None = 
         for d in demands:
             name = key_of(d) or "—"  # type: ignore[operator]
             s = acc.setdefault(name, Slice(name, by_group={k: 0 for k, _, _ in GROUPS}))
-            g = GROUP_OF[d.status_enum]
+            g = group_of(d)
             s.total += 1
             s.open += g in OPEN_GROUPS
             s.by_group[g] += 1
@@ -213,7 +234,7 @@ class NbRow:
 
 
 def non_billable_by_bu(db: Session, account_id: int) -> list[NbRow]:
-    """Per business unit: open non-billable (proactive) positions against the cap the lead admin set."""
+    """Per business unit: open non-billable (proactive) positions against the cap the team lead set."""
     counts: dict[int, dict[str, int]] = {}
     for d in db.scalars(
         select(Demand).where(

@@ -15,7 +15,7 @@ Who acts (§9.2, redesigned 1 Oct): each trigger has a rule in Account settings:
 The responsible person acts; everyone else is only informed.
 
 - L1: the escalation opens with the rule's severity. The responsible person is mailed what to do and
-  by when (working days per severity). The demand owner and the lead admin are copied.
+  by when (working days per severity). The demand owner and the GTD admin team lead are copied.
 - L2: the due date passed with no response. Leadership and the BU's delivery head are informed; the
   same responsible person still has to act and is reminded once a day until they do.
 - The responsible person closes it with a reason and an action. Asking for more time keeps its level.
@@ -262,24 +262,37 @@ def last_stage_change(db: Session, demand_ids: list[int]) -> dict[int, datetime]
 
 
 def current_doj(db: Session, account_id: int) -> dict[int, date | None]:
-    """Date of joining per demand: from the latest BCM sheet (the row of the demand's current
-    requisition) when it has one, otherwise the expected date the demand owner recorded."""
-    out: dict[int, date | None] = {
-        demand_id: doj
-        for demand_id, doj in db.execute(
-            select(Demand.id, Demand.expected_doj).where(
-                Demand.account_id == account_id, Demand.expected_doj.is_not(None)
-            )
+    """Date of joining per demand: the latest BCM sheet's (the row of the demand's current requisition)
+    when it has one, otherwise the date the demand owner recorded. A date the owner set after that
+    sheet was imported stands until a newer sheet says otherwise."""
+    out: dict[int, date | None] = {}
+    set_at: dict[int, datetime] = {}
+    for demand_id, doj, at in db.execute(
+        select(Demand.id, Demand.expected_doj, Demand.expected_doj_at).where(
+            Demand.account_id == account_id, Demand.expected_doj.is_not(None)
         )
-    }
-    latest = db.scalar(
-        select(ExcelImport.id)
+    ):
+        out[demand_id] = doj
+        if at is not None:
+            set_at[demand_id] = at
+    latest = db.execute(
+        select(ExcelImport.id, ExcelImport.imported_at)
         .where(ExcelImport.account_id == account_id)
         .order_by(ExcelImport.imported_at.desc(), ExcelImport.id.desc())
         .limit(1)
-    )
+    ).first()
     if latest is None:
         return out
+    rows = db.execute(
+        select(GtdSubmission.demand_id, ExcelRow.doj)
+        .join(ExcelRow, ExcelRow.submission_id == GtdSubmission.id)
+        .where(ExcelRow.import_id == latest.id)
+    ).all()
+    for demand_id, doj in rows:
+        owners_is_newer = demand_id in set_at and set_at[demand_id] > latest.imported_at
+        if (doj is not None and not owners_is_newer) or demand_id not in out:
+            out[demand_id] = doj
+    return out
     rows = db.execute(
         select(GtdSubmission.demand_id, ExcelRow.doj)
         .join(ExcelRow, ExcelRow.submission_id == GtdSubmission.id)
@@ -373,6 +386,14 @@ def is_cleared(db: Session, account: Account, esc: Escalation, demand: Demand | 
         return not _past_start(demand, current_doj(db, account.id).get(demand.id), today)
     if t is EscalationType.PANEL_SLA:
         return not overdue_panels(db, account, now).get(demand.id)
+    if t in (EscalationType.PREJOIN_OVERDUE, EscalationType.NOT_BILLING):
+        from app.services import onboarding_service
+
+        today = now.astimezone(_tz(account)).date()
+        if t is EscalationType.PREJOIN_OVERDUE:
+            return demand.id not in onboarding_service.overdue_items(db, account, today)
+        due = onboarding_service.not_billing_due(db, account, today).get(demand.id)
+        return due is None or bool(due.reason)
     return False  # rejection limit: a person decides what happens next
 
 
@@ -454,6 +475,37 @@ def open_triggered(db: Session, account: Account, now: datetime, result: SweepRe
             detail = f"Start {d.start_date:%d %b} · {s.label.lower()} · {when} · {late} days late"
             raise_(d, EscalationType.PAST_START, detail)
 
+    # From offer to first billable day (imported here: that module reads dates of joining from this one).
+    from app.services import onboarding_service
+
+    by_id = {d.id: d for d in demands}
+    for d in demands:
+        onboarding_service.ensure_checklist(db, account, d)
+    onboarding_service.ask_for_confirmation(db, account, today)
+    for demand_id, late_items in onboarding_service.overdue_items(db, account, today).items():
+        owner = by_id.get(demand_id)
+        if owner is None:
+            continue
+        item, due = late_items[0]
+        more = f" (+{len(late_items) - 1} more)" if len(late_items) > 1 else ""
+        esc = open_escalation(
+            db, account, owner, EscalationType.PREJOIN_OVERDUE, f"{item.label}: due {due:%d %b}{more}", now
+        )
+        if esc is not None:
+            if item.owner_kind != "owner":  # the item isn't the demand owner's to do
+                esc.responsible = Responsible.GTD_TEAM.value
+            result.opened.append(f"{owner.app_ref} {EscalationType.PREJOIN_OVERDUE.label.lower()}")
+    for demand_id, b in onboarding_service.not_billing_due(db, account, today).items():
+        joined = db.get(Demand, demand_id)
+        if joined is None or b.reason:  # a recorded reason answers it until billing starts
+            continue
+        when_joined = f"Joined {b.joined:%d %b}" if b.joined else "Joined"
+        raise_(
+            joined,
+            EscalationType.NOT_BILLING,
+            f"{when_joined}, {b.waiting_days} working days without client billing",
+        )
+
 
 def promote_overdue(db: Session, account: Account, now: datetime, result: SweepResult) -> None:
     """No response by the due date: it becomes L2. The responsible person keeps the action."""
@@ -499,6 +551,7 @@ def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepRes
     result = SweepResult()
     open_triggered(db, account, now, result)
     close_cleared_feedback(db, account, now)
+    close_answered(db, account, now)
     promote_overdue(db, account, now, result)
     db.commit()
     result.mails = notify_pending(db, account, now) + remind_overdue(db, account, now)
@@ -512,7 +565,7 @@ def sweep(db: Session, account_id: int, now: datetime | None = None) -> SweepRes
 class Audience:
     to: list[str]  # the responsible person or people: they act
     cc: list[str]  # informed only
-    names: list[str]  # for the screen: "Demand owner (Priya N.) acts · informed: Lead admin"
+    names: list[str]  # for the screen: "Demand owner (Priya N.) acts · informed: GTD admin team lead"
     acts: str = ""  # who acts, in words
 
 
@@ -538,7 +591,7 @@ def responsible_people(db: Session, account: Account, esc: Escalation, demand: D
             )
         )
         people = list(db.scalars(select(User).where(User.id.in_(set(ids)), User.active)))
-    # Nobody to act (owner left, interviewer not assigned): it falls to the lead admin.
+    # Nobody to act (owner left, interviewer not assigned): it falls to the GTD admin team lead.
     return people or _users(db, account.id, Role.ADMIN)
 
 
@@ -558,7 +611,7 @@ def audience(db: Session, account: Account, esc: Escalation, demand: Demand | No
         cc.append(owner.email)
     team_admin = [u.email for u in _users(db, account.id, Role.ADMIN) if u.email not in to]
     if team_admin:
-        informed.append("Lead admin")
+        informed.append("GTD admin team lead")
         cc += team_admin
     if esc.level == 2:
         if cfg.l2_inform_leadership:
@@ -857,6 +910,113 @@ def resolve(
                 )
     db.commit()
     return esc
+
+
+# Triggers nothing in the app can clear by itself: a reason settles them.
+SETTLED_BY_REASON = frozenset({EscalationType.REJECTION_LIMIT})
+BY_EDIT = "Cleared by a change to the demand"
+
+
+def respond(
+    db: Session,
+    actor: Actor,
+    esc_id: int,
+    *,
+    reason: str,
+    comment: str | None,
+    send_back: bool = False,
+    now: datetime | None = None,
+) -> Escalation:
+    """The responsible person says why. What they do about it, they do on the demand itself (edit it,
+    resubmit it, close it) or on the GTD queue; the escalation stays open, with its clock restarted,
+    until that has actually cleared the problem. It closes straight away when the problem is already
+    gone, when the trigger is one only a reason can settle, or when the GTD admin team sends the demand
+    back to its owner."""
+    now = now or datetime.now(UTC)
+    esc = db.get(Escalation, esc_id)
+    if esc is None or esc.account_id != actor.account_id:
+        raise EscalationError("Escalation not found.")
+    demand = db.get(Demand, esc.demand_id) if esc.demand_id else None
+    account = db.get_one(Account, actor.account_id)
+    allowed = allowed_actions(db, account, esc, demand) if esc.status == EscalationStatus.OPEN.value else []
+    if send_back and ResolutionAction.RETURN in allowed and actor.role in GTD_TEAM_ROLES:
+        return resolve(db, actor, esc_id, reason=reason, action="return", comment=comment, now=now)
+    if demand is None or ResolutionAction.NO_ACTION in allowed:
+        return resolve(db, actor, esc_id, reason=reason, action="no_action", comment=comment, now=now)
+    if esc.type_enum in SETTLED_BY_REASON:
+        resolve(  # validates who and why; the far date is replaced by the close below
+            db, actor, esc_id, reason=reason, action="extend", comment=comment, now=now,
+            extend_to=now.astimezone(_tz(account)).date() + timedelta(days=1),
+        )  # fmt: skip
+        _close(db, esc, actor.id, reason, ResolutionAction.NO_ACTION, (comment or "").strip() or None, now)
+        db.commit()
+        return esc
+    again = due_at(account, now, esc.severity).astimezone(_tz(account)).date()
+    today = now.astimezone(_tz(account)).date()
+    return resolve(
+        db, actor, esc_id, reason=reason, action="extend", comment=comment, now=now,
+        extend_to=max(again, today + timedelta(days=1)),
+    )  # fmt: skip
+
+
+def close_cleared_for(db: Session, demand: Demand, actor_id: int | None, now: datetime | None = None) -> int:
+    """After a change to a demand: close its open escalations whose reason has gone away."""
+    now = now or datetime.now(UTC)
+    account = db.get_one(Account, demand.account_id)
+    n = 0
+    for esc in db.scalars(
+        select(Escalation).where(
+            Escalation.demand_id == demand.id, Escalation.status == EscalationStatus.OPEN.value
+        )
+    ):
+        if is_cleared(db, account, esc, demand, now):
+            _close(db, esc, actor_id, BY_EDIT, ResolutionAction.NO_ACTION, None, now)
+            n += 1
+    return n
+
+
+def close_answered(db: Session, account: Account, now: datetime) -> int:
+    """An escalation someone has given a reason for closes by itself once the problem is gone."""
+    answered = select(EscalationEvent.escalation_id).where(
+        EscalationEvent.kind == EscalationEventKind.EXTENDED.value
+    )
+    n = 0
+    for esc in db.scalars(
+        select(Escalation).where(
+            Escalation.account_id == account.id,
+            Escalation.status == EscalationStatus.OPEN.value,
+            Escalation.demand_id.is_not(None),
+            Escalation.id.in_(answered),
+        )
+    ):
+        demand = db.get(Demand, esc.demand_id)
+        if demand is not None and is_cleared(db, account, esc, demand, now):
+            _close(db, esc, None, BY_EDIT, ResolutionAction.NO_ACTION, None, now)
+            n += 1
+    return n
+
+
+def close_link_escalations(db: Session, demand: Demand, actor_id: int | None) -> None:
+    """The owner corrected the demand and resubmitted it: its link problems are answered by that."""
+    now = datetime.now(UTC)
+    for esc in db.scalars(
+        select(Escalation).where(
+            Escalation.demand_id == demand.id, Escalation.status == EscalationStatus.OPEN.value
+        )
+    ):
+        if esc.type_enum in LINK_TYPES:
+            _close(db, esc, actor_id, "Corrected and resubmitted", ResolutionAction.RESUBMIT, None, now)
+
+
+def close_all_for(db: Session, demand: Demand, actor_id: int | None, reason: str) -> None:
+    """The demand was closed: nothing on it is waiting for anyone any more."""
+    now = datetime.now(UTC)
+    for esc in db.scalars(
+        select(Escalation).where(
+            Escalation.demand_id == demand.id, Escalation.status == EscalationStatus.OPEN.value
+        )
+    ):
+        _close(db, esc, actor_id, reason, ResolutionAction.CLOSE, "The demand was closed by its owner", now)
 
 
 def _mail_owner_returned(db: Session, demand: Demand, reason: str, comment: str | None) -> None:

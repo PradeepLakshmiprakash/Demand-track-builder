@@ -51,7 +51,8 @@ def calculator(
         bill, error = None, "Enter what the client pays per hour as a number above 0."
 
     today = account_today(db, account.id)
-    rows = rate_card_service.offerings(db, account.id, bill, threshold, today) if bill else []
+    region = _region(request, account.settings)
+    rows = rate_card_service.offerings(db, account.id, bill, threshold, today, region) if bill else []
     pick = next((r for r in rows if r.practice == practice and r.grade == grade), None)
     options = (
         rate_card_service.suggestions(rows, practice, grade, threshold, cfg.shared_stacks)
@@ -79,6 +80,12 @@ def calculator(
 
 
 ROWS_MAX = 40  # lines read from one form
+
+
+def _region(request: Request, cfg: AccountConfig) -> str | None:
+    """The region the page prices for: one from the account's list, or every region."""
+    raw = request.query_params.get("region", "")
+    return raw if raw in cfg.regions else None
 
 
 def _num(raw: str, lo: Decimal, hi: Decimal) -> Decimal | None:
@@ -141,7 +148,8 @@ def team_calculator(
     cfg = account.settings
     today = account_today(db, account.id)
     members, problems = _members(request, cfg, with_rate=True)
-    result = rate_card_service.team_contribution(db, account, members, today) if members else None
+    region = _region(request, account.settings)
+    result = rate_card_service.team_contribution(db, account, members, today, region) if members else None
     return render(
         request,
         "margin_calculator/team.html",
@@ -167,12 +175,15 @@ def pod_calculator(
     cfg = account.settings
     today = account_today(db, account.id)
     members, problems = _members(request, cfg, with_rate=False)
+    region = _region(request, cfg)
     raw_price = request.query_params.get("price", "").strip()
     price = _num(raw_price, Decimal(1), Decimal(100_000_000)) if raw_price else None
     if raw_price and price is None:
         problems.append("Enter the pod's price per month as a number above 0.")
     result = (
-        rate_card_service.pod_contribution(db, account, members, price, today) if members and price else None
+        rate_card_service.pod_contribution(db, account, members, price, today, region)
+        if members and price
+        else None
     )
     return render(
         request,

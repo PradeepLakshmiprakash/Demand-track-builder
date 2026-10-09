@@ -52,6 +52,11 @@ NEXT: dict[DemandStatus, str] = {
 }
 
 
+# Joined, but the owner hasn't confirmed the first billable day: the last step of client onboarding.
+# It is shown as a step, without being a demand status of its own.
+BILLING_PENDING = "Joined, billing to be confirmed"
+
+
 def layout() -> dict[str, Any]:
     """The boxes, by label, for static/workflow.js."""
     first = MainStage.COVERAGE
@@ -59,7 +64,8 @@ def layout() -> dict[str, Any]:
         "stages": [
             {
                 "label": stage.label,
-                "subs": [s.label for s in path],
+                "subs": [s.label for s in path]
+                + ([BILLING_PENDING] if stage is MainStage.ALLOC_PENDING else []),
                 "problems": [[s.label, row] for s, row in PROBLEMS] if stage is first else [],
             }
             for stage, path in PATH.items()
@@ -69,18 +75,25 @@ def layout() -> dict[str, Any]:
 
 
 def position(demand: Demand) -> dict[str, str]:
+    """Where a demand is. A joined position whose billing isn't confirmed is at the last step of client
+    onboarding."""
     s = demand.status_enum
+    if demand.awaits_billing:
+        return {"stage": MainStage.ALLOC_PENDING.label, "sub": BILLING_PENDING}
     return {"stage": s.main.label, "sub": s.label}
 
 
 def next_step(demand: Demand) -> str:
+    if demand.awaits_billing:
+        return "The demand owner confirms the first billable day."
     return NEXT[demand.status_enum]
 
 
 def number(status: DemandStatus) -> int:
     """The step's number on the normal path, counted across the stages (Draft is 1)."""
     order = [s for path in PATH.values() for s in path]
-    return order.index(status) + 1
+    n = order.index(status) + 1
+    return n + 1 if n > order.index(S.OFFER_IN_MARKET) + 1 else n  # the billing step sits before Joined
 
 
 def reached(demand: Demand, history: list[StageEvent], tz: str | None) -> dict[str, Any]:
@@ -96,6 +109,10 @@ def reached(demand: Demand, history: list[StageEvent], tz: str | None) -> dict[s
     skipped = (
         [] if demand.client_interview_required else [S.PANEL_SELECTED.label, S.PROFILES_WITH_CLIENT.label]
     )
+    if demand.position_type == "Billable" and not demand.is_proactive_nb and S.STAFFED.label in when:
+        when[BILLING_PENDING] = when.pop(S.STAFFED.label)  # the day the candidate joined
+        if demand.billable_from:
+            when[S.STAFFED.label] = f"{demand.billable_from:%d %b}"  # the day billing started
     return {"when": when, "skipped": skipped}
 
 
@@ -222,8 +239,30 @@ def detail(account: Account) -> dict[str, Any]:
             "with it.",
         },
     }
+    by_label: dict[str, dict[str, Any]] = {s.label: d for s, d in steps.items()}
+    ob = cfg.onboarding
+    by_label[S.OFFER_IN_MARKET.label]["does"] += (
+        f" A pre-joining checklist of {sum(c.enabled for c in ob.checklist)} items runs until the first day."
+    )
+    by_label[S.OFFER_IN_MARKET.label]["back"] = [f"Candidate will not join · {back5}"]
+    by_label[S.OFFER_IN_MARKET.label]["trig"] += trig(
+        EscalationType.PREJOIN_OVERDUE, "a checklist item passes its due date"
+    )
+    by_label[BILLING_PENDING] = {
+        "who": ["own"],
+        "does": "The candidate has joined. The owner confirms the first billable day: normally the joining "
+        "day, or a later one with the reason billing waited. Until then the position still counts as open "
+        "and revenue lost keeps counting.",
+        "next": "the owner confirms the first billable day.",
+        "trig": trig(EscalationType.NOT_BILLING, f"{days(ob.not_billing_after_days)} without confirmation"),
+    }
+    by_label[S.STAFFED.label] = {
+        "who": ["own"],
+        "does": "Joined and billing: the position is fulfilled. Shown for "
+        f"{cfg.archive_after_days} days, then archived.",
+    }
     return {
-        "steps": {s.label: d for s, d in steps.items()},
+        "steps": by_label,
         "decision": {
             "after": S.INTERVIEWING.label,
             "q": "Does this demand need a client interview?",

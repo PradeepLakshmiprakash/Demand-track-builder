@@ -10,9 +10,9 @@
     <div style="margin-top:10px"><span class="chip {{ d.status_enum.main.chip }}">{{ d.status_enum.main.label }}</span> <span class="chip {{ d.status_enum.chip }}">{{ d.status_enum.label }}</span></div>
   </div>
   <div class="row">
-    {% if can_change %}<a class="btn" href="/demands/{{ d.app_ref }}/edit">Edit</a>{% endif %}
+    {% if can_change and d.status == 'draft' %}<a class="btn" href="/demands/{{ d.app_ref }}/edit">Edit</a>{% endif %}
     {% if can_submit %}
-      <form method="post" action="/demands/{{ d.app_ref }}/submit"><button class="btn primary">{{ 'Resubmit to admin' if d.status == 'returned' else 'Submit to admin' }}</button></form>
+      <form method="post" action="/demands/{{ d.app_ref }}/submit"><button class="btn primary">{{ 'Submit to admin' if d.status == 'draft' else 'Resubmit to the GTD admin team' }}</button></form>
     {% endif %}
   </div>
 </div>
@@ -28,7 +28,7 @@
 (function () {
   var panel = document.getElementById('wf-panel'), link = document.getElementById('wf-toggle'), drawn = false;
   function show(on) {
-    if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }}, escalations: {{ wf_esc | tojson }}, when: {{ wf_reached.when | tojson }}, skipped: {{ wf_reached.skipped | tojson }} }); drawn = true; }
+    if (on && !drawn) { document.getElementById('wf-svg').innerHTML = wfDiagram({{ wf_layout | tojson }}, { current: {{ wf_at | tojson }}, escalations: {{ wf_esc | tojson }}, when: {{ wf_reached.when | tojson }}, skipped: {{ wf_reached.skipped | tojson }}, chips: {{ wf_chips | tojson }} }); drawn = true; }
     document.getElementById('wf-tip').dataset.tip = 'The end-to-end demand fulfilment process, with the current position of this demand. ' + wfKey(true);
     panel.hidden = !on; if (on) wfLinks();
     link.textContent = on ? 'Hide workflow' : 'Show workflow';
@@ -42,7 +42,7 @@
 <section class="panel panel-body respond-here" id="respond">
   <div class="eyebrow">{{ 'Escalation · more time given' if x.waiting else 'Needs your response' }} · L{{ x.e.level }}{{ ' · overdue' if x.e.level == 2 and not x.waiting }}</div>
   <h2 style="margin-top:2px">{{ x.e.type_enum.label }} <span class="small sev-{{ x.e.severity }}">{{ x.e.severity_enum.label }} severity</span></h2>
-  <div class="small" style="margin:6px 0 12px">{{ x.e.detail }}<br><strong>Steps:</strong> {{ x.steps }}<br><span class="muted">{{ 'Now due' if x.waiting else 'Was due' if x.e.level == 2 else 'Respond by' }} {{ x.e.due_at | at(tz, '%d %b %Y') }}.{% if can_change %} You can also <a href="/demands/{{ d.app_ref }}/edit">edit the demand</a>.{% endif %}{% if can_revise_dates %} The start date and last working day can be <a href="#dates">changed below</a>.{% endif %}{% if can_set_joining %} The <a href="#offers">joining date</a> is recorded below.{% endif %}</span></div>
+  <div class="small" style="margin:6px 0 12px">{{ x.e.detail }}<br><strong>Steps:</strong> {{ x.steps }}<br><span class="muted">{{ 'Now due' if x.waiting else 'Was due' if x.e.level == 2 else 'Respond by' }} {{ x.e.due_at | at(tz, '%d %b %Y') }}.{% if can_change %} Fix it with the pencil on the boxes below.{% endif %}{% if can_revise_dates %} The start date and last working day can be <a href="#dates">changed below</a>.{% endif %}{% if can_set_joining %} The <a href="#offers">joining date</a> is recorded below.{% endif %}</span></div>
   {% if x.waiting %}
   <div class="flash ok small" style="margin-bottom:10px"><strong>You asked for more time, until {{ x.e.due_at | at(tz, '%d %b %Y') }}.</strong>{% if x.waiting_note %} {{ x.waiting_note }}{% endif %} Nothing more is needed until then; the escalation stays open and reminders are paused.</div>
   <details>
@@ -60,10 +60,144 @@
 <div class="flash bad" role="alert"><strong>Sent back for correction</strong> by {{ returned.by }} on {{ returned.at | at(tz, '%d %b') }}: {{ returned.reason }}{% if returned.comment %}. {{ returned.comment }}{% endif %}.
   {% if can_change %}Correct it with Edit, then resubmit; it goes back to the GTD admin team for GTD.{% endif %}</div>
 {% endif %}
+{% if checklist %}
+<section class="panel panel-body" id="checklist" style="margin-bottom:16px">
+  <div class="row" style="justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap">
+    <div>
+      <h2 style="margin:0 0 2px">Pre-joining checklist</h2>
+      <div class="small muted">{% if checklist.joining %}Joining on <strong>{{ checklist.joining | d }}</strong>{% if checklist.days_to_joining %} · {{ checklist.days_to_joining }} working day{{ 's' if checklist.days_to_joining != 1 }} away{% endif %}. Each item is due a set number of working days before that.{% else %}No joining date yet: due dates appear once the expected date of joining is recorded.{% endif %}</div>
+    </div>
+    <div style="min-width:260px">
+      <div class="small" style="margin-bottom:4px"><strong>{{ checklist.done }} of {{ checklist.total }} done</strong>{% if checklist.overdue %} · <span class="late-t">{{ checklist.overdue }} overdue</span>{% endif %}{% if checklist.blocked %} · {{ checklist.blocked }} blocked{% endif %}</div>
+      <div class="ck-prog" role="img" aria-label="{{ checklist.percent }}% of the checklist done"><i style="width:{{ checklist.percent }}%"></i></div>
+    </div>
+  </div>
+  <div class="ov-scroll"><table class="ck-table">
+    <thead><tr><th>Item</th><th>Who</th><th>Due</th><th>Status</th><th>Note</th><th></th></tr></thead>
+    <tbody>
+    {% for r in checklist.rows %}
+      <tr class="{{ 'late' if r.late_days }}">
+        <td>{{ r.item.label }}</td>
+        <td>{% if r.outside %}{{ r.who }} <span class="chip ro">outside the app</span>{% else %}<strong>{{ r.who }}</strong><div class="small muted">{{ r.role }}</div>{% endif %}</td>
+        <td class="nw {{ 'late-t' if r.late_days }}">{{ (r.due | d) if r.due else '—' }}{% if r.late_days %}<div class="small">{{ r.late_days }} working day{{ 's' if r.late_days != 1 }} late</div>{% endif %}</td>
+        <td><span class="ck-st {{ r.item.status }}">{{ '✓ ' if r.item.status == 'done' }}{{ r.label }}</span></td>
+        <td class="small">{{ r.item.note or '' }}{% if r.item.updated_at %}<div class="muted">{{ r.item.updated_at | at(tz, '%d %b') }} · {{ 'recorded by ' if r.outside }}{{ r.updated_by or '—' }}</div>{% endif %}</td>
+        <td>
+          {% if r.can_update %}
+          <details class="ck-edit"><summary class="btn small {{ 'primary' if r.late_days }}">Update</summary>
+            <form method="post" action="/demands/{{ d.app_ref }}/checklist/{{ r.item.id }}" class="stack">
+              <select name="status" aria-label="Status of {{ r.item.label }}">
+                {% for v, t in (('done', 'Done'), ('in_progress', 'In progress'), ('blocked', 'Blocked'), ('not_started', 'Not started')) %}<option value="{{ v }}" {{ 'selected' if (r.item.status == v) or (v == 'done' and r.item.status == 'not_started') }}>{{ t }}</option>{% endfor %}
+              </select>
+              <input type="text" name="note" maxlength="300" value="{{ r.item.note or '' }}" placeholder="Note (needed when blocked)" aria-label="Note for {{ r.item.label }}">
+              <button class="btn small primary">Save</button>
+            </form>
+          </details>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
+{% if billing %}
+<section class="panel panel-body {{ 'respond-here' if billing.waiting }}" id="billing" style="margin-bottom:16px">
+  <div class="eyebrow">{{ 'Client onboarding · needs the owner\'s confirmation' if billing.waiting else 'Billing confirmed' }}</div>
+  <h2 style="margin:2px 0 10px">{{ 'Has client billing started?' if billing.waiting else 'Billing' }}</h2>
+  <div class="grid3">
+    <div><div class="small muted">Requested start</div><div class="bigval">{{ (d.start_date | d) if d.start_date else '—' }}</div></div>
+    <div><div class="small muted">Joined</div><div class="bigval">{{ (billing.joined | d) if billing.joined else '—' }}</div></div>
+    <div><div class="small muted">First billable day</div><div class="bigval {{ 'late-t' if billing.waiting }}">{{ (billing.started | d) if billing.started else 'Not confirmed' }}</div></div>
+  </div>
+  {% if billing.waiting %}
+  <div class="ck-gap">The first billable day is normally the joining day. Until you confirm it, this position stays in client onboarding and revenue lost keeps counting{% if billing.waiting_days %}: <strong>{{ billing.waiting_days }} working day{{ 's' if billing.waiting_days != 1 }} since joining</strong>{% if sees_rates and billing.amount is not none %}, {{ billing.amount | money }} at the bill rate{% endif %}{% endif %}.{% if billing.reason %} Reason on record: {{ billing.reason }}.{% endif %}</div>
+  {% elif billing.waiting_days %}
+  <div class="small muted" style="margin-top:10px">Billing started {{ billing.waiting_days }} working day{{ 's' if billing.waiting_days != 1 }} after joining{% if sees_rates and billing.amount is not none %} ({{ billing.amount | money }} counted as revenue lost in between){% endif %}.</div>
+  {% endif %}
+  {% if can_set_billing %}
+  <div class="row" style="gap:16px;margin-top:14px;align-items:flex-end;flex-wrap:wrap">
+    {% if billing.waiting and billing.joined and billing.joined <= today %}
+    <form method="post" action="/demands/{{ d.app_ref }}/billing">
+      <input type="hidden" name="billable_from" value="{{ billing.joined }}">
+      <button class="btn primary">Yes, from the joining day ({{ billing.joined | d }})</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/demands/{{ d.app_ref }}/billing" class="row" style="gap:10px;align-items:flex-end">
+      <label class="f">{{ 'It started on another day' if billing.waiting else 'First billable day' }}<input type="date" name="billable_from" value="{{ billing.started or today }}" {% if billing.joined %}min="{{ billing.joined }}"{% endif %} max="{{ today }}" required></label>
+      <button class="btn">{{ 'Confirm this day' if billing.waiting else 'Change the date' }}</button>
+    </form>
+    <form method="post" action="/demands/{{ d.app_ref }}/billing" class="row" style="gap:10px;align-items:flex-end">
+      <input type="hidden" name="waiting" value="1">
+      <label class="f" style="min-width:260px">{{ 'Not billing yet, because' if billing.waiting else 'Undo: not billing yet, because' }}<select name="reason" required>{% for x in ob.not_billing_reasons %}<option {{ 'selected' if billing.reason == x }}>{{ x }}</option>{% endfor %}</select></label>
+      <button class="btn">Save reason</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if can_record_exit %}
+<section class="panel panel-body" id="no-join" style="margin-bottom:16px">
+  <details {{ 'open' if request.query_params.get('err') and 'no-join' in (request.url.fragment or '') }}>
+    <summary class="wf-link" style="display:inline-block">The candidate will not join</summary>
+    <form method="post" action="/demands/{{ d.app_ref }}/no-join" class="stack" style="margin-top:12px;max-width:760px">
+      <div class="small muted">Record it when a candidate declines the offer, drops out, does not show up, or the offer is withdrawn. The demand goes back to Sourcing profiles, their open checklist items and pending offer approval are closed, and the GTD admin team is told. The requested start date does not move.</div>
+      <label class="f">Candidate<select name="candidate_id">{% for c in exit_candidates %}<option value="{{ c.id }}">{{ c.name }}{% if c.current_stage %} · {{ c.current_stage }}{% endif %}</option>{% else %}<option value="">Not named on this demand</option>{% endfor %}</select></label>
+      <fieldset class="f" style="border:0;padding:0;margin:0"><legend style="padding:0 0 6px;font-weight:500">What happened</legend>
+        <div class="ticks">{% for k, label in exit_kinds.items() %}<label class="tick"><input type="radio" name="kind" value="{{ k }}" required {{ 'checked' if loop.first }}> {{ label }}</label>{% endfor %}</div>
+      </fieldset>
+      <div class="grid2">
+        <label class="f">Reason<select name="reason" required>{% for x in ob.exit_reasons %}<option>{{ x }}</option>{% endfor %}</select></label>
+        <label class="f">Date<input type="date" name="on_date" value="{{ today }}" max="{{ today }}" required></label>
+      </div>
+      <div><button class="btn danger">Record and go back to sourcing</button></div>
+    </form>
+  </details>
+</section>
+{% endif %}
+
+{% if can_close %}
+<details class="close-demand" style="margin:-4px 0 14px">
+  <summary class="wf-link" style="display:inline-block">This position is no longer needed</summary>
+  <form method="post" action="/demands/{{ d.app_ref }}/close" class="row" style="gap:10px;align-items:flex-end;margin-top:10px;flex-wrap:wrap">
+    <label class="f" style="min-width:280px">Why is it being closed<select name="reason" required><option value="">Choose a reason</option>{% for x in close_reasons %}<option>{{ x }}</option>{% endfor %}</select></label>
+    <button class="btn danger">Close the demand</button>
+    <span class="small muted">Closing ends its escalations and its checklist. It can't be reopened; raise a new demand and link it as a re-raise.</span>
+  </form>
+</details>
+{% endif %}
+
+{% if exits %}
+<section class="panel panel-body" style="margin-bottom:16px">
+  <h2 style="margin:0 0 8px">Candidates who did not join</h2>
+  {% for x in exits %}
+  <div class="small" style="padding:6px 0;{{ 'border-top:1px solid var(--line)' if not loop.first }}"><strong>{{ x.on_date | d }} · {{ x.candidate_name }}</strong> · {{ exit_kinds[x.kind] }} · {{ x.reason }} <span class="muted">· recorded by {{ people.get(x.recorded_by, '—') }}</span></div>
+  {% endfor %}
+</section>
+{% endif %}
+
 <div class="split">
   <div class="stack">
-    <section class="panel panel-body">
-      <h2>Position</h2>
+    <section class="panel panel-body box-edit {{ 'editing' if editing == 'position' }}" id="position">
+      <h2>Position{% if can_change %} <button type="button" class="edit-ic" data-edit="position" aria-label="Edit position" title="Edit position">✎</button>{% endif %}</h2>
+      {% if can_change %}
+      <form method="post" action="/demands/{{ d.app_ref }}/part/position" class="inline-edit stack">
+        <label class="f">Demand request name<input type="text" name="name" value="{{ d.name }}" maxlength="200" required></label>
+        <div class="grid3">
+          <label class="f">Practice<select name="practice" required>{% for x in cfg.practices %}<option {{ 'selected' if x == d.practice }}>{{ x }}</option>{% endfor %}{% if d.practice and d.practice not in cfg.practices %}<option selected>{{ d.practice }}</option>{% endif %}</select></label>
+          <label class="f">Grade<select name="grade" required>{% for x in cfg.grades %}<option {{ 'selected' if x == d.grade }}>{{ x }}</option>{% endfor %}{% if d.grade and d.grade not in cfg.grades %}<option selected>{{ d.grade }}</option>{% endif %}</select></label>
+          <label class="f">Category<select name="category">{% for x in cfg.categories %}<option {{ 'selected' if x == d.category }}>{{ x }}</option>{% endfor %}</select></label>
+          <label class="f">Type<select name="type"><option {{ 'selected' if d.type == 'New' }}>New</option><option {{ 'selected' if d.type == 'Replacement' }}>Replacement</option></select></label>
+          <label class="f">Position<select name="position_type"><option {{ 'selected' if d.position_type == 'Billable' }}>Billable</option><option {{ 'selected' if d.position_type == 'Non-billable' }}>Non-billable</option></select></label>
+          <label class="f">Client interview<select name="client_interview_required"><option value="true" {{ 'selected' if d.client_interview_required }}>Required</option><option value="false" {{ 'selected' if not d.client_interview_required }}>Not required: the panel's decision is final</option></select></label>
+          <label class="f">Replaces (for a replacement)<input type="text" name="replaced_resource" value="{{ d.replaced_resource or '' }}" maxlength="120"></label>
+          <label class="f">Leaver's last working day<input type="date" name="lwd" value="{{ d.lwd or '' }}"></label>
+        </div>
+        <div class="row" style="gap:8px"><button class="btn primary small">Save</button><button type="button" class="btn small edit-cancel">Cancel</button></div>
+      </form>
+      {% endif %}
       <div class="facts">
         {{ field('Demand owner', d.owner.name ~ ' · ' ~ d.business_unit.name) }}
         {{ field('Practice', d.practice) }}{{ field('Grade', d.grade) }}{{ field('Category', d.category) }}
@@ -71,19 +205,64 @@
         {% if d.lwd %}{{ field('Last working day (leaver)', (d.lwd | d) ~ (' · %d days uncovered before the requested start' % d.uncovered_days if d.uncovered_days else '') ~ (' · loss counts from ' ~ (d.loss_from | d) if d.loss_from and d.loss_from != d.start_date else '')) }}{% endif %}
         {{ field('Position', d.position_type) }}{{ field('Name on GTD', d.gtd_name) }}
         {{ field('Client interview', 'Required' if d.client_interview_required else 'Not required: panel decision is final') }}
+        {% if replaces %}<div><div class="k">Re-raises</div><div class="v"><a href="/demands/{{ replaces.app_ref }}">{{ replaces.app_ref }}</a> · {{ statuses.get(replaces.status, replaces.status) }}{% if replaces.start_date %} · first asked for {{ replaces.start_date | d }}{% endif %}</div></div>{% endif %}
+        {% if replaced_by %}<div><div class="k">Re-raised as</div><div class="v"><a href="/demands/{{ replaced_by.app_ref }}">{{ replaced_by.app_ref }}</a></div></div>{% endif %}
       </div>
+      {% if can_link_replaced and (replaceable or replaces) and not replaced_by %}
+      <details style="margin-top:10px">
+        <summary class="wf-link" style="display:inline-block">{{ 'Change the demand this re-raises' if replaces else 'This re-raises an abandoned demand' }}</summary>
+        <form method="post" action="/demands/{{ d.app_ref }}/replaces" class="row" style="gap:10px;align-items:flex-end;margin-top:10px;flex-wrap:wrap">
+          <label class="f" style="min-width:320px">The earlier demand for this position<select name="replaces"><option value="">None</option>{% for x in replaceable %}<option value="{{ x.app_ref }}" {{ 'selected' if replaces and replaces.id == x.id }}>{{ x.app_ref }} · {{ x.name[:50] }} · {{ statuses.get(x.status, x.status) }}</option>{% endfor %}{% if replaces and replaces not in replaceable %}<option value="{{ replaces.app_ref }}" selected>{{ replaces.app_ref }} · {{ replaces.name[:50] }}</option>{% endif %}</select></label>
+          <button class="btn">Save</button>
+        </form>
+        <div class="small muted" style="margin-top:6px">Use it when a position was cancelled or closed and is now being asked for again, so its history stays in one line.</div>
+      </details>
+      {% endif %}
     </section>
-    <section class="panel panel-body">
-      <h2>Requirements</h2>
+    <section class="panel panel-body box-edit {{ 'editing' if editing == 'requirements' }}" id="requirements">
+      <h2>Requirements{% if can_change %} <button type="button" class="edit-ic" data-edit="requirements" aria-label="Edit requirements" title="Edit requirements">✎</button>{% endif %}</h2>
+      {% if can_change %}
+      <form method="post" action="/demands/{{ d.app_ref }}/part/requirements" class="inline-edit stack">
+        <div class="grid2">
+          <label class="f">Primary skills<input type="text" name="primary_skills" value="{{ d.primary_skills | join(', ') }}" required><span class="hint">Comma-separated</span></label>
+          <label class="f">Secondary skills<input type="text" name="secondary_skills" value="{{ d.secondary_skills | join(', ') }}"></label>
+          <label class="f">Experience from (years)<input type="number" name="exp_min" min="0" max="50" value="{{ d.exp_min if d.exp_min is not none else '' }}"></label>
+          <label class="f">Experience to (years)<input type="number" name="exp_max" min="0" max="50" value="{{ d.exp_max if d.exp_max is not none else '' }}"></label>
+        </div>
+        <label class="f">Job description<textarea name="jd_text" rows="12" maxlength="12000">{{ d.jd_text or '' }}</textarea></label>
+        <div class="row" style="gap:8px"><button class="btn primary small">Save</button><button type="button" class="btn small edit-cancel">Cancel</button></div>
+      </form>
+      {% endif %}
       <div class="facts">
         {{ field('Primary skills', d.primary_skills | join(', ')) }}
         {{ field('Secondary skills', d.secondary_skills | join(', ')) }}
         {{ field('Experience', (d.exp_min | string if d.exp_min is not none else '?') ~ '–' ~ (d.exp_max | string if d.exp_max is not none else '?') ~ ' yrs' if d.exp_min is not none or d.exp_max is not none else none) }}
-        <div><div class="k">Job description</div><div class="v">{% if d.jd_path %}<a href="/demands/{{ d.app_ref }}/jd">{{ d.jd_path.split('/')[-1] }}</a>{% else %}—{% endif %}</div></div>
+        {% if d.jd_path and not d.jd_text %}<div><div class="k">Job description</div><div class="v"><a href="/demands/{{ d.app_ref }}/jd">{{ d.jd_path.split('/')[-1] }}</a></div></div>{% elif not d.jd_text %}<div><div class="k">Job description</div><div class="v">—</div></div>{% endif %}
       </div>
+      {% if d.jd_text %}
+      <details class="jd-box" {{ 'open' if d.status == 'draft' }}>
+        <summary class="wf-link" style="display:inline-block">Job description</summary>
+        <pre class="jd-text">{{ d.jd_text }}</pre>
+      </details>
+      {% endif %}
     </section>
-    <section class="panel panel-body">
-      <h2>Commercial and timing</h2>
+    <section class="panel panel-body box-edit {{ 'editing' if editing == 'commercial' }}" id="commercial">
+      <h2>Commercial and timing{% if can_change %} <button type="button" class="edit-ic" data-edit="commercial" aria-label="Edit commercial and timing" title="Edit commercial and timing">✎</button>{% endif %}</h2>
+      {% if can_change %}
+      <form method="post" action="/demands/{{ d.app_ref }}/part/commercial" class="inline-edit stack">
+        <div class="grid3">
+          {% if sees_rates %}<label class="f">Client bill rate, per hour (USD)<input type="number" name="client_rate" min="0" step="0.01" value="{{ '%.2f' % d.client_rate if d.client_rate is not none else '' }}"><span class="hint">Blank keeps the rate on file</span></label>{% endif %}
+          <label class="f">Requested start date<input type="date" name="start_date" value="{{ d.start_date or '' }}" required></label>
+          {% if can_set_doj %}<label class="f">Date of joining<input type="date" name="expected_doj" value="{{ doj or '' }}"><span class="hint">Stands until a later BCM sheet gives another date</span></label>{% endif %}
+          <label class="f">Region<select name="region">{% for x in cfg.regions %}<option {{ 'selected' if x == d.region }}>{{ x }}</option>{% endfor %}</select></label>
+          <label class="f">Location<input type="text" name="location" value="{{ d.location or '' }}" maxlength="80" required></label>
+          <label class="f">Work mode<select name="work_mode">{% for x in cfg.work_modes %}<option {{ 'selected' if x == d.work_mode }}>{{ x }}</option>{% endfor %}</select></label>
+          <label class="f">Client hiring manager<input type="text" name="hiring_manager" value="{{ d.hiring_manager or '' }}" maxlength="120"></label>
+        </div>
+        {% if not can_set_doj %}<div class="small muted">The date of joining can be set here once the offer is made.</div>{% endif %}
+        <div class="row" style="gap:8px"><button class="btn primary small">Save</button><button type="button" class="btn small edit-cancel">Cancel</button></div>
+      </form>
+      {% endif %}
       <div class="facts">
         {% if sees_rates %}{{ field('Client bill rate', ('$%.2f / hr' % d.client_rate) if d.client_rate is not none else none) }}{% endif %}
         {{ field('Requested start date', d.start_date | d) }}
@@ -111,14 +290,14 @@
           <button class="btn primary">{{ 'Change the date' if d.billable_from else 'Mark as billable' }}</button>
           {% if d.billable_from %}<button class="btn" name="undo" value="1" formnovalidate>Undo: still non-billable</button>{% endif %}
         </form>
-        {% if not d.billable_from %}<div class="small muted" style="margin-top:8px">Costing stops from that date. The lead admin is told.</div>{% endif %}
+        {% if not d.billable_from %}<div class="small muted" style="margin-top:8px">Costing stops from that date. The GTD admin team lead is told.</div>{% endif %}
         {% endif %}
       </div>
       {% endif %}
       {% if can_revise_dates %}
       <form method="post" action="/demands/{{ d.app_ref }}/dates" id="dates" class="dates-form">
         <div class="title">Change the dates</div>
-        <div class="small muted">The rest of the demand is locked now that it is on GTD. The lead admin is told of any change.</div>
+        <div class="small muted">The rest of the demand is locked now that it is on GTD. The GTD admin team lead is told of any change.</div>
         <div class="fields">
           <label>Requested start date<input type="date" name="start_date" value="{{ d.start_date or '' }}" required></label>
           {% if d.type == 'Replacement' %}<label>Last working day (leaver)<input type="date" name="lwd" value="{{ d.lwd or '' }}" required></label>{% endif %}
@@ -241,4 +420,15 @@
     </section>
   </aside>
 </div>
+<script>
+/* Each box is edited in place: the pencil swaps its facts for a form, Cancel swaps back. */
+(function () {
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.edit-ic');
+    if (b) { var box = b.closest('.box-edit'); box.classList.toggle('editing'); var f = box.querySelector('.inline-edit input, .inline-edit select'); if (box.classList.contains('editing') && f) f.focus(); return; }
+    var c = e.target.closest('.edit-cancel');
+    if (c) { var bx = c.closest('.box-edit'); bx.querySelector('.inline-edit').reset(); bx.classList.remove('editing'); }
+  });
+})();
+</script>
 {% endblock %}

@@ -80,6 +80,7 @@
       if (cur && now) h += '<span class="wx-here">Now here' + (when[sub] ? ' · since ' + esc(when[sub]) : '') + '</span>';
       else if (done) h += '<span class="wx-tick">✓ Done' + (when[sub] ? ' · ' + esc(when[sub]) : '') + '</span>';
       else if (cur && problem && when[sub]) h += '<span class="wx-when">was here ' + esc(when[sub]) + '</span>';
+      if (o.chips && o.chips[sub]) h += '<span class="wx-chip">' + esc(o.chips[sub]) + '</span>';
       if (n) h += '<span class="wx-n">' + n + '</span>';
       return h + '</div>' + more(sub) + '</div>';
     }

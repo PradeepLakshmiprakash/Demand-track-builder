@@ -141,7 +141,7 @@
 {% endif %}
 
 <section class="panel">
-  <div class="panel-head"><div><h2>{{ 'Open and past requests' if sees_all else 'Your requests' }}</h2>{% if sees_all and can_raise %}<div class="hint">As Lead admin you see every request raised in this account.</div>{% endif %}</div><span class="chip {{ 'risk' if open_count else 'gray' }}">{{ open_count }} open</span></div>
+  <div class="panel-head"><div><h2>{{ 'Open and past requests' if sees_all else 'Your requests' }}</h2>{% if sees_all and can_raise %}<div class="hint">As GTD admin team lead you see every request raised in this account.</div>{% endif %}</div><span class="chip {{ 'risk' if open_count else 'gray' }}">{{ open_count }} open</span></div>
   {% for r in rows %}
   <div class="match-row">
     <div class="match-head">

@@ -3,10 +3,10 @@
 from datetime import date
 from decimal import Decimal
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from app.services import (
     loss_service,
     margin_service,
     notify_service,
+    onboarding_service,
     pipeline_service,
     workflow_service,
 )
@@ -45,6 +46,8 @@ from app.services.demand_service import (
 from app.services.escalation_service import current_doj
 from app.services.margin_service import ApprovalError
 
+PAGE_SIZE = 50  # demands shown at a time in the list
+
 router = APIRouter(tags=["demands"])
 guard = require_screen("demands")
 
@@ -57,6 +60,7 @@ def demands_page(
     start: str = "",
     end: str = "",
     days: str = "",
+    page: int = 1,
     actor: Actor = Depends(guard),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
@@ -73,12 +77,19 @@ def demands_page(
     bus = list(db.scalars(bus_stmt)) if actor.scope in (Scope.FULL, Scope.OWN_BU_READ) else []
     if len(bus) < 2:
         bus = []
+    shown = filter_rows(all_rows, filter, bu, period)
+    pages = max(1, -(-len(shown) // PAGE_SIZE))
+    page = min(max(page, 1), pages)
     return render(
         request,
         "my_demands/index.html",
         actor,
         db,
-        rows=filter_rows(all_rows, filter, bu, period),
+        rows=shown[(page - 1) * PAGE_SIZE : page * PAGE_SIZE],
+        total=len(shown),
+        page=page,
+        pages=pages,
+        page_query=urlencode([(k, v) for k, v in request.query_params.multi_items() if k != "page"]),
         counts=filter_counts(filter_rows(all_rows, "all", bu), period),
         period=period,
         filters=FILTERS,
@@ -139,6 +150,13 @@ def demand_page(
     names: dict[int, str] = {
         uid: name for uid, name in db.execute(select(User.id, User.name).where(User.id.in_(submitted_by)))
     }
+    account = get_account(db, demand.account_id)
+    ob = account.settings.onboarding
+    today = account_today(db, demand.account_id)
+    if demand.status_enum is DemandStatus.OFFER_IN_MARKET and not onboarding_service.items(db, demand.id):
+        onboarding_service.ensure_checklist(db, account, demand)  # the offer is made: its checklist starts
+        db.commit()
+    check = onboarding_service.checklist(db, actor, demand, today)
     return render(
         request,
         "my_demands/detail.html",
@@ -147,8 +165,11 @@ def demand_page(
         d=demand,
         can_change=can_change(actor, demand) and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
         can_submit=can_edit(actor, demand)
-        and demand.status_enum in (DemandStatus.DRAFT, DemandStatus.RETURNED)
+        and (demand.status_enum is DemandStatus.DRAFT or demand.status_enum in demand_service.RESUBMITTABLE)
         and actor.role in (Role.DEMAND_OWNER, Role.ADMIN),
+        cfg=account.settings,
+        can_set_doj=demand_service.can_set_joining(actor, demand),
+        editing=request.query_params.get("edit", ""),
         history=stage_history(db, demand),
         escalations=list(
             db.scalars(
@@ -161,6 +182,25 @@ def demand_page(
         respond=_to_respond(db, actor, demand),
         wf_layout=workflow_service.layout(),
         wf_at=workflow_service.position(demand),
+        wf_chips=(
+            {demand.status_enum.label: f"{check.done} of {check.total} pre-joining"}
+            if check and demand.status_enum is DemandStatus.OFFER_IN_MARKET
+            else {}
+        ),
+        checklist=check,
+        replaces=db.get(Demand, demand.replaces_demand_id) if demand.replaces_demand_id else None,
+        replaced_by=db.scalars(select(Demand).where(Demand.replaces_demand_id == demand.id)).first(),
+        can_link_replaced=demand_service.can_link_replaced(actor, demand),
+        replaceable=demand_service.replaceable(db, demand)
+        if demand_service.can_link_replaced(actor, demand)
+        else [],
+        exits=onboarding_service.exits_for(db, demand.id),
+        exit_kinds=onboarding_service.EXIT_KINDS,
+        can_record_exit=onboarding_service.can_record_exit(actor, demand),
+        exit_candidates=onboarding_service.exit_candidates(db, demand),
+        ob=ob,
+        billing=onboarding_service.billing(db, account, [demand], today).get(demand.id),
+        can_set_billing=onboarding_service.can_set_billing(actor, demand),
         wf_next=workflow_service.next_step(demand),
         wf_reached=workflow_service.reached(demand, stage_history(db, demand), _account_tz(db, actor)),
         wf_esc=[
@@ -171,13 +211,15 @@ def demand_page(
                 .order_by(Escalation.level.desc(), Escalation.opened_at)
             )
         ],
-        can_revise_dates=demand_service.can_revise_dates(actor, demand),
+        can_revise_dates=False,  # the whole demand is editable now: dates are changed with Edit
+        can_close=demand_service.can_change(actor, demand) and demand.status != "staffed",
+        close_reasons=account.settings.resolution_reasons,
         cost=costing_service.costs(db, demand.account_id).get(demand.id) if demand.is_proactive_nb else None,
         can_mark_billable=costing_service.can_mark_billable(actor, demand),
         billable_by=db.get(User, demand.billable_marked_by) if demand.billable_marked_by else None,
-        today=account_today(db, demand.account_id),
+        today=today,
         candidates=interview_service.for_demand(db, demand.id),
-        decides_rounds=demand.owner_id == actor.id or actor.role is Role.ADMIN,
+        decides_rounds=demand.owner_id == actor.id,  # an extra round is the demand owner's call
         people={u.id: u.name for u in db.scalars(select(User).where(User.accounts.any(id=actor.account_id)))},
         submitters=names,
         statuses={s.value: s.full for s in DemandStatus},
@@ -256,6 +298,108 @@ async def revise_dates(
     db.commit()
     msg = "Dates updated; the past start date escalation is closed" if closed else "Dates updated"
     return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#dates", status_code=303)
+
+
+def _own_demand(db: Session, actor: Actor, ref: str) -> Demand:
+    demand = get_visible(db, actor, ref)
+    if demand is None:
+        raise HTTPException(404, "Demand not found, or not visible to you.")
+    return demand
+
+
+@router.post("/demands/{ref}/close")
+async def close_demand(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """The position is no longer needed: its owner closes the demand, with the reason."""
+    demand = _own_demand(db, actor, ref)
+    f = await request.form()
+    try:
+        demand_service.close_demand(db, actor, demand, str(f.get("reason") or ""))
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}", status_code=303)
+    return RedirectResponse(f"/demands/{ref}?msg=Demand+closed", status_code=303)
+
+
+@router.post("/demands/{ref}/replaces")
+async def link_replaced(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """This demand re-raises a position whose earlier demand was abandoned."""
+    demand = _own_demand(db, actor, ref)
+    f = await request.form()
+    try:
+        other = demand_service.set_replaces(db, actor, demand, str(f.get("replaces") or ""))
+    except ValueError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}", status_code=303)
+    msg = f"Linked: this demand re-raises {other.app_ref}" if other else "Link removed"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}", status_code=303)
+
+
+@router.post("/demands/{ref}/checklist/{item_id}")
+async def update_checklist_item(
+    ref: str,
+    item_id: int,
+    request: Request,
+    actor: Actor = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """A pre-joining item: done, in progress, blocked (with what it waits on) or back to not started."""
+    demand = _own_demand(db, actor, ref)
+    f = await request.form()
+    try:
+        onboarding_service.update_item(
+            db, actor, demand, item_id, str(f.get("status") or ""), str(f.get("note") or "")
+        )
+    except onboarding_service.OnboardingError as e:
+        db.rollback()
+        return RedirectResponse(f"/demands/{ref}?err={quote(str(e))}#checklist", status_code=303)
+    return RedirectResponse(f"/demands/{ref}?msg=Checklist+updated#checklist", status_code=303)
+
+
+@router.post("/demands/{ref}/no-join")
+async def record_no_join(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """The candidate with the offer will not join: record why; the demand goes back to sourcing."""
+    demand = _own_demand(db, actor, ref)
+    f = await request.form()
+    raw_id, raw_day = str(f.get("candidate_id") or ""), str(f.get("on_date") or "")
+    try:
+        on = date.fromisoformat(raw_day)
+        out = onboarding_service.record_exit(
+            db, actor, demand, int(raw_id) if raw_id.isdigit() else None,
+            str(f.get("kind") or ""), str(f.get("reason") or ""), on,
+        )  # fmt: skip
+    except ValueError as e:
+        db.rollback()
+        text = str(e) if isinstance(e, onboarding_service.OnboardingError) else "Enter the date it happened."
+        return RedirectResponse(f"/demands/{ref}?err={quote(text)}#no-join", status_code=303)
+    msg = f"Recorded: {out.candidate_name} will not join. The demand is back at Sourcing profiles"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}", status_code=303)
+
+
+@router.post("/demands/{ref}/billing")
+async def record_billing(
+    ref: str, request: Request, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """A joined, billable position: its first billable day, or why billing has not started."""
+    demand = _own_demand(db, actor, ref)
+    f = await request.form()
+    raw = str(f.get("billable_from") or "")
+    try:
+        started = date.fromisoformat(raw) if raw and not f.get("waiting") else None
+        if started is None and not f.get("waiting"):
+            raise onboarding_service.OnboardingError("Enter the first billable day.")
+        onboarding_service.set_billing(db, actor, demand, started, str(f.get("reason") or ""))
+    except ValueError as e:
+        db.rollback()
+        text = str(e) if isinstance(e, onboarding_service.OnboardingError) else "Enter a valid date."
+        return RedirectResponse(f"/demands/{ref}?err={quote(text)}#billing", status_code=303)
+    msg = f"Billing started on {started:%d %b %Y}" if started else "Reason saved: billing has not started"
+    return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}#billing", status_code=303)
 
 
 @router.post("/demands/{ref}/billable")
@@ -350,12 +494,14 @@ async def ask_for_offer_approval(
 @router.get("/demands/{ref}/jd")
 def job_description(
     ref: str, actor: Actor = Depends(current_user), db: Session = Depends(get_db)
-) -> FileResponse:
+) -> Response:
     demand = get_visible(db, actor, ref)
-    if demand is None or not demand.jd_path:
+    if demand is None or not (demand.jd_path or demand.jd_text):
         raise HTTPException(404, "No job description.")
+    if demand.jd_text:  # typed on the demand form
+        return PlainTextResponse(demand.jd_text)
     try:
-        path = storage.open_path(demand.jd_path)
+        path = storage.open_path(demand.jd_path or "")
     except FileNotFoundError as e:
         raise HTTPException(404, "The job description file is missing.") from e
     return FileResponse(path, filename=path.name)

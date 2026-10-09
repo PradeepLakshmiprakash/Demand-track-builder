@@ -77,6 +77,31 @@
   </form>
 </section>
 
+<section id="rename" class="panel">
+  <div class="panel-head"><div><h2>Rename a practice or a grade</h2><div class="hint">Renaming here changes it everywhere at once: every demand and rate that carries it, people's practices and interviewer profiles. Editing a name in the list above instead would add a new one and leave the old one on its demands.</div></div></div>
+  <div class="panel-body grid2">
+    {% for kind, names in (('practice', cfg.practices), ('grade', cfg.grades)) %}
+    <form method="post" action="/settings/rename" class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <label class="f">{{ kind | capitalize }}<select name="old" required>{% for n in names %}<option>{{ n }}</option>{% endfor %}</select></label>
+      <label class="f">New name<input type="text" name="new" maxlength="{{ 40 if kind == 'practice' else 10 }}" required></label>
+      <button class="btn">Rename</button>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="retention" class="panel">
+  <div class="panel-head"><div><h2>Data retention</h2><div class="hint">Leave both blank to keep everything, which is how an account starts. Once set, the daily job removes candidates' names, CVs and feedback text from demands that finished longer ago than the first number (counts, ratings and decisions stay), and deletes the row-by-row snapshot of BCM sheets older than the latest ones kept. Removal cannot be undone.</div></div></div>
+  <form method="post" action="/settings/retention" class="panel-body stack">
+    <div class="grid2">
+      <label class="f">Keep candidate details for (days after the demand finishes)<input type="number" name="candidate_days" min="30" max="3650" value="{{ cfg.retention.candidate_days or '' }}" placeholder="Keep everything"></label>
+      <label class="f">Keep the rows of the latest (number of BCM sheets)<input type="number" name="sheet_imports_kept" min="2" max="500" value="{{ cfg.retention.sheet_imports_kept or '' }}" placeholder="Keep everything"></label>
+    </div>
+    <div><button class="btn primary">Save retention</button></div>
+  </form>
+</section>
+
 <section id="escalation-rules" class="panel">
   <div class="panel-head"><div><h2>Escalation rules</h2><div class="hint">For each trigger: whether it's on, who has to act, how urgent it is, and the steps the email tells them, and the reasons they choose from when they respond. The responsible person acts; everyone else is only informed.</div></div></div>
   <form method="post" action="/settings/escalation-rules" class="panel-body stack">
@@ -105,6 +130,83 @@
     </fieldset>
     <div><button class="btn primary">Save escalation rules</button></div>
   </form>
+</section>
+
+{% set ob = cfg.onboarding %}
+<section id="onboarding" class="panel">
+  <div class="panel-head"><div><h2>Onboarding: from offer to first billable day</h2><div class="hint">The pre-joining checklist every demand gets when its offer is made, the reasons people pick from, and the targets on the speed report. People in the app are shown by name on each demand; a party outside the app is shown as named here, never as a person. Who acts on the two onboarding escalations, and how urgent they are, is set under Escalation rules.</div></div></div>
+  <form method="post" action="/settings/onboarding" class="panel-body stack" id="ob-form">
+    <div class="ov-scroll"><table class="cfg-table">
+      <thead><tr><th>On</th><th>Item</th><th>Who owns it</th><th>Person or outside party</th><th>Due, working days before joining</th><th>Escalate when late</th><th></th></tr></thead>
+      <tbody id="ob-rows">
+        {% for c in ob.checklist %}
+        <tr>
+          <td><input type="checkbox" name="enabled" value="{{ loop.index0 }}" {{ 'checked' if c.enabled }} aria-label="{{ c.label }} on"></td>
+          <td><input type="hidden" name="key" value="{{ c.key }}"><input type="text" name="label" value="{{ c.label }}" maxlength="160" aria-label="Item"></td>
+          <td><select name="owner_kind" aria-label="Who owns {{ c.label }}">
+            <option value="owner" {{ 'selected' if c.owner_kind == 'owner' }}>The demand's owner</option>
+            <option value="person" {{ 'selected' if c.owner_kind == 'person' }}>A named person</option>
+            <option value="gtd_team" {{ 'selected' if c.owner_kind == 'gtd_team' }}>GTD admin team (whoever picks it up)</option>
+            <option value="outside" {{ 'selected' if c.owner_kind == 'outside' }}>Outside the app</option>
+          </select></td>
+          <td>
+            <select name="person_id" aria-label="Person for {{ c.label }}"><option value="">Choose a person…</option>{% for u in people %}<option value="{{ u.id }}" {{ 'selected' if c.person_id == u.id }}>{{ u.name }}</option>{% endfor %}</select>
+            <input type="text" name="outside_label" value="{{ c.outside_label or '' }}" maxlength="80" placeholder="e.g. GTD staffing, Client" aria-label="Outside party for {{ c.label }}">
+            <span class="small muted ob-hint"></span>
+          </td>
+          <td><input type="number" name="due_days_before" min="0" max="90" value="{{ c.due_days_before }}" required aria-label="Due days for {{ c.label }}"></td>
+          <td><input type="checkbox" name="escalate" value="{{ loop.index0 }}" {{ 'checked' if c.escalate }} aria-label="Escalate {{ c.label }}"></td>
+          <td><button type="button" class="btn small ob-rm">Remove</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    <div><button type="button" class="btn" id="ob-add">+ Add an item</button></div>
+    <div class="grid2">
+      <label class="f">Reasons a candidate did not join (one per line)<textarea name="exit_reasons" rows="8" required>{{ ob.exit_reasons | join('\n') }}</textarea></label>
+      <label class="f">Reasons billing has not started (one per line)<textarea name="not_billing_reasons" rows="8" required>{{ ob.not_billing_reasons | join('\n') }}</textarea></label>
+    </div>
+    <div class="grid2">
+      <div class="small muted" style="align-self:center">A joined, billable position stays in client onboarding until its owner confirms the first billable day; revenue lost keeps counting until then.</div>
+      <label class="f" style="max-width:360px">Escalate "Joined, not billing" after (working days)<input type="number" name="not_billing_after_days" min="1" max="60" value="{{ ob.not_billing_after_days }}" required></label>
+    </div>
+    <fieldset class="f" style="border:0;padding:0;margin:0"><legend style="padding:0 0 6px;font-weight:500">Targets for the speed report, in working days <span class="hint">Leave one blank for no target</span></legend>
+      <div class="grid4">{% for key, label in target_steps %}<label class="f" style="font-weight:400">{{ label }}<input type="number" name="target_{{ key }}" min="1" max="365" value="{{ ob.targets.get(key, '') }}"></label>{% endfor %}</div>
+    </fieldset>
+    <div><button class="btn primary">Save onboarding settings</button></div>
+  </form>
+  <template id="ob-tpl"><tr>
+    <td><input type="checkbox" name="enabled" checked aria-label="On"></td>
+    <td><input type="hidden" name="key" value=""><input type="text" name="label" maxlength="160" placeholder="What has to be done" aria-label="Item"></td>
+    <td><select name="owner_kind" aria-label="Who owns it"><option value="owner">The demand's owner</option><option value="person">A named person</option><option value="gtd_team">GTD admin team (whoever picks it up)</option><option value="outside">Outside the app</option></select></td>
+    <td><select name="person_id" aria-label="Person"><option value="">Choose a person…</option>{% for u in people %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select><input type="text" name="outside_label" maxlength="80" placeholder="e.g. GTD staffing, Client" aria-label="Outside party"><span class="small muted ob-hint"></span></td>
+    <td><input type="number" name="due_days_before" min="0" max="90" value="5" required aria-label="Due days"></td>
+    <td><input type="checkbox" name="escalate" checked aria-label="Escalate"></td>
+    <td><button type="button" class="btn small ob-rm">Remove</button></td>
+  </tr></template>
+  <script>
+  (function () {
+    var body = document.getElementById('ob-rows'), tpl = document.getElementById('ob-tpl');
+    var HINT = { owner: 'Shown by name on each demand', gtd_team: 'Shown as GTD admin team' };
+    function sync() {  // each row shows only the field its owner type needs; ticked boxes carry their row number
+      [].forEach.call(body.rows, function (tr, i) {
+        var kind = tr.querySelector('[name=owner_kind]').value;
+        tr.querySelector('[name=person_id]').hidden = kind !== 'person';
+        tr.querySelector('[name=outside_label]').hidden = kind !== 'outside';
+        tr.querySelector('.ob-hint').textContent = HINT[kind] || '';
+        tr.querySelector('[name=enabled]').value = i;
+        tr.querySelector('[name=escalate]').value = i;
+      });
+    }
+    document.getElementById('ob-add').addEventListener('click', function () {
+      body.appendChild(tpl.content.cloneNode(true)); sync();
+      body.rows[body.rows.length - 1].querySelector('[name=label]').focus();
+    });
+    body.addEventListener('click', function (e) { if (e.target.classList.contains('ob-rm')) { e.target.closest('tr').remove(); sync(); } });
+    body.addEventListener('change', sync);
+    sync();
+  })();
+  </script>
 </section>
 
 <section id="practice-stacks" class="panel">

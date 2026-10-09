@@ -202,7 +202,7 @@ def _guard_last(db: Session, actor: Actor, user_id: int, leaving: Role | None) -
         )
     )
     if not others:
-        raise UserAccessError(f"The account needs at least one active {leaving.label}.")
+        raise UserAccessError(f"The account needs at least one active {leaving.full_title}.")
 
 
 def create_user(db: Session, actor: Actor, form: UserForm) -> Member:

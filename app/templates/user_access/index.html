@@ -37,7 +37,7 @@
             <div class="title">{{ u.name }}</div>
             <div class="note">{{ u.email }}</div>
           </div>
-          <div>{{ u.role_enum.label }}</div>
+          <div>{{ u.role_enum.full_title }}</div>
           <div class="small">
             {% set bn = u.business_units | map(attribute='name') | list %}
             {{ 'All BUs' if u.visibility_scope == 'full' else (bn | join(', ') or '—') }}{% if u.practices %} · {{ u.practices | join(', ') }}{% endif %}{% if u.other_accounts %} · also in {{ u.other_accounts | join(', ') }}{% endif %}
@@ -55,7 +55,7 @@
       <div class="defaults">
         <div class="title">Demand owner</div><div>Own demands, one BU. Admin can widen to read-only view of their BU.</div>
         <div class="title">Interviewer</div><div>Only interviews assigned to them, plus alerts for new requisitions in their skills.</div>
-        <div class="title">Lead admin</div><div>Full account, all BUs. Fixed.</div>
+        <div class="title">GTD admin team lead</div><div>Full account, all BUs. Fixed.</div>
         <div class="title">GTD admin team</div><div>Full account, all BUs. Fixed. Does the manual admin work: GTD entry, BCM sheet upload, reconciliation.</div>
         <div class="title">Leadership</div><div>Full account, all BUs. Fixed.</div>
       </div>
@@ -76,7 +76,7 @@
       <div class="grid2">
         <label class="f">Role
           <select name="role" id="role">
-            {% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if v.role == r.value }}>{{ r.label }}</option>{% endfor %}
+            {% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if v.role == r.value }}>{{ r.full_title }}</option>{% endfor %}
           </select>
         </label>
         <label class="f">Level<input type="text" name="level" value="{{ v.level }}" placeholder="e.g. C2" maxlength="10"></label>

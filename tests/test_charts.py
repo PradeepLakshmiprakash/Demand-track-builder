@@ -23,7 +23,7 @@ def test_every_status_is_a_box_in_the_workflow() -> None:
         p[0] for s in lay["stages"] for p in s["problems"]
     }
     boxes |= set(lay["abandoned"]["subs"])
-    assert boxes == {s.label for s in DemandStatus}
+    assert boxes == {s.label for s in DemandStatus} | {"Joined, billing to be confirmed"}
     assert [s["label"] for s in lay["stages"]][0] == "Resourcing In Progress"
     assert set(workflow_service.NEXT) == set(DemandStatus)
     for stage, path in workflow_service.PATH.items():
@@ -70,7 +70,7 @@ def test_detailed_workflow_page(client: Client, db: Session) -> None:
     m = re.search(r"window\.WF = (\{.*?\});</script>", html, re.S)
     assert m
     wf = json.loads(m.group(1))
-    assert set(wf["detail"]["steps"]) == {s.label for s in DemandStatus}
+    assert set(wf["detail"]["steps"]) == {s.label for s in DemandStatus} | {"Joined, billing to be confirmed"}
     assert sum(wf["counts"].values()) == loss_service.overview(db, 1, date.today()).live
     assert wf["detail"]["decision"]["yes"].startswith("Continue to 7") and not wf["still"]
     # thresholds read from the account, not fixed text
@@ -86,7 +86,8 @@ def test_detailed_workflow_page(client: Client, db: Session) -> None:
 
 def test_steps_are_numbered_along_the_path(db: Session) -> None:
     assert workflow_service.number(DemandStatus.DRAFT) == 1
-    assert workflow_service.number(DemandStatus.STAFFED) == 11
+    assert workflow_service.number(DemandStatus.OFFER_IN_MARKET) == 10
+    assert workflow_service.number(DemandStatus.STAFFED) == 12  # the billing step sits before it
 
 
 def test_demand_workflow_carries_the_dates_reached(client: Client) -> None:

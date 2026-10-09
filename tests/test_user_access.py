@@ -133,7 +133,7 @@ def test_last_admin_cannot_be_demoted(admin: Client, db: Session) -> None:
     r = admin.post(
         f"/users/{kavya}", data=_form(name="Kavya R.", email="kavya.r@example.com", role="demand_owner")
     )
-    assert r.status_code == 400 and "at least one active lead admin" in r.text.lower()
+    assert r.status_code == 400 and "at least one active gtd admin team lead" in r.text.lower()
     assert _m(db, "kavya.r@example.com").role == "admin"
 
 

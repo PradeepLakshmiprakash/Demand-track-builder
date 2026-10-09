@@ -26,6 +26,7 @@ def _same(label: str, *roles: Role) -> dict[Role, str]:
 
 NAV: tuple[NavItem, ...] = (
     NavItem("overview", "/overview", _same("Account overview", LD, AD), phase=5, ready=True),
+    NavItem("speed", "/speed", _same("Speed report", LD, AD), phase=8, ready=True),
     NavItem(
         "demands",
         "/demands",
@@ -70,7 +71,7 @@ def menu_for(role: Role) -> list[NavItem]:
     return [n for n in NAV if role in n.labels]
 
 
-# Where each role lands. The lead admin's day starts on the demands, not the overview.
+# Where each role lands. The GTD admin team lead's day starts on the demands, not the overview.
 HOME = {AD: "demands", ADM: "requests"}
 
 

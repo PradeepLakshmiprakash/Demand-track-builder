@@ -1,6 +1,6 @@
 """GTD queue: demands waiting to be entered on GTD, and linking the requisition ID GTD generates.
 
-The app has no view into GTD. The lead admin or the GTD admin team enters each demand there by
+The app has no view into GTD. The GTD admin team lead or the GTD admin team enters each demand there by
 hand (the plain demand name) and pastes the requisition ID back. That link is the key the
 BCM sheet reconciles on, so an ID can be linked only once, ever.
 """

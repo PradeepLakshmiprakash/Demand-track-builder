@@ -1,4 +1,4 @@
-"""Lead admin and GTD admin team: candidates and the requisitions they're on, CVs from staffing's
+"""GTD admin team lead and GTD admin team: candidates and the requisitions they're on, CVs from staffing's
 emails, L2 requests, and the interview placeholders (staffing schedules; who interviews L2 is open)."""
 
 from datetime import datetime

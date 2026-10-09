@@ -1,4 +1,4 @@
-"""Accounts: an Administrator creates a client account, names its first lead admin, and can
+"""Accounts: an Administrator creates a client account, names its first GTD admin team lead, and can
 deactivate it. Everything else about the client is set by that admin in the account's own settings.
 
 A new account starts either blank (defaults only) or with a copy of another account's settings: lists,
@@ -83,7 +83,7 @@ def create_account(
     except (ZoneInfoNotFoundError, ValueError) as e:
         raise PlatformError(f"Unknown time zone: {timezone}") from e
     if len(admin_name) < 2 or "@" not in admin_email:
-        raise PlatformError("Name the account's first lead admin, with their email.")
+        raise PlatformError("Name the account's first GTD admin team lead, with their email.")
 
     account = Account(name=name, active=True)
     if copy_from:

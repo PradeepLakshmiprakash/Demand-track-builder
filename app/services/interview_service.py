@@ -414,14 +414,14 @@ def request_next_round(
 def decide_next_round(
     db: Session, actor: Actor, interview_id: int, approve: bool, note: str | None
 ) -> Interview:
-    """The demand owner (or the lead admin) approves or declines an asked-for round."""
+    """The demand owner (or the GTD admin team lead) approves or declines an asked-for round."""
     iv = _interview(db, actor, interview_id)
     if iv.status_enum is not InterviewStatus.REQUESTED:
         raise InterviewError("That round isn't waiting for a decision.")
     if iv.demand_id is None:
         raise InterviewError("Map the candidate to a requisition first; its owner decides.")
     d = db.get_one(Demand, iv.demand_id)
-    if not (d.owner_id == actor.id or actor.role is Role.ADMIN):
+    if d.owner_id != actor.id:
         raise InterviewError("The requisition's demand owner decides on another round.")
     if not approve and not (note or "").strip():
         raise InterviewError("Add a note: why no further round.")
@@ -517,7 +517,7 @@ def _send_invite(db: Session, account: Account, iv: Interview) -> None:
         f"Requisition: {req} · {ref}" + (f" · {d.name} · {d.grade}" if d else ""),
         f"When: {when}",
         f"Required skills: {', '.join(d.primary_skills)}" if d and d.primary_skills else "",
-        f"Job description: {base}/demands/{d.app_ref}/jd" if d and d.jd_path else "",
+        f"Job description: {base}/demands/{d.app_ref}/jd" if d and (d.jd_path or d.jd_text) else "",
         f"Candidate CV: {base}/cv/{iv.feedback_token}" if c.cv_path else "CV: not attached yet",
         "",
         f"Your feedback (no sign-in needed, one use): {feedback_link(iv)}",

@@ -41,6 +41,7 @@ class DemandForm(BaseModel):
     work_mode: str | None = None
     hiring_manager: str | None = Field(None, max_length=120)
     positions: int = Field(1, ge=1, le=20)
+    jd_text: str | None = Field(None, max_length=12000)
 
     @field_validator("*", mode="before")
     @classmethod

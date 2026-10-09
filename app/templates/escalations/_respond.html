@@ -1,12 +1,8 @@
-{# Needs: e (escalation), sd (its demand or none), actions, reasons, is_owner; next_url (optional). #}
+{# Needs: e (escalation), sd (its demand or none), actions, reasons, is_owner; next_url (optional).
+   The form asks why. What is done about it is done on the demand itself (edit, resubmit, close) or on
+   the GTD queue; the escalation stays open until that has cleared the problem. #}
 <form method="post" action="/escalations/{{ e.id }}/resolve" class="stack esc-form">
   {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-  <fieldset class="f radios"><legend>What will you do?</legend>
-    {% for a in actions %}
-      <label><input type="radio" name="action" value="{{ a.value }}" {{ 'checked' if loop.first }} required> {{ "I'll correct it and resubmit" if a.value == 'return' and is_owner else "Not ours: ignore this requisition" if not sd else a.label }}</label>
-    {% endfor %}
-  </fieldset>
-  <label class="f extend-date"><span class="extend-label">New due date</span><input type="date" name="extend_to"></label>
   <label class="f">Why?
     <select name="reason" required>
       <option value="">Choose a reason</option>
@@ -14,25 +10,14 @@
     </select>
   </label>
   <label class="f">Comment<textarea name="comment" rows="3" placeholder="What was agreed, and with whom (required with Other)"></textarea></label>
+  {% set can_return = sd and not is_owner and (actions | selectattr('value', 'equalto', 'return') | list) %}
+  {% if can_return %}
+  <label class="row" style="gap:8px;font-weight:500"><input type="checkbox" name="send_back" value="1" style="width:18px;height:18px;accent-color:var(--brand)"> Send it back to the demand owner to correct</label>
+  {% endif %}
+  <div class="small muted">
+    {% if not sd %}Giving a reason closes this: the requisition isn't ours to track.
+    {% elif is_owner %}Giving a reason restarts the clock. To fix it, <a href="/demands/{{ sd.app_ref }}#commercial">edit the demand</a> with the pencil on its boxes: the escalation closes by itself once the change clears the problem.
+    {% else %}Giving a reason restarts the clock. It closes by itself once the problem is gone{{ ', or when you send it back to the owner' if can_return }}.{% endif %}
+  </div>
   <div><button class="btn primary">Respond</button></div>
 </form>
-<script>
-(function () {
-  if (window.__escForms) return;
-  window.__escForms = true;
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.esc-form').forEach(function (f) {
-      var box = f.querySelector('.extend-date');
-      function sync() {
-        var ext = f.querySelector('input[name=action][value=extend]');
-        var start = f.querySelector('input[name=action][value=new_start]');
-        var isStart = !!(start && start.checked);
-        box.hidden = !((ext && ext.checked) || isStart);
-        f.querySelector('.extend-label').textContent = isStart ? 'Revised start date' : 'New due date';
-      }
-      f.querySelectorAll('input[name=action]').forEach(function (r) { r.addEventListener('change', sync); });
-      sync();
-    });
-  });
-})();
-</script>

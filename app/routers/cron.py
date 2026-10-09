@@ -6,7 +6,7 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException
 
 from app.core.config import get_settings
-from app.jobs.scheduler import daily_admin_mail, escalation_sweep
+from app.jobs.scheduler import daily_admin_mail, daily_housekeeping, escalation_sweep
 
 router = APIRouter(tags=["cron"])
 
@@ -18,4 +18,5 @@ def daily(authorization: str = Header("")) -> dict[str, str]:
         raise HTTPException(401, "Not allowed.")
     daily_admin_mail()
     escalation_sweep()
+    daily_housekeeping()
     return {"status": "ok"}

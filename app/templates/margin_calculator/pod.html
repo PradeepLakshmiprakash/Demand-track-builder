@@ -14,6 +14,7 @@
 <section class="panel">
   <div class="panel-head"><div><h2>The pod</h2><div class="hint">The price the client pays for the pod each month, and who is in it. Allocation is the share of a person's time on the pod. Add or remove lines with the buttons; an empty line is ignored.</div></div></div>
   <form method="get">
+    <div class="panel-body" style="padding-bottom:0"><label class="f" style="max-width:240px">Region<select name="region"><option value="">All regions</option>{% for x in cfg.regions %}<option {{ 'selected' if request.query_params.get('region') == x }}>{{ x }}</option>{% endfor %}</select><span class="hint">Costs are in USD</span></label></div>
     <div class="panel-body" style="padding-bottom:0">
       <label class="f" style="max-width:320px">Pod price, per month ($)
         <input type="number" name="price" min="1" step="1" value="{{ price }}" placeholder="e.g. 60000" required>

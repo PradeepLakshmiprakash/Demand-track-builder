@@ -1,4 +1,4 @@
-"""Leadership and the lead admin: account overview. Fill speed, pipeline, and revenue lost
+"""Leadership and the GTD admin team lead: account overview. Fill speed, pipeline, and revenue lost
 to missed start dates."""
 
 from typing import Any
@@ -13,7 +13,13 @@ from app.core.enums import EscalationStatus, MainStage, Role
 from app.core.security import Actor, require_screen
 from app.core.templating import render
 from app.models import BusinessUnit, Demand, Escalation, OfferApproval
-from app.services import costing_service, loss_service, reconcile_service, workflow_service
+from app.services import (
+    costing_service,
+    loss_service,
+    onboarding_service,
+    reconcile_service,
+    workflow_service,
+)
 from app.services.account_service import get_account
 from app.services.demand_service import account_today, period_for
 from app.services.escalation_service import current_doj
@@ -43,7 +49,7 @@ def overview_page(
     today = account_today(db, actor.account_id)
     period = period_for(db, actor.account_id, start, end, days)
     o = loss_service.overview(db, actor.account_id, today, period)
-    # Offers this viewer decides: below the cut-off for leadership, at or above for the lead admin.
+    # Offers this viewer decides: below the cut-off for leadership, at or above for the GTD admin team lead.
     route = "leadership" if actor.role is Role.LEADERSHIP else "admin"
     waiting = db.scalar(
         select(func.count())
@@ -147,6 +153,10 @@ MEANS = {
 }
 
 
+def _waits(b: onboarding_service.Billing | None) -> bool:
+    return b is not None and b.waiting and b.waiting_days > 0
+
+
 def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
     """Everything static/overview.js needs: one row per position in view, and the order things show in."""
     account = get_account(db, o.demands[0].account_id) if o.demands else None
@@ -164,6 +174,8 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
             if e.demand_id is not None:
                 escs.setdefault(e.demand_id, []).append({"t": e.type_enum.label, "l": e.level})
     costs = costing_service.costs(db, account.id, o.today) if account else {}
+    bills = onboarding_service.billing(db, account, o.demands, o.today) if account else {}
+    lists = onboarding_service.progress(db, [d.id for d in o.demands])
     rows = []
     for d in sorted(o.demands, key=lambda d: d.app_ref):
         loss = o.loss_of.get(d.id)
@@ -174,15 +186,25 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
                 "ref": d.app_ref,
                 "req": d.gtd_req_id,
                 "name": d.name,
-                "stage": d.status_enum.main.label,
-                "sub": d.status_enum.label,
+                "stage": workflow_service.position(d)["stage"],
+                "sub": workflow_service.position(d)["sub"],
+                # joined and billable, with no first billable day recorded yet
+                "nobill": "Joined, not billing" if _waits(bills.get(d.id)) else "",
+                "nobill_days": bills[d.id].waiting_days if _waits(bills.get(d.id)) else 0,
+                "nobill_amount": float(bills[d.id].amount or 0) if _waits(bills.get(d.id)) else 0,
+                # offer made, with pre-joining items still open
+                "prejoin": "Pre-joining open"
+                if d.status_enum.value == "offer_in_market"
+                and lists.get(d.id, (0, 0))[0] < lists.get(d.id, (0, 0))[1]
+                else "",
+                "prejoin_text": "{} of {}".format(*lists[d.id]) if d.id in lists else "",
                 "bu": d.business_unit.name,
                 "owner": d.owner.name,
                 "practice": d.practice or "—",
                 "type": f"{kind} · {'non-billable' if d.position_type == 'Non-billable' else 'billable'}",
                 "start": f"{d.start_date:%d %b %Y}" if d.start_date else None,
                 "joining": f"{doj[d.id]:%d %b %Y}" if doj.get(d.id) else None,
-                "open": d.status_enum.main.value in loss_service.OPEN_GROUPS,
+                "open": loss_service.group_of(d) in loss_service.OPEN_GROUPS,
                 "late": loss is not None and not loss.filled,
                 "esc": escs.get(d.id, []),
                 "costing": "Non-billable cost" if cost is not None else "",
@@ -227,7 +249,7 @@ def _page_data(db: Session, o: loss_service.Overview) -> dict[str, Any]:
 async def save_nb_caps(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
-    """The lead admin sets the agreed number of non-billable positions per business unit."""
+    """The GTD admin team lead sets the agreed number of non-billable positions per business unit."""
     if actor.role is not Role.ADMIN:
         return RedirectResponse("/overview?err=Only+the+GTD+team+admin+sets+the+caps#nb", status_code=303)
     form = await request.form()

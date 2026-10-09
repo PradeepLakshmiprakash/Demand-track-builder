@@ -101,7 +101,7 @@
               </select>
               {% if guess %}<span class="hint">Matches the sheet's originator.</span>{% elif r.originator %}<span class="hint">No user matches "{{ r.originator }}".</span>{% endif %}
             </label>
-            <label class="f">Business unit <span class="hint">(only when the owner is the lead admin)</span>
+            <label class="f">Business unit <span class="hint">(only when the owner is the GTD admin team lead)</span>
               <select name="bu_id"><option value="">Owner's BU</option>{% for b in bus %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select>
             </label>
             <div><button class="btn small">Create demand from row</button></div>

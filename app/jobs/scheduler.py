@@ -9,13 +9,14 @@ to L2, and mail whoever hasn't been told.
 """
 
 import logging
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
 
 from app.core.db import new_session
 from app.models import Account
-from app.services import escalation_service, notify_service
+from app.services import escalation_service, housekeeping_service, notify_service
 
 log = logging.getLogger("demand_tracker.jobs")
 
@@ -43,6 +44,17 @@ def escalation_sweep() -> None:
                 log.exception("escalation_sweep failed for %s", account.name)
 
 
+def daily_housekeeping() -> None:
+    """Store the day's figures and apply each account's retention rule."""
+    with new_session() as db:
+        for account in db.scalars(select(Account).where(Account.active)):
+            try:
+                housekeeping_service.run_daily(db, account)
+            except Exception:
+                db.rollback()
+                log.exception("daily_housekeeping failed for %s", account.name)
+
+
 def start() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(
@@ -51,5 +63,9 @@ def start() -> BackgroundScheduler:
     scheduler.add_job(
         escalation_sweep, "interval", hours=2, id="escalation_sweep", coalesce=True, max_instances=1
     )
+    scheduler.add_job(  # also at start-up, so today's figures exist without waiting six hours
+        daily_housekeeping, "interval", hours=6, id="daily_housekeeping", coalesce=True, max_instances=1,
+        next_run_time=datetime.now(UTC) + timedelta(seconds=20),
+    )  # fmt: skip
     scheduler.start()
     return scheduler

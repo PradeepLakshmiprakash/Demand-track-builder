@@ -1,7 +1,7 @@
 """Escalations: opened automatically, closed only with a reason and an action.
 
 The responsible party responds: the GTD admin team for what is theirs to do, the demand owner for
-their own demands (they see only those). Leadership and the lead admin see everything; leadership
+their own demands (they see only those). Leadership and the GTD admin team lead see everything; leadership
 is informed, never the one to act.
 """
 
@@ -116,21 +116,27 @@ async def resolve(
     on_demand = nxt.startswith("/demands/") and "//" not in nxt and "?" not in nxt  # answered on its page
     try:
         extend_to = date.fromisoformat(raw_date) if raw_date else None
-        esc = svc.resolve(
-            db,
-            actor,
-            esc_id,
-            reason=str(form.get("reason") or ""),
-            action=str(form.get("action") or ""),
-            comment=str(form.get("comment") or ""),
-            extend_to=extend_to,
-        )
+        reason, comment = str(form.get("reason") or ""), str(form.get("comment") or "")
+        if form.get("action"):  # an explicit action, as before
+            esc = svc.resolve(
+                db, actor, esc_id, reason=reason, action=str(form.get("action")), comment=comment,
+                extend_to=extend_to,
+            )  # fmt: skip
+        else:  # the form now asks only why; what is done about it is done on the demand
+            esc = svc.respond(
+                db, actor, esc_id, reason=reason, comment=comment, send_back=form.get("send_back") == "1"
+            )
     except (EscalationError, ValueError) as e:
         db.rollback()
         if on_demand:
             return RedirectResponse(f"{nxt}?err={quote(str(e))}#respond", status_code=303)
         return _back(esc_id, "open", err=str(e))
-    msg = f"Due date extended to {esc.due_at:%d %b}" if esc.status == "open" else "Escalation resolved"
+    if esc.status != "open":
+        msg = "Escalation resolved"
+    elif form.get("action"):
+        msg = f"Due date extended to {esc.due_at:%d %b}"
+    else:
+        msg = f"Reason recorded. It stays open until the problem is fixed; next check {esc.due_at:%d %b}"
     if on_demand:
         return RedirectResponse(f"{nxt}?msg={quote(msg)}", status_code=303)
     return _back(esc_id, "open" if esc.status == "open" else "resolved", msg=msg)

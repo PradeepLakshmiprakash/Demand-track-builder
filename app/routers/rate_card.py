@@ -1,4 +1,4 @@
-"""Lead admin: the vendor rate card (dated cost rates per hour)."""
+"""GTD admin team lead: the vendor rate card (dated cost rates per hour)."""
 
 from datetime import date
 from urllib.parse import quote
@@ -30,7 +30,9 @@ def rate_card_page(
     history = request.query_params.get("history") == "1"
     rows = rate_card_service.listing(db, actor.account_id, on=today, include_history=True)
     rows.sort(key=lambda r: (r.practice or "", cfg.grade_rank(r.grade), r.effective_from))
-    card = rate_card_service.grid(db, actor.account_id, today)
+    region = request.query_params.get("region", "")
+    region = region if region in cfg.regions else ""
+    card = rate_card_service.grid(db, actor.account_id, today, region or None)
     return render(
         request,
         "rate_card/index.html",
@@ -39,6 +41,7 @@ def rate_card_page(
         cfg=cfg,
         account=account,
         card=card,
+        region=region,
         upcoming=[r for r in rows if r.effective_from > today],
         past=[r for r in rows if r.effective_to is not None and r.effective_to < today],
         today=today,
@@ -70,6 +73,7 @@ async def add(
             cost_rate=str(f.get("cost_rate") or ""),
             effective_from=start,
             effective_to=_date(f.get("effective_to")),
+            region=str(f.get("region") or ""),
         )
     except (RateCardError, ValueError) as e:
         db.rollback()

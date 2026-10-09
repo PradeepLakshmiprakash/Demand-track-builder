@@ -124,7 +124,8 @@ def test_rate_card_screen(client: Client) -> None:
     client.as_user("anil")
     page = client.get("/rate-card").text
     assert "Cost per hour by grade and practice" in page and "CCA-FS" in page and "$71.40" in page
-    assert "Supply channel" not in page and "Region" not in page  # neither prices anything now
+    assert "Supply channel" not in page  # the channel prices nothing
+    assert "All regions" in page and "All amounts are in USD" in page  # a cost can be for one region
     r = client.post("/rate-card", data={"grade": "E1", "practice": "DCX-FS", "cost_rate": "120",
                                         "effective_from": "2027-01-01"})  # fmt: skip
     assert "msg=Rate%20set" in r.headers["location"]
@@ -400,7 +401,7 @@ def test_upload_rates_xlsx(client: Client, db: Session) -> None:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.append(rate_card_service.UPLOAD_COLUMNS)
-    ws.append(["TES-FS", "E1", 101, date(2027, 3, 1), None])
+    ws.append(["TES-FS", "E1", None, 101, date(2027, 3, 1), None])  # no region: every region
     buf = io.BytesIO()
     wb.save(buf)
     client.as_user("anil").post(
@@ -434,4 +435,35 @@ def test_export_is_the_upload_template(client: Client) -> None:
     r = client.as_user("anil").get("/rate-card/export.csv")
     lines = r.text.splitlines()
     assert lines[0] == ",".join(rate_card_service.UPLOAD_COLUMNS)
-    assert "CCA-FS,C1,60.00,2026-01-01," in lines
+    assert "CCA-FS,C1,,60.00,2026-01-01," in lines
+
+
+def test_a_region_can_have_its_own_cost(client: Client, db: Session) -> None:
+    on = date(2027, 6, 1)
+    everywhere = rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=on)
+    assert everywhere is not None and everywhere.region is None
+    c = client.as_user("anil")
+    form = {"grade": "C1", "practice": "CCA-FS", "cost_rate": "48", "effective_from": "2027-01-01"}
+    assert "err=" in c.post("/rate-card", data=form | {"region": "MARS"}).headers["location"]
+    assert "msg=Rate%20set" in c.post("/rate-card", data=form | {"region": "CA"}).headers["location"]
+    # the region's own cost wins there; everywhere else keeps the all-regions cost, which was not ended
+    ca = rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=on, region="CA")
+    us = rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=on, region="US")
+    assert ca is not None and ca.cost_rate == Decimal("48.00") and ca.region == "CA"
+    assert us is not None and us.cost_rate == everywhere.cost_rate and us.region is None
+    assert (
+        rate_card_service.lookup(db, 1, grade="C1", practice="CCA-FS", on=on).cost_rate
+        == everywhere.cost_rate
+    )
+    grid = rate_card_service.grid(db, 1, on, "CA")
+    assert grid[("C1", "CCA-FS")].cost_rate == Decimal("48.00")
+    assert rate_card_service.grid(db, 1, on)[("C1", "CCA-FS")].cost_rate == everywhere.cost_rate
+    page = c.get("/rate-card?region=CA").text
+    assert "Set for CA only" in page or "$48.00" in page or "Rates still to start" in page
+    # the upload takes a Region column, and the calculator prices for a region
+    more = "Practice,Grade,Region,Cost per hour,From,Until\nDCX-FS,C1,CA,41,2027-01-01,\n"
+    c.post("/rate-card/upload", files={"file": ("rates.csv", more.encode(), "text/csv")})
+    got = rate_card_service.lookup(db, 1, grade="C1", practice="DCX-FS", on=on, region="CA")
+    assert got is not None and got.cost_rate == Decimal("41.00")
+    calc = client.as_user("kavya").get("/margin-calculator?rate=100&practice=CCA-FS&grade=C1&region=CA")
+    assert calc.status_code == 200 and "All regions" in calc.text

@@ -53,11 +53,11 @@ class Actor:
 
     @property
     def can_see_bill_rate(self) -> bool:
-        """Rates across the whole account: the lead admin and leadership. See `sees_rates`."""
+        """Rates across the whole account: the GTD admin team lead and leadership. See `sees_rates`."""
         return self.role in (Role.ADMIN, Role.LEADERSHIP)
 
     def sees_rates(self, owner_id: int | None) -> bool:
-        """Bill rate, vendor cost and margin: the lead admin and leadership for every demand, and a
+        """Bill rate, vendor cost and margin: the GTD admin team lead and leadership for every demand, and a
         demand owner for their own."""
         return self.can_see_bill_rate or (owner_id is not None and owner_id == self.id)
 

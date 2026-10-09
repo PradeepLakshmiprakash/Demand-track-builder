@@ -73,7 +73,12 @@
         <label class="f">Exp. max (yrs)<input type="number" name="exp_max" min="0" max="50" value="{{ v.exp_max if v.exp_max is not none else '' }}"></label>
       </div>
       <label class="f">Job description
-        <input type="file" name="jd" accept=".pdf,.doc,.docx,.txt,.rtf">
+        <textarea name="jd_text" id="jd-text" rows="16" maxlength="12000" placeholder="Fill in the position details above, then press Draft it for me.">{{ v.jd_text or '' }}</textarea>
+        <span class="row" style="gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn small" id="jd-fill">Draft it for me</button><span class="hint" id="jd-hint">Drafted from the practice, grade, category, type, skills, experience and location above. It stays yours to edit; pressing the button again replaces it.</span></span>
+        {% if demand and demand.jd_path %}<span class="hint">An earlier file is on record: <a href="/demands/{{ demand.app_ref }}/jd">{{ demand.jd_path.split('/')[-1] }}</a>.</span>{% endif %}
+      </label>
+      <label class="f" hidden>Job description file
+        <input type="file" name="jd" accept=".pdf,.doc,.docx,.txt,.rtf" disabled>
         <span class="hint">{% if demand and demand.jd_path %}On file: <a href="/demands/{{ demand.app_ref }}/jd">{{ demand.jd_path.split('/')[-1] }}</a>. Choose a file to replace it. {% endif %}PDF, Word or text, up to 5 MB.</span>
       </label>
     </fieldset>
@@ -83,7 +88,7 @@
       <div class="grid2">
         <label class="f">Client bill rate (per hour)
           <input type="number" name="client_rate" min="0" step="0.01" value="{{ v.client_rate if v.client_rate is not none else '' }}" >
-          <span class="hint">Seen by you, the lead admin and leadership. Used for the offer margin and revenue loss.</span>
+          <span class="hint">Seen by you, the GTD admin team lead and leadership. Used for the offer margin and revenue loss.</span>
         </label>
         <label class="f">Requested start date<input type="date" name="start_date" value="{{ v.start_date or '' }}"><span class="hint">Revenue loss is counted from this date</span></label>
         <label class="f">Region
@@ -103,6 +108,7 @@
         <button class="btn primary" type="submit" name="action" value="submit">{{ 'Resubmit to admin' if demand and demand.status == 'returned' else 'Submit to admin' }}</button>
       {% else %}
         <button class="btn primary" type="submit" name="action" value="save">Save changes</button>
+        {% if demand.status in ('dropped', 'incorrect', 'missing') %}<button class="btn" type="submit" name="action" value="submit">Save and resubmit to the GTD admin team</button>{% endif %}
       {% endif %}
       <a class="btn" href="{{ '/demands/' ~ demand.app_ref if demand else '/demands' }}">Cancel</a>
     </div>
@@ -131,6 +137,50 @@
       var pick = document.querySelector('input[name=position_type][value="' + want + '"]');
       if (pick) pick.checked = true;
     });
+  });
+})();
+</script>
+<script>
+/* The job description, drafted from what the form already says. The owner edits it from there. */
+(function () {
+  var form = document.getElementById('jd-text').form, box = document.getElementById('jd-text');
+  function val(name) { var el = form.elements[name]; if (!el) return ''; if (el.length && !el.options) { for (var i = 0; i < el.length; i++) if (el[i].checked) return el[i].value; return ''; } return (el.value || '').trim(); }
+  function list(text) { return text.split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+  function draftJd() {
+    var name = val('name') || 'This role', practice = val('practice'), grade = val('grade'), category = val('category'), type = val('type');
+    var position = val('position_type'), primary = list(val('primary_skills')), secondary = list(val('secondary_skills'));
+    var min = val('exp_min'), max = val('exp_max'), location = val('location'), mode = val('work_mode'), region = val('region');
+    var client = val('client_interview_required'), replaced = val('replaced_resource');
+    var exp = min && max ? min + ' to ' + max + ' years' : max ? 'Up to ' + max + ' years' : min ? min + ' or more years' : '';
+    var L = [];
+    L.push('JOB DESCRIPTION', '', 'Role: ' + name);
+    if (practice || grade) L.push('Practice and grade: ' + [practice, grade].filter(Boolean).join(' · '));
+    if (location || mode || region) L.push('Location: ' + [location, region].filter(Boolean).join(', ') + (mode ? ' · ' + mode : ''));
+    L.push('Position: ' + [type || 'New', (position || 'Billable').toLowerCase(), category ? category.toLowerCase() : ''].filter(Boolean).join(', '));
+    if (exp) L.push('Experience: ' + exp);
+    L.push('', 'About the role');
+    if (category === 'Proactive') L.push('This position is raised ahead of confirmed client demand. The person joins the account team, builds knowledge of the client\'s systems and ways of working, and is ready to move into a billable role as soon as one is confirmed.');
+    else if (type === 'Replacement') L.push('This role takes over from ' + (replaced || 'a team member who is moving on') + '. The person picks up their responsibilities with a handover period, and is expected to become independent quickly.');
+    else L.push('This is a new position on the client engagement. The person joins an established delivery team and works directly with client stakeholders.');
+    if (position === 'Non-billable') L.push('The position is not billed to the client at the start.');
+    L.push('', 'What you will do');
+    L.push('- Deliver work in ' + (primary.length ? primary.join(', ') : 'the primary skill area') + ' as part of the ' + (practice || 'delivery') + ' team.');
+    L.push('- Analyse requirements, estimate the work and agree the approach with the team lead.');
+    L.push('- Build, test and release changes, following the engagement\'s review and release process.');
+    L.push('- Investigate and fix issues in live systems within agreed service levels.');
+    L.push('- Keep documentation current and share knowledge with the team, onshore and offshore.');
+    L.push('', 'Required skills');
+    (primary.length ? primary : ['(add the primary skills above)']).forEach(function (x) { L.push('- ' + x); });
+    if (exp) L.push('- ' + exp + ' of relevant experience');
+    L.push('- Clear written and spoken communication; comfortable working with a client team');
+    if (secondary.length) { L.push('', 'Good to have'); secondary.forEach(function (x) { L.push('- ' + x); }); }
+    L.push('', 'Interview');
+    L.push(client === 'false' || client === '0' || client === 'no' ? 'Internal panel interview; the panel\'s decision is final.' : 'Internal panel interview, followed by a client interview.');
+    return L.join('\n');
+  }
+  document.getElementById('jd-fill').addEventListener('click', function () {
+    if (box.value.trim() && !confirm('Replace the job description with a fresh draft?')) return;
+    box.value = draftJd(); box.focus();
   });
 })();
 </script>

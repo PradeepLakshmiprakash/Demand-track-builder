@@ -3,7 +3,7 @@
 When a demand reaches Offer in process, its candidate's offer is priced:
     margin = (client bill rate − vendor cost rate) ÷ client bill rate
 with the cost from the rate card in force on the offer date. At or above the account's cut-off (30% for
-Discover) the lead admin approves or declines; below it, leadership decides at their
+Discover) the GTD admin team lead approves or declines; below it, leadership decides at their
 discretion (confirmed 24 Sep). Every decision records approver, margin and time.
 
 An offer whose bill rate or rate card entry is missing waits unpriced, with the reason
@@ -59,7 +59,9 @@ def price(db: Session, account: Account, approval: OfferApproval, demand: Demand
     if not demand.client_rate:
         approval.blocked_reason = "The demand has no client bill rate. Add it on the demand."
         return
-    rate = rate_card_service.lookup(db, account.id, grade=demand.grade or "", practice=demand.practice, on=on)
+    rate = rate_card_service.lookup(
+        db, account.id, grade=demand.grade or "", practice=demand.practice, on=on, region=demand.region
+    )
     if rate is None:
         approval.blocked_reason = (
             f"The rate card has no cost for {demand.grade} in {demand.practice} on {on:%d %b %Y}."
@@ -108,7 +110,7 @@ def _numbers(approval: OfferApproval) -> str:
 def _mail_raised(
     db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval
 ) -> None:
-    """An offer needs a decision: mail whoever decides it. The lead admin is always notified."""
+    """An offer needs a decision: mail whoever decides it. The GTD admin team lead is always notified."""
     owner = db.get_one(User, demand.owner_id)
     admins = _team_admins(db, account.id)
     if approval.route == ApprovalRoute.LEADERSHIP.value:
@@ -263,7 +265,7 @@ def decide(db: Session, actor: Actor, approval_id: int, decision: str, comment: 
 def _mail_decision(
     db: Session, account: Account, demand: Demand, cand: Candidate, approval: OfferApproval, actor: Actor
 ) -> None:
-    """The decision goes to the lead admin (always notified) and to the demand owner when someone
+    """The decision goes to the GTD admin team lead (always notified) and to the demand owner when someone
     else decided."""
     owner = db.get_one(User, demand.owner_id)
     to = set(_team_admins(db, account.id)) | ({owner.email} if owner.active else set())
@@ -409,7 +411,7 @@ def set_joining_date(db: Session, actor: Actor, demand: Demand, when: date | Non
         raise ApprovalError("The demand's owner records the joining date, once an offer is approved.")
     if when is None:
         raise ApprovalError("Enter the expected date of joining.")
-    demand.expected_doj = when
+    demand.expected_doj, demand.expected_doj_at = when, datetime.now(UTC)
     if demand.status_enum in PROGRESS_ORDER and PROGRESS_ORDER.index(
         demand.status_enum
     ) < PROGRESS_ORDER.index(DemandStatus.OFFER_IN_MARKET):

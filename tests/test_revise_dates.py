@@ -22,9 +22,10 @@ def test_owner_changes_the_dates_after_gtd(client: Client, db: Session) -> None:
     d.type, d.replaced_resource, d.lwd = "Replacement", "Someone Leaving", date.today()
     db.commit()
     page = client.as_user("priya").get(f"/demands/{REF}").text
-    assert "Change the dates" in page and "Last working day (leaver)" in page
-    assert ">Demand owner<" in page and "Priya N." in page
-    assert "Change the dates" not in client.as_user("farah").get(f"/demands/{REF}").text
+    # dates are changed in place now, with the pencil on the box, like everything else on the demand
+    assert "Change the dates" not in page and 'data-edit="commercial"' in page
+    assert "Last working day (leaver)" in page and ">Demand owner<" in page and "Priya N." in page
+    assert "data-edit=" not in client.as_user("farah").get(f"/demands/{REF}").text
 
     mail.sent.clear()
     start, lwd = date.today() + timedelta(days=20), date.today() + timedelta(days=5)

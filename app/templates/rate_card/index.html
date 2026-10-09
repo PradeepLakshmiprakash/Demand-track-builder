@@ -30,6 +30,11 @@
 
 <section class="panel">
   <div class="panel-head"><div><h2>Cost per hour by grade and practice</h2><div class="hint">The practice sets the rate, so the same grade costs a different amount in each practice. To change a rate, set a new one below: the old one is kept as history.</div></div></div>
+  <div class="panel-body row" style="gap:8px;align-items:center;padding-bottom:0">
+    <span class="small muted">Showing the cost for</span>
+    <div class="wx-seg" role="group" aria-label="Region">{% if region %}<a href="/rate-card">All regions</a>{% else %}<span class="on">All regions</span>{% endif %}{% for x in cfg.regions %}{% if region == x %}<span class="on">{{ x }}</span>{% else %}<a href="/rate-card?region={{ x | urlencode }}">{{ x }}</a>{% endif %}{% endfor %}</div>
+    <span class="small muted">All amounts are in USD. A region shows its own cost where one is set, otherwise the all-regions cost.</span>
+  </div>
   <div class="ov-scroll">
     <table class="pay-table">
       <thead><tr><th>Grade</th>{% for p in cfg.practices %}<th class="num">{{ p }}</th>{% endfor %}</tr></thead>
@@ -39,23 +44,24 @@
           <td><strong>{{ g }}</strong></td>
           {% for p in cfg.practices %}
             {% set r = card.get((g, p)) or card.get((g, none)) %}
-            <td class="num">{% if r %}{{ r.cost_rate | money(true) }}{% if r.practice is none %}<span class="small muted" title="Entered for any practice"> *</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td class="num">{% if r %}{{ r.cost_rate | money(true) }}{% if r.practice is none %}<span class="small muted" title="Entered for any practice"> *</span>{% endif %}{% if region and r.region %}<span class="small" title="Set for {{ r.region }} only" style="color:var(--brand)"> ●</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
           {% endfor %}
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="panel-body small muted">— no cost yet: offers for that practice and grade can't be priced. &nbsp; * a rate entered for any practice, used where the practice has none of its own.</div>
+  <div class="panel-body small muted">— no cost yet: offers for that practice and grade can't be priced. &nbsp; * a rate entered for any practice, used where the practice has none of its own. &nbsp; ● a cost set for this region only.</div>
 </section>
 
 <section class="panel">
   <div class="panel-head"><h2>Change a rate</h2></div>
   <form method="post" action="/rate-card" class="panel-body stack">
-    <div class="grid4">
+    <div class="grid5">
       <label class="f">Practice<select name="practice" required><option value="">Choose…</option>{% for p in cfg.practices %}<option>{{ p }}</option>{% endfor %}</select></label>
       <label class="f">Grade<select name="grade" required><option value="">Choose…</option>{% for g in cfg.grades %}<option>{{ g }}</option>{% endfor %}</select></label>
-      <label class="f">Cost per hour ($)<input type="number" name="cost_rate" min="0" step="0.01" required></label>
+      <label class="f">Region<select name="region"><option value="">All regions</option>{% for x in cfg.regions %}<option {{ 'selected' if region == x }}>{{ x }}</option>{% endfor %}</select></label>
+      <label class="f">Cost per hour (USD)<input type="number" name="cost_rate" min="0" step="0.01" required></label>
       <label class="f">From<input type="date" name="effective_from" value="{{ today.isoformat() }}" required></label>
     </div>
     <div class="row"><button class="btn primary">Set rate</button><span class="small muted">The rate in use until then ends the day before. Offers still waiting are re-priced.</span></div>
@@ -63,7 +69,7 @@
 </section>
 
 <section class="panel">
-  <div class="panel-head"><div><h2>Upload rates</h2><div class="hint">A .csv or .xlsx with the columns {{ upload_columns | join(', ') }}. Until can be blank. All or nothing: if any row is wrong, nothing is imported. The download above is also the template.</div></div></div>
+  <div class="panel-head"><div><h2>Upload rates</h2><div class="hint">A .csv or .xlsx with the columns {{ upload_columns | join(', ') }}. Until and Region can be blank; a blank Region means every region. All or nothing: if any row is wrong, nothing is imported. The download above is also the template.</div></div></div>
   <form method="post" action="/rate-card/upload" enctype="multipart/form-data" class="panel-body row">
     <label class="f" style="flex:1;max-width:420px">Rates file<input type="file" name="file" accept=".csv,.xlsx" required></label>
     <button class="btn primary" style="align-self:flex-end">Import rates</button>
@@ -76,7 +82,7 @@
   <div class="tbl rates">
     <div class="tr th"><div>Practice</div><div>Grade</div><div>Cost / h</div><div>From</div><div>Until</div><div></div></div>
     {% for r in upcoming %}
-    <div class="tr"><div>{{ r.practice or 'Any' }}</div><div>{{ r.grade }}</div><div class="num">{{ r.cost_rate | money(true) }}</div><div>{{ r.effective_from | d }}</div><div>{{ r.effective_to | d if r.effective_to else 'Open' }}</div>
+    <div class="tr"><div>{{ r.practice or 'Any' }}{% if r.region %} <span class="chip gray">{{ r.region }}</span>{% endif %}</div><div>{{ r.grade }}</div><div class="num">{{ r.cost_rate | money(true) }}</div><div>{{ r.effective_from | d }}</div><div>{{ r.effective_to | d if r.effective_to else 'Open' }}</div>
       <div><details class="end-rate"><summary class="small">End…</summary>
         <form method="post" action="/rate-card/{{ r.id }}/end" class="row" style="margin-top:6px">
           <input type="date" name="last_day" value="{{ r.effective_from.isoformat() }}" aria-label="Last day for this rate" required style="width:auto">
@@ -93,7 +99,7 @@
   <div class="tbl rates">
     <div class="tr th"><div>Practice</div><div>Grade</div><div>Cost / h</div><div>From</div><div>Until</div><div></div></div>
     {% for r in past %}
-    <div class="tr past"><div>{{ r.practice or 'Any' }}</div><div>{{ r.grade }}</div><div class="num">{{ r.cost_rate | money(true) }}</div><div>{{ r.effective_from | d }}</div><div>{{ r.effective_to | d }}</div><div></div></div>
+    <div class="tr past"><div>{{ r.practice or 'Any' }}{% if r.region %} <span class="chip gray">{{ r.region }}</span>{% endif %}</div><div>{{ r.grade }}</div><div class="num">{{ r.cost_rate | money(true) }}</div><div>{{ r.effective_from | d }}</div><div>{{ r.effective_to | d }}</div><div></div></div>
     {% else %}
     <div class="empty">No rate has been replaced yet. Every change is kept here.</div>
     {% endfor %}

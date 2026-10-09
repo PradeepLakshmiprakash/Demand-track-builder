@@ -230,11 +230,13 @@ def test_l2_request_approval_and_scheduling(client: Client, db: Session) -> None
     assert f"/feedback/{iv.feedback_token}" in invite.text and "10:30" in invite.text
 
 
-def test_admin_demand_owner_can_decide_a_round(db: Session) -> None:
+def test_an_extra_round_is_the_demand_owners_call(db: Session) -> None:
     c = svc.ensure_candidate(db, 1, by_ref(db, "DM-000142"), "Candidate Y")
     svc.record_feedback(db, db.get_one(Account, 1), user_id("vikram"), c, fb(needs_next_round=True))
     req = db.scalars(select(Interview).where(Interview.candidate_id == c.id, Interview.round == "L2")).one()
-    svc.decide_next_round(db, actor(db, "kavya"), req.id, True, None)
+    with pytest.raises(svc.InterviewError):  # the team lead doesn't decide rounds on other people's demands
+        svc.decide_next_round(db, actor(db, "kavya"), req.id, True, None)
+    svc.decide_next_round(db, actor(db, "priya"), req.id, True, None)
     assert db.get_one(Interview, req.id).status == "open"
 
 

@@ -13,7 +13,8 @@
 <section class="panel">
   <form method="get" class="panel-body stack">
     {% if error %}<div class="flash bad" role="alert">{{ error }}</div>{% endif %}
-    <div class="grid4">
+    <div class="grid5">
+      <label class="f">Region<select name="region"><option value="">All regions</option>{% for x in cfg.regions %}<option {{ 'selected' if request.query_params.get('region') == x }}>{{ x }}</option>{% endfor %}</select><span class="hint">Costs are in USD</span></label>
       <label class="f">Client rate, per hour ($)
         <input type="number" name="bill_rate" min="1" step="1" value="{{ v.bill_rate }}" required>
         <span class="hint">What the client pays for this position.</span>

@@ -22,10 +22,15 @@ class Role(StrEnum):
     def label(self) -> str:
         return ROLE_LABELS[self]
 
+    @property
+    def full_title(self) -> str:
+        """The label where the lead has to be told apart from the rest of the team (User access)."""
+        return "GTD admin team lead" if self is Role.ADMIN else ROLE_LABELS[self]
+
 
 ROLE_LABELS = {
     Role.DEMAND_OWNER: "Demand owner",
-    Role.ADMIN: "Lead admin",
+    Role.ADMIN: "GTD admin team",  # its lead: the same team, with special access
     Role.ADMIN_TEAM: "GTD admin team",
     Role.LEADERSHIP: "Leadership",
     Role.INTERVIEWER: "Interviewer",
@@ -235,11 +240,15 @@ class EscalationType(StrEnum):
     PANEL_SLA = "panel_sla"
     PAST_START = "past_start"
     UNLINKED_ROW = "unlinked_row"  # a BCM sheet row whose requisition no demand in the app is linked to
+    PREJOIN_OVERDUE = "prejoin_overdue"  # a pre-joining checklist item is past its due date
+    NOT_BILLING = "not_billing"  # the candidate joined, but client billing has not started
 
     @property
     def label(self) -> str:
         return {
             "unlinked_row": "In BCM sheet, not in the app",
+            "prejoin_overdue": "Pre-joining item overdue",
+            "not_billing": "Joined, not billing",
             "not_submitted": "Not submitted",
             "missing": "Missing from sheet",
             "dropped": "Dropped from sheet",

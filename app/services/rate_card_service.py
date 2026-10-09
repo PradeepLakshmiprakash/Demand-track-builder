@@ -31,38 +31,58 @@ class RateCardError(ValueError):
 class RateKey:
     grade: str
     practice: str | None
+    region: str | None = None  # None: the cost for every region without one of its own
 
 
 def _in_force(on: date) -> list[ColumnElement[bool]]:
     return [RateCard.effective_from <= on, or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on)]
 
 
-def lookup(db: Session, account_id: int, *, grade: str, practice: str | None, on: date) -> RateCard | None:
-    """The cost in force on `on` for this practice and grade. A rate entered for "any practice" (kept
-    from older cards) applies where the practice has none of its own."""
+def _for_region(region: str | None) -> ColumnElement[bool]:
+    """Rates that can apply in this region: its own, and the ones entered for every region."""
+    if region:
+        return or_(RateCard.region == region, RateCard.region.is_(None))
+    return RateCard.region.is_(None)
+
+
+def lookup(
+    db: Session, account_id: int, *, grade: str, practice: str | None, on: date, region: str | None = None
+) -> RateCard | None:
+    """The cost in force on `on` for this practice and grade, in USD. A cost entered for the region
+    wins over the one for every region; a rate entered for "any practice" (kept from older cards)
+    applies where the practice has none of its own."""
     rows = db.scalars(
         select(RateCard).where(
             RateCard.account_id == account_id,
             RateCard.grade == grade,
             or_(RateCard.practice == practice, RateCard.practice.is_(None)),
+            _for_region(region),
             *_in_force(on),
         )
     ).all()
-    specific = [r for r in rows if r.practice is not None]
-    candidates = specific or list(rows)
-    return candidates[0] if candidates else None
+    ranked = sorted(rows, key=lambda r: (r.practice is None, r.region is None))
+    return ranked[0] if ranked else None
 
 
-def grid(db: Session, account_id: int, on: date) -> dict[tuple[str, str | None], RateCard]:
-    """Every rate in force on `on`, by (grade, practice); practice None is the "any practice" rate."""
-    rows = db.scalars(select(RateCard).where(RateCard.account_id == account_id, *_in_force(on)))
-    return {(r.grade, r.practice): r for r in rows}
+def grid(
+    db: Session, account_id: int, on: date, region: str | None = None
+) -> dict[tuple[str, str | None], RateCard]:
+    """Every rate in force on `on` for a region, by (grade, practice); practice None is the "any
+    practice" rate. Where the region has its own cost it replaces the all-regions one."""
+    rows = db.scalars(
+        select(RateCard).where(RateCard.account_id == account_id, _for_region(region), *_in_force(on))
+    )
+    out: dict[tuple[str, str | None], RateCard] = {}
+    for r in sorted(rows, key=lambda r: r.region is not None):  # region-specific last, so it wins
+        out[(r.grade, r.practice)] = r
+    return out
 
 
 def _same_key(key: RateKey) -> list[ColumnElement[bool]]:
     return [
         RateCard.grade == key.grade,
         RateCard.practice.is_(None) if key.practice is None else RateCard.practice == key.practice,
+        RateCard.region.is_(None) if key.region is None else RateCard.region == key.region,
     ]
 
 
@@ -77,9 +97,13 @@ def add_rate(
     effective_from: date,
     effective_to: date | None = None,
     commit: bool = True,
+    region: str | None = None,
 ) -> RateCard:
     cfg = db.get_one(Account, account_id).settings
     practice = practice or None
+    region = (region or "").strip() or None
+    if region is not None and region not in cfg.regions:
+        raise RateCardError(f"Region '{region}' isn't in the account's list.")
     if grade not in cfg.grades:
         raise RateCardError(f"Grade '{grade}' isn't in the account's list.")
     if practice is None:
@@ -95,7 +119,7 @@ def add_rate(
     if effective_to is not None and effective_to < effective_from:
         raise RateCardError("The end date is before the start date.")
 
-    key = RateKey(grade, practice)
+    key = RateKey(grade, practice, region)
     existing = list(db.scalars(select(RateCard).where(RateCard.account_id == account_id, *_same_key(key))))
     for r in existing:
         starts_before = r.effective_from < effective_from
@@ -115,6 +139,7 @@ def add_rate(
         account_id=account_id,
         grade=grade,
         practice=practice,
+        region=region,
         cost_rate=cost,
         effective_from=effective_from,
         effective_to=effective_to,
@@ -144,7 +169,13 @@ def listing(db: Session, account_id: int, *, on: date, include_history: bool = F
     stmt = select(RateCard).where(RateCard.account_id == account_id)
     if not include_history:
         stmt = stmt.where(or_(RateCard.effective_to.is_(None), RateCard.effective_to >= on))
-    return list(db.scalars(stmt.order_by(RateCard.practice, RateCard.grade, RateCard.effective_from)))
+    return list(
+        db.scalars(
+            stmt.order_by(
+                RateCard.practice, RateCard.grade, RateCard.region.nulls_first(), RateCard.effective_from
+            )
+        )
+    )
 
 
 # --- The calculator: what a client rate affords ------------------------------------------------------
@@ -169,10 +200,12 @@ def ceiling(bill: Decimal, hold: Decimal) -> Decimal:
     return (bill * (1 - hold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def offerings(db: Session, account_id: int, bill: Decimal, hold: Decimal, on: date) -> list[Offering]:
+def offerings(
+    db: Session, account_id: int, bill: Decimal, hold: Decimal, on: date, region: str | None = None
+) -> list[Offering]:
     """Every practice and grade on the card, priced against this client rate."""
     cfg = db.get_one(Account, account_id).settings
-    card = grid(db, account_id, on)
+    card = grid(db, account_id, on, region)
     out = []
     for practice in cfg.practices:
         for grade in cfg.grades:
@@ -264,20 +297,24 @@ class Contribution:
         return (self.cost / (1 - self.threshold / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def cost_members(db: Session, account_id: int, members: list[Member], on: date) -> list[Member]:
+def cost_members(
+    db: Session, account_id: int, members: list[Member], on: date, region: str | None = None
+) -> list[Member]:
     """Fill each line's cost per hour from the rate card."""
-    card = grid(db, account_id, on)
+    card = grid(db, account_id, on, region)
     for m in members:
         rate = card.get((m.grade, m.practice)) or card.get((m.grade, None))
         m.cost = Decimal(rate.cost_rate) if rate is not None else None
     return members
 
 
-def team_contribution(db: Session, account: Account, members: list[Member], on: date) -> Contribution:
+def team_contribution(
+    db: Session, account: Account, members: list[Member], on: date, region: str | None = None
+) -> Contribution:
     """Team contribution margin: each role has its own client rate; the team's margin is everything
     billed less everything it costs, over everything billed. Lines without a cost or a rate are left out
     of the totals (and listed, so the gap is visible)."""
-    cost_members(db, account.id, members, on)
+    cost_members(db, account.id, members, on, region)
     counted = [m for m in members if m.cost is not None and m.rate is not None]
     hours = Decimal(str(account.settings.billable_hours_per_day)) * MONTH_DAYS
     return Contribution(
@@ -290,12 +327,17 @@ def team_contribution(db: Session, account: Account, members: list[Member], on: 
 
 
 def pod_contribution(
-    db: Session, account: Account, members: list[Member], price_per_month: Decimal, on: date
+    db: Session,
+    account: Account,
+    members: list[Member],
+    price_per_month: Decimal,
+    on: date,
+    region: str | None = None,
 ) -> Contribution:
     """Pod contribution margin: the client pays one price a month for the whole pod; people can be on
     it part-time. The pod's cost is each member's cost for their share of time; its margin is the price
     less that cost, over the price."""
-    cost_members(db, account.id, members, on)
+    cost_members(db, account.id, members, on, region)
     hours = Decimal(str(account.settings.billable_hours_per_day)) * MONTH_DAYS
     cost = sum((m.cost * m.fte for m in members if m.cost is not None), Decimal(0))
     return Contribution(
@@ -365,7 +407,8 @@ def suggestions(
 
 # --- Bulk upload -----------------------------------------------------------------------------------
 
-UPLOAD_COLUMNS = ["Practice", "Grade", "Cost per hour", "From", "Until"]
+UPLOAD_COLUMNS = ["Practice", "Grade", "Region", "Cost per hour", "From", "Until"]
+OPTIONAL_COLUMNS = ("Until", "Region")  # a blank or missing Region means every region
 
 
 def _cell_date(v: object) -> date | None:
@@ -408,11 +451,12 @@ def import_rates(db: Session, account_id: int, actor_id: int, filename: str, dat
     if not rows:
         raise RateCardError("The file has no rates.")
     columns = {k.strip().casefold(): k for k in rows[0]}
-    missing = [c for c in UPLOAD_COLUMNS if c != "Until" and c.casefold() not in columns]
+    missing = [c for c in UPLOAD_COLUMNS if c not in OPTIONAL_COLUMNS and c.casefold() not in columns]
     if missing:
         raise RateCardError(f"Missing columns: {', '.join(missing)}. Expected: {', '.join(UPLOAD_COLUMNS)}.")
     cfg = db.get_one(Account, account_id).settings
     practice_of = {p.casefold(): p for p in cfg.practices}
+    region_of = {r.casefold(): r for r in cfg.regions}
     errors: list[str] = []
     for n, row in enumerate(rows, start=2):  # row 1 is the header
 
@@ -436,6 +480,9 @@ def import_rates(db: Session, account_id: int, actor_id: int, filename: str, dat
                 effective_from=start,
                 effective_to=_cell_date(row.get(columns["until"])) if "until" in columns else None,
                 commit=False,
+                region=None
+                if col("Region").casefold() in ("", "all", "any")
+                else region_of.get(col("Region").casefold(), col("Region")),
             )
         except RateCardError as e:
             errors.append(f"Row {n}: {e}")
@@ -454,5 +501,7 @@ def export_csv(rows: list[RateCard]) -> str:
     w.writerow(UPLOAD_COLUMNS)
     for r in rows:
         until = r.effective_to.isoformat() if r.effective_to else ""
-        w.writerow([r.practice or "Any", r.grade, r.cost_rate, r.effective_from.isoformat(), until])
+        w.writerow(
+            [r.practice or "Any", r.grade, r.region or "", r.cost_rate, r.effective_from.isoformat(), until]
+        )
     return out.getvalue()

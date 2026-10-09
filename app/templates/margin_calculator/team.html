@@ -14,6 +14,7 @@
 <section class="panel">
   <div class="panel-head"><div><h2>The team</h2><div class="hint">One line per role. Add or remove lines with the buttons; an empty line is ignored.</div></div></div>
   <form method="get">
+    <div class="panel-body" style="padding-bottom:0"><label class="f" style="max-width:240px">Region<select name="region"><option value="">All regions</option>{% for x in cfg.regions %}<option {{ 'selected' if request.query_params.get('region') == x }}>{{ x }}</option>{% endfor %}</select><span class="hint">Costs are in USD</span></label></div>
     <div class="tbl plain">
       <div class="tr th teamrow"><div>Practice</div><div>Grade / designation</div><div>People</div><div>Client rate / h ($)</div><div></div></div>
       {% macro line(m, n) %}

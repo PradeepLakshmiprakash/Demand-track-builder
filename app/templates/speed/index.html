@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Speed report{% endblock %}
+{% macro num(v) %}{{ ('%g' % v) if v is not none else '—' }}{% endmacro %}
+{% block main %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ actor.role.label }} · {{ actor.account_name }}</div>
+    <h1>Speed report</h1>
+    <div class="lede">How long positions take to fill and where the time goes, in working days, from {{ r.since | d }} to {{ r.today | d }}. A step counts once the demand has left it; time to fill counts once the candidate has joined.</div>
+  </div>
+  <div class="head-side"><a class="btn" href="/speed.csv?days={{ days }}&bu={{ bu | urlencode }}&practice={{ practice | urlencode }}&owner={{ owner | urlencode }}">Download (.csv)</a></div>
+</div>
+
+<section class="panel panel-body">
+  <form method="get" class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <label class="f">Period<select name="days">{% for n in periods %}<option value="{{ n }}" {{ 'selected' if n == days }}>Last {{ n }} days</option>{% endfor %}</select></label>
+    <label class="f">Business unit<select name="bu"><option value="">All</option>{% for x in bus %}<option {{ 'selected' if x == bu }}>{{ x }}</option>{% endfor %}</select></label>
+    <label class="f">Practice<select name="practice"><option value="">All</option>{% for x in practices %}<option {{ 'selected' if x == practice }}>{{ x }}</option>{% endfor %}</select></label>
+    <label class="f">Demand owner<select name="owner"><option value="">All</option>{% for u in owners %}<option value="{{ u.id }}" {{ 'selected' if owner == u.id | string }}>{{ u.name }}</option>{% endfor %}</select></label>
+    <input type="hidden" name="by" value="{{ by }}">
+    <button class="btn primary">Show</button>
+    {% if bu or practice or owner or days != 90 %}<a class="btn" href="/speed">Clear</a>{% endif %}
+  </form>
+</section>
+
+<div class="ov-kpis">
+  <div class="kpi {{ 'amber' if r.time_to_fill is not none and r.fill_target and r.time_to_fill > r.fill_target }}"><div class="k">Time to fill · median</div><div class="v">{{ num(r.time_to_fill) }}{{ ' days' if r.time_to_fill is not none }}</div>{% if r.fill_target %}<span class="tag">target {{ r.fill_target }}</span>{% endif %}</div>
+  <div class="kpi"><div class="k">Filled in the period</div><div class="v">{{ r.filled }}</div></div>
+  <div class="kpi {{ 'amber' if r.filled_late }}"><div class="k">Filled after the start date</div><div class="v">{{ r.filled_late }} of {{ r.filled }}</div>{% if r.filled %}<span class="tag">{{ (r.filled_late / r.filled * 100) | round | int }}%</span>{% endif %}</div>
+  <div class="kpi {{ 'red' if r.exits }}"><div class="k">Did not join after an offer</div><div class="v">{{ r.exits }}{% if r.offers %} of {{ r.offers }}{% endif %}</div>{% if r.exit_share is not none and r.exits %}<span class="tag">{{ r.exit_share }}%</span>{% endif %}</div>
+  <div class="kpi {{ 'amber' if r.billing_gap is not none and r.billing_target and r.billing_gap > r.billing_target }}"><div class="k">Joined to billing · median</div><div class="v">{{ num(r.billing_gap) }}{{ ' days' if r.billing_gap is not none }}</div>{% if r.billing_target %}<span class="tag">target {{ r.billing_target }}</span>{% endif %}</div>
+</div>
+
+<div class="sp-two">
+  <section class="panel panel-body">
+    <h2 style="margin-bottom:4px">Where the time goes</h2>
+    <div class="small muted" style="margin-bottom:12px">Median working days a demand spent at each step. A darker bar is over the target the Administrator set for that step. Select a step to list the demands behind it.</div>
+    <div class="sp-bars">
+      {% for s in r.steps %}
+      <a class="sp-row {{ 'on' if step == s.key }}" href="/speed?{{ query | replace('&step=' ~ step, '') | replace('step=' ~ step, '') }}{{ '&' if query and query != 'step=' ~ step }}step={{ s.key }}#stays">
+        <span>{{ s.no }} · {{ s.label }}</span>
+        <span class="t" title="{{ s.count }} stay{{ 's' if s.count != 1 }}">{% if s.days is not none %}<i class="{{ 'over' if s.over }}" style="width:{{ [s.days / r.longest * 100, 2] | max }}%"></i>{% endif %}{% if s.target %}<b style="left:{{ [s.target / r.longest * 100, 100] | min }}%" title="Target {{ s.target }}"></b>{% endif %}</span>
+        <span class="n">{{ num(s.days) }}{% if s.target %} <span class="tgt">/ {{ s.target }}</span>{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="small muted" style="margin-top:10px">The thin mark on a bar is its target. Steps with a dash had no demand leave them in the period.</div>
+  </section>
+
+  <section class="panel panel-body">
+    <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0">By {{ groups[by] | lower }}</h2>
+      <div class="wx-seg" role="group" aria-label="Group by">{% for k, label in groups.items() %}{% if k == by %}<span class="on">{{ label }}</span>{% else %}<a href="/speed?days={{ days }}&bu={{ bu | urlencode }}&practice={{ practice | urlencode }}&owner={{ owner | urlencode }}&by={{ k }}">{{ label }}</a>{% endif %}{% endfor %}</div>
+    </div>
+    <table class="ov-table" style="margin-top:0">
+      <thead><tr><th>{{ groups[by] }}</th><th class="r">Filled</th><th class="r">Time to fill</th><th class="r">Late</th><th class="r">Did not join</th></tr></thead>
+      <tbody>
+      {% for g in r.groups %}
+        <tr><td>{{ g.name }}</td><td class="r">{{ g.filled }}</td><td class="r {{ 'late' if g.time_to_fill is not none and r.fill_target and g.time_to_fill > r.fill_target }}">{{ num(g.time_to_fill) }}{{ ' days' if g.time_to_fill is not none }}</td><td class="r">{{ g.late }}</td><td class="r">{{ g.exits }}</td></tr>
+      {% else %}
+        <tr><td colspan="5" class="small muted">No position was filled, and no candidate dropped out, in this period.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <h2 style="margin:18px 0 10px">Why candidates did not join</h2>
+    {% if r.reasons %}
+    <div class="sp-bars reasons">
+      {% for reason, n in r.reasons %}<div class="sp-row"><span>{{ reason }}</span><span class="t"><i style="width:{{ n / r.reasons[0][1] * 100 }}%"></i></span><span class="n">{{ n }}</span></div>{% endfor %}
+    </div>
+    {% else %}<div class="small muted">Nobody with an offer dropped out in this period.</div>{% endif %}
+  </section>
+</div>
+
+<section class="panel panel-body" id="trend">
+  <h2 style="margin-bottom:4px">Day by day</h2>
+  <div class="small muted" style="margin-bottom:10px">The account's headline figures as they stood at the end of each day, kept so a past report can be shown again. One row is stored a day; the account-wide figures, not the filters above.</div>
+  {% if trend %}
+  {% set top = trend | map(attribute='revenue_lost') | max %}
+  <div class="ov-scroll"><table class="ov-table" style="margin-top:0">
+    <thead><tr><th>Day</th><th class="r">Open</th><th class="r">Past start</th><th class="r">Escalations open</th><th>Revenue lost to date</th><th class="r">Non-billable cost</th><th class="r">Joined, not billed</th></tr></thead>
+    <tbody>
+    {% for f in trend | reverse %}
+      <tr><td class="nw">{{ f.day | d }}</td><td class="r">{{ f.open_positions }}</td><td class="r">{{ f.late_positions }}</td><td class="r">{{ f.escalations_open }}</td>
+        <td><span class="sp-mini"><i style="width:{{ (f.revenue_lost / top * 100) if top else 0 }}%"></i></span> {{ f.revenue_lost | money }}</td>
+        <td class="r">{{ f.nb_cost | money }}</td><td class="r">{{ f.unbilled | money }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<div class="small muted">Nothing stored yet. The first row appears after the daily job has run.</div>{% endif %}
+</section>
+
+{% if step %}
+<section class="panel panel-body" id="stays">
+  <h2 style="margin-bottom:8px">{{ step_label }} · {{ r.stays[step] | length }} stay{{ 's' if r.stays[step] | length != 1 }}, slowest first</h2>
+  <div class="ov-scroll"><table class="ov-table" style="margin-top:0">
+    <thead><tr><th>Demand</th><th>Position</th><th>Business unit</th><th>Practice</th><th>Entered</th><th>Left</th><th class="r">Working days</th></tr></thead>
+    <tbody>
+    {% for s in r.stays[step][:50] %}
+      <tr><td><a class="mono" href="/demands/{{ s.demand.app_ref }}">{{ s.demand.gtd_req_id or s.demand.app_ref }}</a></td><td>{{ s.demand.name }}</td><td>{{ s.demand.business_unit.name }}</td><td>{{ s.demand.practice or '—' }}</td><td class="nw">{{ s.entered | d }}</td><td class="nw">{{ s.left | d }}</td><td class="r"><strong>{{ s.days }}</strong></td></tr>
+    {% else %}
+      <tr><td colspan="7" class="small muted">No demand left this step in the period.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,4 +1,4 @@
-"""Offer margin approvals: the demand owner decides at or above the cut-off (the lead admin is
+"""Offer margin approvals: the demand owner decides at or above the cut-off (the GTD admin team lead is
 notified), leadership below it."""
 
 from urllib.parse import quote
@@ -62,7 +62,7 @@ async def request_approval(
     request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
 ) -> RedirectResponse:
     if actor.role is not Role.ADMIN:
-        return _back(err="Only the lead admin raises an offer approval.")
+        return _back(err="Only the GTD admin team lead raises an offer approval.")
     f = await request.form()
     try:
         margin_service.request(

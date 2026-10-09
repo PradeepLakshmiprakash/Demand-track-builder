@@ -1,6 +1,7 @@
-"""Demand owner (and lead admin): raise a demand, edit it while it's a draft or waiting for the
+"""Demand owner (and GTD admin team lead): raise a demand, edit it while it's a draft or waiting for the
 admin mail, submit it, attach the job description."""
 
+from datetime import date
 from typing import Any
 from urllib.parse import quote
 
@@ -27,7 +28,7 @@ FIELDS = (
     "bu_id", "name", "practice", "grade", "category", "type", "replaced_resource", "lwd", "position_type",
     "client_interview_required",
     "primary_skills", "secondary_skills", "exp_min", "exp_max", "client_rate", "start_date", "region",
-    "location", "work_mode", "hiring_manager", "positions",
+    "location", "work_mode", "hiring_manager", "positions", "jd_text",
 )  # fmt: skip
 
 
@@ -100,7 +101,7 @@ def _editable(db: Session, actor: Actor, ref: str) -> Demand:
     if demand is None:
         raise HTTPException(404, "Demand not found.")
     if not svc.can_change(actor, demand):
-        raise HTTPException(403, "This demand can't be changed any more.")
+        raise HTTPException(403, "This demand is cancelled or closed, or isn't yours to change.")
     return demand
 
 
@@ -145,7 +146,46 @@ async def update(
         db.rollback()
         return _page(request, actor, db, demand=demand, values=raw, error=_message(e))
     msg = "Submitted: it goes out in the next admin mail" if submit else "Changes saved"
+    if not submit and demand.status not in ("draft", "submitted", "returned"):
+        msg = "Changes saved. The GTD admin team has been told what changed"
     return RedirectResponse(f"/demands/{ref}?msg={quote(msg)}", status_code=303)
+
+
+# The demand page's boxes, each edited in place: which fields a box carries.
+PARTS: dict[str, tuple[str, ...]] = {
+    "position": (
+        "name", "practice", "grade", "category", "type", "replaced_resource", "lwd", "position_type",
+        "client_interview_required",
+    ),
+    "requirements": ("primary_skills", "secondary_skills", "exp_min", "exp_max", "jd_text"),
+    "commercial": ("client_rate", "start_date", "region", "location", "work_mode", "hiring_manager"),
+}  # fmt: skip
+
+
+@router.post("/demands/{ref}/part/{part}")
+async def update_part(
+    ref: str, part: str, request: Request, actor: Actor = Depends(guard), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    """Save one box of the demand page. Everything the box doesn't carry stays as it is."""
+    demand = _editable(db, actor, ref)
+    if part not in PARTS:
+        raise HTTPException(404, "No such part of a demand.")
+    form = await request.form()
+    values = _values(demand, actor) | {"client_rate": None, "positions": 1}  # None keeps the rate on file
+    for f in PARTS[part]:
+        if f in form:
+            values[f] = form.get(f)
+    try:
+        svc.update_demand(db, actor, demand, DemandForm.model_validate(values), submit=False)
+        raw = str(form.get("expected_doj") or "")
+        if part == "commercial" and raw and svc.can_set_joining(actor, demand):
+            svc.set_joining(db, actor, demand, date.fromisoformat(raw))
+    except (ValidationError, DemandError, ValueError) as e:
+        db.rollback()
+        return RedirectResponse(
+            f"/demands/{ref}?err={quote(_message(e))}&edit={part}#{part}", status_code=303
+        )
+    return RedirectResponse(f"/demands/{ref}?msg=Saved#{part}", status_code=303)
 
 
 @router.post("/demands/{ref}/submit")

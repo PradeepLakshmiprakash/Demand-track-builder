@@ -18,7 +18,7 @@ from app.core.account_config import (
     SupplyChannel,
 )
 from app.core.enums import EscalationType, Severity
-from app.models import Account, BusinessUnit, Demand, UserBusinessUnit
+from app.models import Account, BusinessUnit, Demand, User, UserBusinessUnit
 
 
 class SettingsError(ValueError):
@@ -183,6 +183,70 @@ def update_practice_stacks(db: Session, account_id: int, stacks: dict[str, str])
     db.commit()
 
 
+def update_retention(db: Session, account_id: int, form: dict[str, str]) -> None:
+    """How long candidates' details and BCM sheet rows are kept. Blank keeps everything."""
+    acc = get_account(db, account_id)
+    cfg = acc.settings
+
+    def number(name: str, low: int, high: int, what: str) -> int | None:
+        raw = (form.get(name) or "").strip()
+        if not raw:
+            return None
+        if not raw.isdigit() or not low <= int(raw) <= high:
+            raise SettingsError(f"{what}: a whole number from {low} to {high}, or blank to keep everything.")
+        return int(raw)
+
+    cfg.retention.candidate_days = number("candidate_days", 30, 3650, "Days to keep candidate details")
+    cfg.retention.sheet_imports_kept = number("sheet_imports_kept", 2, 500, "BCM sheets kept row by row")
+    acc.settings = cfg
+    db.commit()
+
+
+def update_onboarding(db: Session, account_id: int, rows: list[dict[str, str]], form: dict[str, str]) -> None:
+    """Account settings → Onboarding: the checklist, the reasons lists, billing and the report's targets."""
+    from app.services import onboarding_service  # it imports this module's neighbours
+
+    acc = get_account(db, account_id)
+    cfg = acc.settings
+    ob = cfg.onboarding
+    people = set(db.scalars(select(User.id).where(User.accounts.any(id=account_id))))
+    try:
+        ob.checklist = onboarding_service.parse_checklist(rows, people, ob.checklist)
+    except onboarding_service.OnboardingError as e:
+        raise SettingsError(str(e)) from e
+
+    def lines(name: str, what: str) -> list[str]:
+        seen: dict[str, str] = {}
+        for line in (form.get(name) or "").splitlines():
+            text = " ".join(line.split())[:120]
+            if text:
+                seen.setdefault(text.casefold(), text)
+        if not seen:
+            raise SettingsError(f"Give at least one reason for {what}.")
+        if len(seen) > 20:
+            raise SettingsError(f"20 reasons at most for {what}.")
+        return list(seen.values())
+
+    ob.exit_reasons = lines("exit_reasons", "a candidate not joining")
+    ob.not_billing_reasons = lines("not_billing_reasons", "billing not started")
+    days = form.get("not_billing_after_days") or ""
+    if not days.isdigit() or not 1 <= int(days) <= 60:
+        raise SettingsError("Working days before 'Joined, not billing' escalates: 1 to 60.")
+    ob.not_billing_after_days = int(days)
+    targets: dict[str, int] = {}
+    for key, value in form.items():
+        if key.startswith("target_") and value.strip():
+            if not value.strip().isdigit() or not 1 <= int(value) <= 365:
+                raise SettingsError(
+                    "Targets are whole working days, 1 to 365. Leave one blank for no target."
+                )
+            targets[key[7:]] = int(value)
+    ob.targets = targets
+    cfg.onboarding = ob
+    acc.settings = cfg
+    db.commit()
+
+
 def update_supply_channels(db: Session, account_id: int, rows: list[dict[str, str]]) -> None:
     try:
         channels = [
@@ -264,3 +328,10 @@ def update_escalation_rules(db: Session, account_id: int, form: dict[str, str]) 
     cfg.l2_inform_delivery_head = form.get("inform_delivery_head") == "on"
     acc.settings = cfg
     db.commit()
+
+
+def people(db: Session, account_id: int) -> list[User]:
+    """The account's active people, for choosing a named owner."""
+    return list(
+        db.scalars(select(User).where(User.accounts.any(id=account_id), User.active).order_by(User.name))
+    )

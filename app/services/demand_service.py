@@ -139,12 +139,11 @@ def finished_dates(db: Session, demands: list[Demand]) -> dict[int, date]:
         if e.to_stage == done[e.demand_id]:
             out[e.demand_id] = e.at.date()  # the latest one wins
     for d in demands:
-        # A joined proactive, non-billable position isn't finished while it still costs the account.
-        if d.id in out and d.is_proactive_nb and d.status_enum is DemandStatus.STAFFED:
-            if d.billable_from is None:
-                del out[d.id]
-            else:
-                out[d.id] = max(out[d.id], d.billable_from)
+        # A joined position isn't finished while money is still at stake on it: a proactive, non-billable
+        # one that still costs the account, or a billable one whose billing hasn't been confirmed.
+        waiting = d.billable_from is None and (d.is_proactive_nb or d.awaits_billing)
+        if d.id in out and d.status_enum is DemandStatus.STAFFED and waiting:
+            del out[d.id]
     return out
 
 
@@ -164,6 +163,8 @@ class DemandRow:
     @property
     def main(self) -> MainStage:
         """The main stage; `status_label` is the sub-stage (or the open escalation) within it."""
+        if self.demand.awaits_billing:
+            return MainStage.ALLOC_PENDING  # joined, billing not confirmed: still client onboarding
         return self.demand.status_enum.main
 
 
@@ -225,6 +226,8 @@ def demand_rows(db: Session, actor: Actor, today: date | None = None) -> list[De
     rows = []
     for d in demands:
         label, chip, note, attention = _describe(d, escs.get(d.id, []), today)
+        if d.awaits_billing and label == d.status_enum.label:
+            label, attention = "Joined, billing to be confirmed", True
         if d.id in progress and not note:
             note = progress[d.id]
         elif d.id in progress:
@@ -282,6 +285,7 @@ def summary(rows: list[DemandRow]) -> dict[str, int]:
 # --- Intake: raise, edit, submit (Phase 2) ---------------------------------------------------------
 
 # Locked once it's in the admin mail; a demand sent back for correction opens up again.
+GTD_TEAM = (Role.ADMIN, Role.ADMIN_TEAM)
 EDITABLE = frozenset({DemandStatus.DRAFT, DemandStatus.SUBMITTED, DemandStatus.RETURNED})
 
 
@@ -300,8 +304,27 @@ def get_visible(db: Session, actor: Actor, app_ref: str) -> Demand | None:
     )
 
 
+ABANDONED = (DemandStatus.CANCELLED, DemandStatus.CLOSED)
+# A demand in one of these can be sent to the GTD admin team again once its owner has corrected it.
+RESUBMITTABLE = frozenset(
+    {DemandStatus.RETURNED, DemandStatus.DROPPED, DemandStatus.INCORRECT, DemandStatus.MISSING}
+)
+# What an edit can change, with the words used when the GTD admin team is told about it.
+WATCHED = {
+    "name": "Name", "practice": "Practice", "grade": "Grade", "category": "Category", "type": "Type",
+    "position_type": "Position", "client_interview_required": "Client interview required",
+    "replaced_resource": "Replaces", "lwd": "Last working day", "primary_skills": "Primary skills",
+    "secondary_skills": "Secondary skills", "exp_min": "Experience from", "exp_max": "Experience to",
+    "start_date": "Start date", "region": "Region", "location": "Location", "work_mode": "Work mode",
+    "hiring_manager": "Client hiring manager", "bu_id": "Business unit", "jd_text": "Job description",
+}  # fmt: skip
+
+
 def can_change(actor: Actor, demand: Demand) -> bool:
-    return can_edit(actor, demand) and demand.status_enum in EDITABLE
+    """The owner (and the GTD admin team's lead) can change a demand at any stage, until it is
+    cancelled or closed. Every change is in the change history; once the demand is with the GTD admin
+    team they are told what changed."""
+    return can_edit(actor, demand) and demand.status_enum not in ABANDONED
 
 
 def can_revise_dates(actor: Actor, demand: Demand) -> bool:
@@ -372,7 +395,9 @@ def _resolve_bu(db: Session, actor: Actor, form: DemandForm) -> int:
     return bu.id
 
 
-def _check(cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date) -> None:
+def _check(
+    cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date, past_start_ok: bool = False
+) -> None:
     problems = []
     for label, value, allowed in (
         ("Practice", form.practice, cfg.practices),
@@ -387,7 +412,7 @@ def _check(cfg: AccountConfig, form: DemandForm, *, submit: bool, today: date) -
         missing = form.missing_for_submit()
         if missing:
             problems.append("Needed before submitting: " + ", ".join(missing))
-        if form.start_date and form.start_date < today:
+        if form.start_date and form.start_date < today and not past_start_ok:
             problems.append("Requested start date is in the past")
     if problems:
         raise DemandError(". ".join(problems) + ".")
@@ -403,6 +428,7 @@ def _apply(demand: Demand, form: DemandForm) -> None:
         setattr(demand, field, getattr(form, field))
     if form.client_rate is not None:  # blank keeps the rate on file (demand owners can't see it)
         demand.client_rate = form.client_rate
+    demand.jd_text = (form.jd_text or "").strip() or None
 
 
 Upload = tuple[str, bytes]  # (file name, content) of a job description
@@ -452,29 +478,174 @@ def update_demand(
     db: Session, actor: Actor, demand: Demand, form: DemandForm, *, submit: bool, jd: Upload | None = None
 ) -> Demand:
     if not can_change(actor, demand):
-        raise DemandError("This demand can't be changed any more: it's already with the admin.")
+        raise DemandError("This demand is cancelled or closed, so it can't be changed.")
     _check_jd(jd)
     account = db.get_one(Account, actor.account_id)
-    _check(account.settings, form, submit=submit or demand.status_enum is DemandStatus.SUBMITTED,
-           today=account_today(db, actor.account_id))  # fmt: skip
+    was = demand.status_enum
+    moving = was not in EDITABLE  # already with the GTD admin team or further on
+    before = {f: getattr(demand, f) for f in WATCHED}
+    _check(
+        account.settings,
+        form,
+        submit=submit or was is not DemandStatus.DRAFT,
+        today=account_today(db, actor.account_id),
+        past_start_ok=moving,  # a date that has since passed can stay while other things are corrected
+    )
     if actor.role is not Role.DEMAND_OWNER:
         demand.bu_id = _resolve_bu(db, actor, form)
     _apply(demand, form)
     _store_jd(demand, jd)
+    changes = [
+        f"{label}: {_shown(before[f])} → {_shown(getattr(demand, f))}"
+        for f, label in WATCHED.items()
+        if before[f] != getattr(demand, f) and f != "jd_text"
+    ] + (["Job description: edited"] if before["jd_text"] != demand.jd_text else [])
+    db.flush()
+    from app.services import escalation_service  # it imports this module
+
+    if submit and was in RESUBMITTABLE and was is not DemandStatus.RETURNED:
+        escalation_service.close_link_escalations(db, demand, actor.id)
     if submit:
         _submit(db, actor, demand)
+    elif moving and changes:
+        _tell_team_of_changes(db, actor, demand, changes)
+    if moving:
+        escalation_service.close_cleared_for(db, demand, actor.id)  # an edit that fixes it, answers it
     db.commit()
     return demand
 
 
+def _shown(value: object) -> str:
+    if value is None or value == "" or value == []:
+        return "not set"
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, date):
+        return f"{value:%d %b %Y}"
+    return str(value)
+
+
+def _tell_team_of_changes(db: Session, actor: Actor, demand: Demand, changes: list[str]) -> None:
+    """The demand is already with the GTD admin team: they hear what its owner changed, so GTD can
+    be brought in line."""
+    from app.core import mail
+    from app.core.config import get_settings
+    from app.models import User, member_of
+
+    team = [u.email for u in db.scalars(select(User).where(member_of(demand.account_id, *GTD_TEAM)))]
+    owner = db.get_one(User, demand.owner_id)
+    ref = demand.gtd_req_id or demand.app_ref
+    mail.notify(
+        mail.Mail(
+            to=team,
+            cc=[owner.email],
+            subject=f"[{ref} | {demand.app_ref}] Demand changed by {actor.name}",
+            text=(
+                f"{actor.name} changed {demand.app_ref} ({demand.name}).\n"
+                f"It is at {demand.status_enum.label}.\n\n"
+                + "\n".join(f"- {c}" for c in changes)
+                + "\n\nIf the requisition on GTD carries any of these, update it there too.\n"
+                f"{get_settings().app_base_url}/demands/{demand.app_ref}"
+            ),
+        )
+    )
+
+
+JOINING_EDITABLE = (DemandStatus.OFFER_IN_MARKET, DemandStatus.STAFFED)
+
+
+def can_set_joining(actor: Actor, demand: Demand) -> bool:
+    """Once the offer is made, the joining date is the owner's to keep right (and the team lead's)."""
+    return can_change(actor, demand) and demand.status_enum in JOINING_EDITABLE
+
+
+def set_joining(db: Session, actor: Actor, demand: Demand, when: date | None) -> bool:
+    """Change the joining date on the demand's page. True if it changed. The date stands until a BCM
+    sheet imported later gives another one."""
+    if not can_set_joining(actor, demand):
+        raise DemandError("The joining date is changed by the demand's owner, once the offer is made.")
+    if when is None:
+        raise DemandError("Enter the date of joining.")
+    from app.services import escalation_service
+
+    before = escalation_service.current_doj(db, demand.account_id).get(demand.id)
+    if before == when:
+        return False
+    demand.expected_doj, demand.expected_doj_at = when, datetime.now(UTC)
+    db.flush()
+    was = f"{before:%d %b %Y}" if before else "not set"
+    _tell_team_of_changes(db, actor, demand, [f"Date of joining: {was} → {when:%d %b %Y}"])
+    escalation_service.close_cleared_for(db, demand, actor.id)
+    db.commit()
+    return True
+
+
+def close_demand(db: Session, actor: Actor, demand: Demand, reason: str) -> None:
+    """The position is no longer needed: the owner closes the demand, with the reason."""
+    if not can_change(actor, demand) or demand.status_enum is DemandStatus.STAFFED:
+        raise DemandError("Only an open demand can be closed, by its owner or the GTD admin team lead.")
+    account = db.get_one(Account, demand.account_id)
+    if reason not in account.settings.resolution_reasons:
+        raise DemandError("Choose why the demand is being closed.")
+    from app.services import escalation_service, onboarding_service
+
+    record_stage(db, demand, DemandStatus.CLOSED, actor.id)
+    escalation_service.close_all_for(db, demand, actor.id, reason)
+    onboarding_service.close_open(db, demand)
+    db.commit()
+
+
 def _submit(db: Session, actor: Actor, demand: Demand) -> None:
-    if demand.status_enum in (DemandStatus.DRAFT, DemandStatus.RETURNED):
+    if demand.status_enum is DemandStatus.DRAFT or demand.status_enum in RESUBMITTABLE:
         record_stage(db, demand, DemandStatus.SUBMITTED, actor.id)
         demand.submitted_at = datetime.now(UTC)
         db.flush()
         from app.services import notify_service  # it imports this module
 
         notify_service.safely(notify_service.send_landed, db, demand)
+
+
+def can_link_replaced(actor: Actor, demand: Demand) -> bool:
+    return actor.id == demand.owner_id or actor.role is Role.ADMIN
+
+
+def replaceable(db: Session, demand: Demand) -> list[Demand]:
+    """Abandoned demands this one could be the re-raise of: same account and business unit, and not
+    already replaced by another demand."""
+    taken = select(Demand.replaces_demand_id).where(
+        Demand.replaces_demand_id.is_not(None), Demand.id != demand.id
+    )
+    return list(
+        db.scalars(
+            select(Demand)
+            .where(
+                Demand.account_id == demand.account_id,
+                Demand.bu_id == demand.bu_id,
+                Demand.id != demand.id,
+                Demand.status.in_([s.value for s in ABANDONED]),
+                Demand.id.notin_(taken),
+            )
+            .order_by(Demand.app_ref.desc())
+        )
+    )
+
+
+def set_replaces(db: Session, actor: Actor, demand: Demand, app_ref: str) -> Demand | None:
+    """Say which abandoned demand this one re-raises ("" clears it)."""
+    if not can_link_replaced(actor, demand):
+        raise ValueError("The demand's owner or the GTD admin team lead links it to the demand it replaces.")
+    if not app_ref:
+        demand.replaces_demand_id = None
+        db.commit()
+        return None
+    other = next((d for d in replaceable(db, demand) if d.app_ref == app_ref), None)
+    if other is None:
+        raise ValueError("Choose an abandoned demand from the same business unit.")
+    demand.replaces_demand_id = other.id
+    db.commit()
+    return other
 
 
 def stage_history(db: Session, demand: Demand) -> list[StageEvent]:

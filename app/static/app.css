@@ -746,3 +746,64 @@ fieldset[data-kind=special] .tick { display: flex; }
 .audit-changes { font-size: 13px; max-width: 560px; overflow-wrap: anywhere; }
 .audit-changes div + div { margin-top: 3px; }
 .audit-changes .was { color: var(--muted); text-decoration: line-through; }
+
+/* From offer to first billable day: the pre-joining checklist, billing, and the settings table. */
+.ck-prog { height: 10px; background: #E9EDF3; border-radius: 5px; overflow: hidden; }
+.ck-prog i { display: block; height: 100%; background: #43A063; }
+.ck-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 14px; }
+.ck-table th { text-align: left; font-size: 12px; background: #F1F4F7; padding: 8px 10px; font-weight: 500; white-space: nowrap; }
+.ck-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ck-table tr.late td { background: #FBF2F3; }
+.ck-table .nw { white-space: nowrap; }
+.late-t { color: #9E0029; font-weight: 600; }
+.ck-st { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; white-space: nowrap; background: #F1F4F7; color: #595E6A; }
+.ck-st.done { background: #43A063; color: #fff; }
+.ck-st.in_progress { background: #E9EDF3; color: #264F96; }
+.ck-st.blocked { background: #FFCACA; color: #9E0029; }
+.ck-st.not_needed { background: transparent; border: 1px solid var(--line); font-weight: 500; }
+.ck-edit summary { list-style: none; cursor: pointer; display: inline-flex; }
+.ck-edit summary::-webkit-details-marker { display: none; }
+.ck-edit form { margin-top: 8px; min-width: 230px; gap: 8px; }
+.ck-gap { background: #FFE5D3; border: 1px solid #FCB988; border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin-top: 14px; }
+.bigval { font-size: 18px; font-weight: 600; }
+.wx-chip { margin-left: auto; font-size: 11px; font-weight: 600; border: 1px solid #8A919C; border-radius: 999px; padding: 1px 8px; white-space: nowrap; background: #fff; color: var(--ink); }
+.cfg-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 980px; }
+.cfg-table th { text-align: left; font-size: 12px; background: #F1F4F7; padding: 7px 8px; font-weight: 500; }
+.cfg-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.cfg-table input[type=text], .cfg-table select { min-height: 36px; font-size: 13.5px; width: 100%; }
+.cfg-table td:nth-child(2) { min-width: 300px; }
+.cfg-table input[type=number] { width: 80px; min-height: 36px; }
+.cfg-table input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--brand); }
+/* ov-kpis auto: the number strip takes as many cards as the account has figures for */
+.ov-kpis { grid-template-columns: repeat(auto-fit, minmax(126px, 1fr)); }
+
+/* Speed report */
+.sp-two { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+.sp-bars { display: flex; flex-direction: column; gap: 4px; }
+.sp-row { display: grid; grid-template-columns: 230px 1fr 76px; gap: 10px; align-items: center; font-size: 13px; padding: 5px 6px; border-radius: 6px; text-decoration: none; color: var(--ink); }
+a.sp-row:hover, a.sp-row.on { background: #F1F4F7; }
+a.sp-row.on { font-weight: 600; }
+.sp-row .t { position: relative; height: 14px; background: #F1F4F7; border-radius: 4px; }
+a.sp-row:hover .t, a.sp-row.on .t { background: #fff; }
+.sp-row .t i { display: block; height: 100%; background: #3573C0; border-radius: 4px; }
+.sp-row .t i.over { background: #1C4076; }
+.sp-row .t b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #171A22; }
+.sp-row .n { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sp-row .tgt { font-size: 11px; color: var(--muted); font-weight: 400; }
+.sp-bars.reasons .sp-row { grid-template-columns: 230px 1fr 30px; }
+@media (max-width: 1100px) { .sp-two { grid-template-columns: 1fr; } .sp-row { grid-template-columns: 150px 1fr 60px; } }
+.sp-mini { display: inline-block; width: 120px; height: 10px; background: #F1F4F7; border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+.sp-mini i { display: block; height: 100%; background: #3573C0; }
+.pager { display: flex; gap: 10px; align-items: center; padding: 12px 18px; }
+.jd-box { margin-top: 10px; }
+.jd-text { white-space: pre-wrap; font: inherit; font-size: 13.5px; background: #F8FAFC; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 8px 0 0; }
+.grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .grid5 { grid-template-columns: 1fr 1fr; } }
+
+/* The demand page's boxes are edited in place. */
+.edit-ic { border: 1px solid var(--field); background: #fff; color: var(--brand); border-radius: 6px; width: 28px; height: 28px; min-height: 0; padding: 0; font-size: 15px; line-height: 1; cursor: pointer; vertical-align: middle; margin-left: 6px; }
+.edit-ic:hover, .box-edit.editing .edit-ic { background: var(--brand); color: #fff; border-color: var(--brand); }
+.box-edit:not(.editing) > .inline-edit { display: none; }
+.box-edit.editing > .facts, .box-edit.editing > .jd-box { display: none; }
+.box-edit .inline-edit { margin-top: 10px; }
+.box-edit { scroll-margin-top: 16px; }

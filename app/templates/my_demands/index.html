@@ -74,6 +74,9 @@
     {% else %}
     <div class="empty">No demands here{% if active_filter != 'all' %} for this filter{% endif %}.</div>
     {% endfor %}
+    {% if pages > 1 %}
+    <div class="pager">{% if page > 1 %}<a class="btn small" href="?{{ page_query }}{{ '&' if page_query }}page={{ page - 1 }}">← Previous</a>{% endif %}<span class="small muted">Page {{ page }} of {{ pages }} · {{ total }} demands</span>{% if page < pages %}<a class="btn small" href="?{{ page_query }}{{ '&' if page_query }}page={{ page + 1 }}">Next →</a>{% endif %}</div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -45,6 +46,19 @@ class Demand(Base):
             "status = 'draft' OR (practice IS NOT NULL AND grade IS NOT NULL)", name="submitted_is_complete"
         ),
         Index("ix_demands_account_status", "account_id", "status"),
+        # A demand's practice and grade exist for its account; a rename there carries to here.
+        ForeignKeyConstraint(
+            ["account_id", "practice"],
+            ["practices.account_id", "practices.name"],
+            name="fk_demands_practice",
+            onupdate="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["account_id", "grade"],
+            ["grades.account_id", "grades.name"],
+            name="fk_demands_grade",
+            onupdate="CASCADE",
+        ),
         Index("ix_demands_owner", "owner_id"),
     )
 
@@ -70,6 +84,9 @@ class Demand(Base):
     billable_from: Mapped[date | None] = mapped_column(Date)
     billable_marked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     billable_marked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    not_billing_reason: Mapped[str | None] = mapped_column(String(120))  # joined, why billing waits
+    # The earlier demand for the same position, when that one was abandoned and this one re-raises it.
+    replaces_demand_id: Mapped[int | None] = mapped_column(ForeignKey("demands.id"))
     primary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     secondary_skills: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     exp_min: Mapped[int | None] = mapped_column(Integer)
@@ -78,11 +95,15 @@ class Demand(Base):
     start_date: Mapped[date | None] = mapped_column(Date)
     # Entered by the demand owner once the offer is accepted. The BCM sheet's DOJ overrides it.
     expected_doj: Mapped[date | None] = mapped_column(Date)
+    # When the owner last set it: it stands until a BCM sheet imported after that gives another date.
+    expected_doj_at: Mapped[datetime | None]
     region: Mapped[str | None] = mapped_column(String(10))
     location: Mapped[str | None] = mapped_column(String(80))
     work_mode: Mapped[str | None] = mapped_column(String(20))
     hiring_manager: Mapped[str | None] = mapped_column(String(120))
-    jd_path: Mapped[str | None] = mapped_column(Text)
+    jd_path: Mapped[str | None] = mapped_column(Text)  # an uploaded file, on demands raised before 9 Oct 2026
+    jd_text: Mapped[str | None] = mapped_column(Text)  # the job description, typed on the demand form
+    billing_asked_at: Mapped[datetime | None]  # when the owner was asked to confirm the first billable day
     custom_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(24), default=DemandStatus.DRAFT.value)
     submitted_at: Mapped[datetime | None]
@@ -116,6 +137,17 @@ class Demand(Base):
     def is_proactive_nb(self) -> bool:
         """A Proactive position the client isn't paying for: it costs the account, and loses no revenue."""
         return (self.category or "").casefold() == "proactive" and self.position_type == "Non-billable"
+
+    @property
+    def awaits_billing(self) -> bool:
+        """Joined, billable, and its owner hasn't confirmed the first billable day yet. Such a position
+        is still in client onboarding: it counts as open, and revenue is still being lost on it."""
+        return (
+            self.status == DemandStatus.STAFFED.value
+            and self.position_type == "Billable"
+            and not self.is_proactive_nb
+            and self.billable_from is None
+        )
 
     @property
     def loss_from(self) -> date | None:

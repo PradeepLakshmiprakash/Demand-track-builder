@@ -207,7 +207,8 @@ DEMANDS = [
         date(2026, 9, 1),
         "staffed",
         "43TUIX",
-        {"primary_skills": [J, A]},
+        # joined on 8 Sep and billing from that day: a finished position
+        {"primary_skills": [J, A], "billable_from": date(2026, 9, 8)},
     ),
     # CARDS · Rahul (own + BU read-only) and Neha
     (

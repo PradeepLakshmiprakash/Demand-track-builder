@@ -55,7 +55,9 @@ class Cost:
 def _rate_card_rate(db: Session, d: Demand, on: date) -> Decimal | None:
     if not d.grade:
         return None
-    rate = rate_card_service.lookup(db, d.account_id, grade=d.grade, practice=d.practice, on=on)
+    rate = rate_card_service.lookup(
+        db, d.account_id, grade=d.grade, practice=d.practice, on=on, region=d.region
+    )
     return Decimal(rate.cost_rate) if rate is not None else None
 
 

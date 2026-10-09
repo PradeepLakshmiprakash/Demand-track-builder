@@ -494,7 +494,8 @@ def test_reasons_fit_the_trigger_and_the_demand_page_takes_the_response(client: 
 
     page = client.as_user("priya").get("/demands/DM-000121").text  # the full demand, with the form on it
     assert "Needs your response" in page and "Client moved the start date" in page
-    assert "Revise the start date" in page and "Commercial and timing" in page
+    assert "What will you do?" not in page and "edit the demand" in page  # why here; the fix on the demand
+    assert "Commercial and timing" in page
     assert "Needs your response" not in client.as_user("farah").get("/demands/DM-000121").text
     assert "Open the full demand" in client.as_user("priya").get(f"/escalations?id={esc.id}").text
     new = date.today() + timedelta(days=14)

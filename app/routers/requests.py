@@ -1,4 +1,4 @@
-"""Requests to the Administrator: raised by the lead admin, carried out by the Administrator."""
+"""Requests to the Administrator: raised by the GTD admin team lead, carried out by the Administrator."""
 
 from typing import Any
 from urllib.parse import quote

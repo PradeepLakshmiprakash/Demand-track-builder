@@ -112,11 +112,18 @@ def test_owner_sees_their_own_bill_rate(priya: Client, client: Client, db: Sessi
     assert "98.50" not in client.as_user("farah").get(f"/demands/{ref}").text  # not the GTD admin team
 
 
-def test_edit_until_it_goes_out_in_the_mail(priya: Client, db: Session) -> None:
+def test_the_owner_can_edit_at_any_stage_until_it_is_closed(priya: Client, db: Session) -> None:
     ref = ref_from(priya.post("/demands/new", data=form()))
     assert priya.post(f"/demands/{ref}/edit", data=form(name="Still editable")).status_code == 303
     d = demand(db, ref)
-    d.status = "notified"
+    d.status = "coverage_required"  # long since with the GTD admin team
+    db.commit()
+    assert priya.get(f"/demands/{ref}/edit").status_code == 200
+    r = priya.post(f"/demands/{ref}/edit", data=form(name="Changed after GTD", action="save"))
+    assert r.status_code == 303 and "has%20been%20told" in r.headers["location"]
+    d = demand(db, ref)
+    assert d.name == "Changed after GTD" and d.status == "coverage_required"  # an edit doesn't move it
+    d.status = "closed"
     db.commit()
     assert priya.get(f"/demands/{ref}/edit").status_code == 403
     assert priya.post(f"/demands/{ref}/edit", data=form()).status_code == 403

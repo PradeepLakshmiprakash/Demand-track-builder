@@ -38,6 +38,9 @@ class Account(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Counts every save: two people saving settings at the same moment can't silently overwrite each other.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    __mapper_args__ = {"version_id_col": version}
 
     business_units: Mapped[list["BusinessUnit"]] = relationship(
         back_populates="account", order_by="BusinessUnit.id"
@@ -66,7 +69,7 @@ class BusinessUnit(Base):
     # L1 escalation owner for this BU. Not an app user: they're mailed, they don't sign in.
     delivery_head_name: Mapped[str | None] = mapped_column(String(120))
     delivery_head_email: Mapped[str | None] = mapped_column(String(254))
-    # Agreed number of non-billable (proactive) positions for this BU; set by the lead admin.
+    # Agreed number of non-billable (proactive) positions for this BU; set by the GTD admin team lead.
     nb_cap: Mapped[int | None] = mapped_column(Integer)
 
     account: Mapped[Account] = relationship(back_populates="business_units")

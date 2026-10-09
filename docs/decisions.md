@@ -649,3 +649,106 @@ own key and are left to that check.
 **D104. A much shorter sheet is questioned.** A BCM sheet with under 60% of the last sheet's rows (when
 the last had at least 8) is not imported until the uploader confirms it, since a filtered sheet would
 flag the missing requisitions as removed.
+
+**D105. Pre-joining checklist.** A demand gets a checklist when its offer is made: the account's items,
+each with an owner and a due date counted back in working days from the joining date (so it moves when
+the joining date moves). The owner is the demand's owner, a named person, the GTD admin team (named
+once someone updates the item) or a party outside the app, shown as named in settings and never as a
+person; the GTD admin team records outside items. An item past its due date raises "Pre-joining item
+overdue". A demand keeps the items it was given; changes to the list apply to later offers.
+
+**D106. A candidate who does not join.** The owner or the GTD admin team records what happened
+(declined, dropped out, no show, withdrawn), a reason from the account's list and the date. The demand
+goes back to Sourcing profiles, open checklist items become not needed, a pending offer approval is
+closed, the GTD admin team is mailed, and the requested start date does not move.
+
+**D107. First billable day.** A joined, billable position records its first billable day, or the
+reason billing has not started. The wait is counted in working days and money and shown separately from
+revenue lost, which still stops at joining. "Joined, not billing" escalates after the account's
+waiting time unless a reason is on record. Accounts can show "Billing started" as a workflow step after
+Joined; it is a display step, not a new demand status. Proactive, non-billable positions keep their
+costing box and use the same date field.
+
+**D108. Speed report.** For leadership and the Lead admin: median working days to fill, positions
+filled late, candidates who did not join against offers, joined-to-billing wait, median days at each
+step against the Administrator's targets, a table by business unit, practice or owner, and the stays
+behind any step. Read from the dated step history; downloadable as CSV.
+
+**D109. Onboarding settings.** The checklist, both reasons lists, the billing step, the waiting time
+and the targets are account settings (Account settings → Onboarding). Who acts on the two new
+escalations and how urgent they are sit with the other escalation rules.
+
+**D110. Practices and grades are reference tables.** `practices` and `grades` hold each account's
+names; a demand's and a rate's practice and grade must exist there (composite foreign keys that cascade
+on update). The lists in Account settings stay the place to add and reorder; a session listener mirrors
+them into the tables, and a name that arrives another way (a BCM sheet row) is added as inactive
+instead of failing. *Rename a practice or a grade* in settings changes it once and every demand, rate,
+person and interviewer profile follows. Region, work mode and category stay plain lists.
+
+**D111. Settings stay one document, with a save counter.** Escalation rules and the status mapping were
+not split into their own tables: the change history (D102) now records every settings change by part
+with before and after, which was the gap. Accounts carry a version that every save increments, so two
+saves in the same moment can't silently overwrite each other; the second is told to check and save again.
+
+**D112. Day-by-day figures.** Once a day, per account, the headline figures are stored (open, past
+start, open escalations, revenue lost, non-billable cost, joined-not-billed), because the live figures
+are recomputed from today's rates. Shown on the speed report.
+
+**D113. Retention.** Off until the Administrator sets it. Then the daily job removes candidates' names,
+CVs and feedback text from demands finished longer ago than the set days (counts, ratings and decisions
+stay), and deletes the row snapshots of BCM sheets older than the latest N kept.
+
+**D114. A re-raised demand points at the one it replaces.** The owner or the Lead admin links a demand
+to an abandoned demand of the same business unit; both pages show the link. It records lineage only:
+start dates and loss are not carried over.
+
+**D115. The demands list** shows 50 at a time.
+
+**D116. The demand owner keeps the checklist.** Every pre-joining item is updated by the demand's
+owner, whoever it is waiting on (supersedes the per-owner updating in D105). The "Who" column still says
+who does the work; nobody outside the owner records it.
+
+**D117. A demand is editable at any stage.** Its owner, and the GTD admin team's lead, can change
+anything on a demand until it is cancelled or closed (supersedes the lock after the admin mail). Once
+the demand is with the GTD admin team they are mailed what changed. The separate "change the dates"
+form is gone; a dropped, incorrect or overdue demand is corrected and resubmitted from the edit form;
+the owner can close a demand with a reason.
+
+**D118. Escalations ask why, not what.** The response form takes a reason and a comment only. The
+escalation stays open with its clock restarted until the problem is actually gone, then closes by
+itself: at once when the owner's edit clears it, otherwise at the next sweep. A reason closes it
+straight away when the problem is already gone, for a sheet row that isn't ours, and for the rejection
+limit, which nothing in the app can clear. The GTD admin team can still tick "send it back to the
+owner".
+
+**D119. Joined is not finished until billing is confirmed** (supersedes the display step and the
+separate figure in D107). A joined, billable position sits at "Joined, billing to be confirmed", the
+last sub-stage of Client Onboarding: it counts as open and revenue lost keeps counting until its owner
+confirms the first billable day. The owner is mailed on the joining day; the default answer is the
+joining day itself. It is a derived sub-stage, not a new demand status.
+
+**D120. The lead is part of the GTD admin team.** There is no separate "Lead admin" label: they show
+as GTD admin team, and as "GTD admin team lead" only where the two must be told apart (User access).
+They keep their special access and can edit any demand, are copied on every mail as before, and are
+otherwise like any other demand owner: extra interview rounds, checklists and billing belong to each
+demand's own owner.
+
+**D121. The job description is typed.** The demand form has a job description box and a "Draft it for
+me" button that fills it from the practice, grade, category, type, skills, experience and location
+entered above; the owner edits from there. Files uploaded earlier stay downloadable.
+
+**D122. A rate can be for one region.** The rate card is keyed by practice, grade and, optionally,
+region; a blank region is the cost for every region that has none of its own. A region's own cost wins
+there. Offers and non-billable cost price with the demand's region; the rate card screen and the three
+calculators take a region. All amounts stay in USD (supersedes "the card has no region" in D95's notes).
+
+**D123. A demand's boxes are edited in place.** Position, Requirements, and Commercial and timing each
+carry a pencil that swaps the box for a form; saving changes only what that box holds. The full form is
+kept for drafts. The date of joining is in the Commercial box: the owner can set it once the offer is
+made, and it stands until a BCM sheet imported later gives another date.
+
+**D124. Overview numbers.** "Joined, not billing" and "Pre-joining open" are no longer shown on the
+overview: joined-not-billing positions already count as open under Client Onboarding with their revenue
+lost, and the checklist lives on the demand.
+
+**D125. The speed report download** carries each demand's owner.

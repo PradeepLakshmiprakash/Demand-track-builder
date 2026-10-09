@@ -77,7 +77,8 @@ def test_incorrect_demand_goes_back_to_its_owner(client: Client, db: Session) ->
 
     owner = client.as_user("arjun")
     page = owner.get("/demands/DM-000133").text
-    assert "Sent back for correction" in page and "Grade should be C2" in page and "Resubmit to admin" in page
+    assert "Sent back for correction" in page and "Grade should be C2" in page
+    assert "Resubmit to the GTD admin team" in page
     listing = owner.get("/api/demands").json()
     assert next(x for x in listing if x["app_ref"] == "DM-000133")["needs_attention"] is True
 

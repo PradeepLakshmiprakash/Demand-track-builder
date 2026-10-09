@@ -5,6 +5,8 @@ Account settings screen, not code. Numeric thresholds are real columns on `accou
 because the escalation sweep filters on them in SQL.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.enums import SHEET_STAGES, DemandStatus, Responsible, Severity
@@ -86,6 +88,17 @@ DEFAULT_RULES: dict[str, tuple[Responsible, Severity, str]] = {
         "Match the sheet row to its demand, or create the demand from the row, on the Reconciliation "
         "page. If the requisition isn't ours, close this with the reason.",
     ),
+    "prejoin_overdue": (
+        Responsible.DEMAND_OWNER,
+        Severity.MEDIUM,
+        "Open the demand's pre-joining checklist and complete the overdue item, or mark it blocked with "
+        "what it is waiting on.",
+    ),
+    "not_billing": (
+        Responsible.DEMAND_OWNER,
+        Severity.HIGH,
+        "Record the first billable day on the demand, or the reason client billing has not started.",
+    ),
     "past_start": (
         Responsible.DEMAND_OWNER,
         Severity.HIGH,
@@ -147,6 +160,19 @@ DEFAULT_REASONS: dict[str, list[str]] = {
         "Belongs to another account",
         "Old requisition, already closed",
         "Duplicate of an existing demand",
+    ],
+    "prejoin_overdue": [
+        "Done now",
+        "Waiting on the candidate",
+        "Waiting on the client",
+        "Waiting on GTD staffing",
+        "Joining date is moving",
+    ],
+    "not_billing": [
+        "Waiting for client system access",
+        "Client onboarding or training period",
+        "Purchase order not issued",
+        "Shadowing agreed with the client",
     ],
     "past_start": [
         "Candidate selected: joining date agreed",
@@ -218,6 +244,87 @@ def _default_dp_columns() -> dict[str, str]:
     return {k: header for k, (header, _) in DP_FIELDS.items()}
 
 
+class ChecklistItem(BaseModel):
+    """One pre-joining item every demand gets when its offer is made."""
+
+    key: str
+    label: str
+    # who owns it: the demand's owner, a named person, the GTD admin team, or a party outside the app
+    owner_kind: Literal["owner", "person", "gtd_team", "outside"] = "owner"
+    person_id: int | None = None  # for "person"
+    outside_label: str | None = None  # for "outside": the party, never a person
+    due_days_before: int = Field(default=5, ge=0, le=90)  # working days before the joining date
+    escalate: bool = True
+    enabled: bool = True
+
+
+def _default_checklist() -> list[ChecklistItem]:
+    def out(key: str, label: str, days: int) -> ChecklistItem:
+        return ChecklistItem(key=key, label=label, owner_kind="outside", outside_label="GTD staffing",
+                             due_days_before=days)  # fmt: skip
+
+    return [
+        ChecklistItem(key="offer_accepted", label="Offer accepted in writing", due_days_before=12),
+        out("bgv_started", "Background verification started", 10),
+        out("bgv_cleared", "Background verification cleared", 4),
+        ChecklistItem(key="work_auth", label="Work authorisation confirmed", owner_kind="gtd_team",
+                      due_days_before=10),
+        ChecklistItem(key="client_clearance", label="Client security clearance form submitted",
+                      due_days_before=11),
+        ChecklistItem(key="laptop", label="Laptop and assets requested", owner_kind="gtd_team",
+                      due_days_before=8),
+        ChecklistItem(key="client_access", label="Client network and system access requested",
+                      due_days_before=6),
+        ChecklistItem(key="first_day", label="First-day plan sent to the candidate", due_days_before=2,
+                      escalate=False),
+    ]  # fmt: skip
+
+
+class Onboarding(BaseModel):
+    """From offer to first billable day: the checklist, the reasons lists, and the report's targets."""
+
+    checklist: list[ChecklistItem] = Field(default_factory=_default_checklist)
+    exit_reasons: list[str] = [
+        "Took another offer",
+        "Compensation",
+        "Location or work mode",
+        "Notice period or joining date",
+        "Failed background verification",
+        "Client rejected after selection",
+        "Personal reasons",
+        "No reason given",
+    ]
+    not_billing_reasons: list[str] = [
+        "Waiting for client system access",
+        "Client onboarding or training period",
+        "Purchase order not issued",
+        "Shadowing agreed with the client",
+    ]
+    billing_step: bool = True  # show "Billing started" as a step after Joined
+    not_billing_after_days: int = Field(
+        default=5, ge=1, le=60
+    )  # working days after joining before it escalates
+    # Speed report targets in working days: "time_to_fill", "joined_to_billing", or a demand status.
+    targets: dict[str, int] = {
+        "time_to_fill": 40,
+        "sent_to_gtd": 3,
+        "coverage_required": 10,
+        "interviewing": 5,
+        "profiles_with_client": 5,
+        "offer_in_process": 2,
+        "offer_in_market": 15,
+    }
+
+
+class Retention(BaseModel):
+    """What the account stops keeping. Blank means keep everything, which is how an account starts."""
+
+    # Days after a demand finishes before its candidates' names, CVs and feedback text are removed.
+    candidate_days: int | None = Field(default=None, ge=30, le=3650)
+    # How many of the latest BCM sheets keep their row-by-row snapshot.
+    sheet_imports_kept: int | None = Field(default=None, ge=2, le=500)
+
+
 class AccountConfig(BaseModel):
     timezone: str = "America/Chicago"
     practices: list[str] = []
@@ -232,6 +339,8 @@ class AccountConfig(BaseModel):
     # that share a tech stack can take the same person; the margin calculator compares them. A practice
     # the account hasn't listed here falls back to DEFAULT_PRACTICE_STACKS, if it is named there.
     practice_stacks: dict[str, list[str]] = {}
+    onboarding: Onboarding = Onboarding()
+    retention: Retention = Retention()
     status_mapping: list[StatusMapping] = []
     escalation_owners: dict[str, str] = {"L1": "LOB delivery head", "L2": "Account leadership"}
     # Escalations (flow-artifact §9): the responsible person acts; everyone else is informed.

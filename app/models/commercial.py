@@ -1,7 +1,17 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Numeric, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -17,11 +27,25 @@ class RateCard(Base):
         CheckConstraint("effective_to IS NULL OR effective_to >= effective_from", name="dates_ordered"),
         CheckConstraint("cost_rate >= 0", name="cost_positive"),
         Index("ix_rate_cards_lookup", "account_id", "grade", "practice"),
+        ForeignKeyConstraint(
+            ["account_id", "practice"],
+            ["practices.account_id", "practices.name"],
+            name="fk_rate_cards_practice",
+            onupdate="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["account_id", "grade"],
+            ["grades.account_id", "grades.name"],
+            name="fk_rate_cards_grade",
+            onupdate="CASCADE",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     grade: Mapped[str] = mapped_column(String(10))
+    # A cost for one region only; blank applies to every region that has no cost of its own. Always USD.
+    region: Mapped[str | None] = mapped_column(String(10))
     practice: Mapped[str | None] = mapped_column(String(40))  # null = any practice (older cards only)
     cost_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     effective_from: Mapped[date] = mapped_column(Date)
@@ -32,7 +56,7 @@ class RateCard(Base):
 
 class OfferApproval(Base):
     """Margin check for an offer (flow-artifact §8). Priced from the client bill rate and the dated rate
-    card; routed to the lead admin at or above the account's margin cut-off, else leadership.
+    card; routed to the GTD admin team lead at or above the account's margin cut-off, else leadership.
     Until both rates are known it waits unpriced (no route) with the reason in `blocked_reason`."""
 
     __tablename__ = "offer_approvals"

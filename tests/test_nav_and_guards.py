@@ -30,7 +30,7 @@ def test_demand_owner_menu(client: Client) -> None:
 
 def test_admin_menu(client: Client) -> None:
     items = menu(client.as_user("kavya"))
-    assert items[:2] == ["Account overview", "All demands"]
+    assert items[:3] == ["Account overview", "Speed report", "All demands"]
     for expected in (
         "GTD queue",
         "BCM sheet import",
@@ -62,6 +62,7 @@ def test_leadership_menu(client: Client) -> None:
     items = menu(client.as_user("sanjay"))
     assert items == [
         "Account overview",
+        "Speed report",
         "All demands",
         "Escalations",
         "Offer approvals",
